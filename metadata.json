@@ -1,0 +1,6 @@
+{
+  "name": "Controle de Diárias",
+  "description": "Sistema de controle de diárias para obras em português",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

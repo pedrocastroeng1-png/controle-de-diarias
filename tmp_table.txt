@@ -1,0 +1,88 @@
+      </div>
+
+      <div className="bg-white rounded-b-xl shadow-sm border border-gray-200 overflow-hidden w-full">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ferramenta</th>
+                {activeTab === 'emprestadas' && (
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Detalhes</th>
+                )}
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Ações</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {loading ? (
+                <tr><td colSpan={3} className="px-4 py-4 text-center text-sm text-gray-500">Carregando...</td></tr>
+              ) : activeTab === 'disponiveis' && ferramentas.length === 0 ? (
+                <tr><td colSpan={3} className="px-4 py-4 text-center text-sm text-gray-500">Nenhuma ferramenta disponível.</td></tr>
+              ) : activeTab === 'emprestadas' && emprestimos.length === 0 ? (
+                <tr><td colSpan={3} className="px-4 py-4 text-center text-sm text-gray-500">Nenhuma ferramenta emprestada.</td></tr>
+              ) : activeTab === 'disponiveis' ? (
+                ferramentas.map((f) => (
+                  <tr key={f.id}>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 flex-shrink-0">
+                           {imageUrls[f.id] ? (
+                             <img className="h-10 w-10 rounded-full object-cover" src={imageUrls[f.id]} alt="" />
+                           ) : (
+                             <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                               <Wrench className="h-5 w-5 text-gray-500" />
+                             </div>
+                           )}
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900">{f.nome}</div>
+                          <div className="text-xs text-gray-500">{f.codigo_interno} | {f.marca} {f.modelo}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                      <button onClick={() => openEmprestar(f)} className="text-blue-600 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg inline-flex items-center transition-colors">
+                        <Hand className="h-4 w-4 mr-1.5" /> Emprestar
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                emprestimos.map((emp) => (
+                  <tr key={emp.id}>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="h-10 w-10 flex-shrink-0">
+                           {emp.ferramenta?.foto_path ? (
+                             <img className="h-10 w-10 rounded-full object-cover" src={imageUrls[emp.ferramenta_id] || ''} alt="" />
+                           ) : (
+                             <div className="h-10 w-10 rounded-full bg-gray-100 flex items-center justify-center">
+                               <Wrench className="h-5 w-5 text-gray-500" />
+                             </div>
+                           )}
+                        </div>
+                        <div className="ml-3">
+                          <div className="text-sm font-medium text-gray-900">{emp.ferramenta?.nome}</div>
+                          <div className="text-xs text-gray-500">{emp.ferramenta?.codigo_interno}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">{emp.funcionario?.nome}</div>
+                      <div className="text-xs text-gray-500">{emp.obra?.nome}</div>
+                      <div className="text-xs text-gray-400 mt-1">{format(new Date(emp.data_emprestimo), 'dd/MM/yyyy HH:mm')}</div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium space-y-2">
+                      <button onClick={() => openDevolucao(emp)} className="w-full justify-center text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 px-3 py-1.5 rounded-lg inline-flex items-center transition-colors">
+                        <CornerDownLeft className="h-4 w-4 mr-1.5" /> Devolver
+                      </button>
+                      <button onClick={() => handleMarcarPerdida(emp.ferramenta_id)} className="w-full justify-center text-red-600 hover:text-red-900 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-lg inline-flex items-center transition-colors mt-1">
+                        <AlertTriangle className="h-4 w-4 mr-1.5" /> Perdida
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>

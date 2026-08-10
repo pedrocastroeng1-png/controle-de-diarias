@@ -1,0 +1,5 @@
+To apply the database changes for the new Communications module, you need to run the following SQL script in your Supabase SQL Editor. 
+
+You can find this file in the code editor at `/applet/database_updates.sql`.
+
+Copy and paste the entire content of `database_updates.sql` into the Supabase SQL Editor and execute it.

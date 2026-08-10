@@ -1,0 +1,8 @@
+◇ injected env (0) from .env // tip: ⌘ custom filepath { path: '/custom/path/.env' }
+{
+  "errors": [
+    {
+      "message": "pg_graphql extension is not enabled."
+    }
+  ]
+}
