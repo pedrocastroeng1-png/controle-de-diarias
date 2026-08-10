@@ -37,6 +37,7 @@ export interface Presenca {
   tipo_colaborador?: "DIARISTA" | "CLT";
   data: string;
   presente: boolean;
+  meia_diaria?: boolean;
   photo_path?: string | null;
   photo_taken_at?: string;
   photo_taken_by?: string;

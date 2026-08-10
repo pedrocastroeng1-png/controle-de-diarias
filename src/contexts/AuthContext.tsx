@@ -3,6 +3,7 @@ import { Usuario } from '../lib/types';
 import { api } from '../lib/api';
 import { supabase } from '../lib/supabase';
 import { setupPushNotifications } from '../lib/push';
+import { onMessageListener } from '../lib/firebase';
 import { Preferences } from '@capacitor/preferences';
 
 
@@ -19,6 +20,51 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [usuario, setUsuario] = useState<Usuario | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let unsubscribe: any = null;
+    try {
+      unsubscribe = onMessageListener((payload) => {
+        let title = 'Nova Notificação';
+        let body = 'Você tem uma nova mensagem.';
+        
+        if (payload.notification) {
+          title = payload.notification.title || title;
+          body = payload.notification.body || body;
+        } else if (payload.data && (payload.data.title || payload.data.message || payload.data.body)) {
+          title = payload.data.title || title;
+          body = payload.data.body || payload.data.message || body;
+        }
+        
+        // Se a tab está aberta, podemos mostrar um alerta customizado ou nativo
+        if (Notification.permission === 'granted') {
+          const notification = new Notification(title, {
+            body: body,
+            icon: '/logo.png',
+            data: payload.data
+          });
+          notification.onclick = (event) => {
+            event.preventDefault();
+            notification.close();
+            const data = payload.data || {};
+            let targetUrl = '/';
+            if (data.route) targetUrl = data.route;
+            else if (data.link) targetUrl = data.link;
+            else if (data.communication_id) targetUrl = '/admin/comunicacoes';
+            else if (data.presenca_id) targetUrl = '/admin/auditoria';
+            window.location.href = targetUrl;
+          };
+        } else {
+          alert(`${title}\n${body}`);
+        }
+      });
+    } catch (e) {
+      console.error('Error setting up foreground push listener:', e);
+    }
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     const initAuth = async () => {
@@ -86,6 +132,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const logout = () => {
+    // 0. Deactivate token
+    const token = localStorage.getItem('@diarias:push_token');
+    if (token) {
+      api.deactivatePushDevice(token).catch(e => console.error(e));
+      localStorage.removeItem('@diarias:push_token');
+    }
+
     // 1. Limpar estado local imediatamente (sem await) para feedback visual instantâneo
     setUsuario(null);
     localStorage.removeItem('@diarias:usuario');

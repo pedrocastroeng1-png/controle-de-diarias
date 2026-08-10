@@ -1,0 +1,6 @@
+0000000000000000000000000000000000000000 4ee84b0ad39a9e472ff01f9f6b9bc18996f75246 AI Studio Assistant <pedrocastroeng1@gmail.com> 1784296242 +0000	commit (initial): Release Version 2.0.0 - Stable Visual Redesign
+4ee84b0ad39a9e472ff01f9f6b9bc18996f75246 4ee84b0ad39a9e472ff01f9f6b9bc18996f75246 AI Studio Assistant <pedrocastroeng1@gmail.com> 1784296242 +0000	Branch: renamed refs/heads/master to refs/heads/main
+4ee84b0ad39a9e472ff01f9f6b9bc18996f75246 61b1634ae9f5d0f8cab27d68be3b668492cb7d45 AI Studio Assistant <pedrocastroeng1@gmail.com> 1784296482 +0000	commit: feat: Add bcrypt password hashing support
+61b1634ae9f5d0f8cab27d68be3b668492cb7d45 23b85b7acdf2860c8a10cf3f0e2cc6ea5fb849a3 AI Studio Assistant <pedrocastroeng1@gmail.com> 1784297229 +0000	commit: fix: Improve error handling for storage uploads to show exact Supabase error
+23b85b7acdf2860c8a10cf3f0e2cc6ea5fb849a3 177878fb404657476d1d8b07956d1520b0956280 AI Studio Assistant <pedrocastroeng1@gmail.com> 1784298040 +0000	commit: fix: Remove generate-icons.js from build process
+177878fb404657476d1d8b07956d1520b0956280 6f7357c4716fc5f5f947fa4e6d8fc4ffe8c57fc8 AI Studio Assistant <pedrocastroeng1@gmail.com> 1784300248 +0000	commit: feat: enable admin to use and edit attendance records

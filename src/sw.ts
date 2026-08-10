@@ -100,44 +100,73 @@ registerRoute(
 );
 
 // Web Push Notification Support
-self.addEventListener('push', (event) => {
-  let data = { title: 'Nova Comunicação', message: 'Você tem uma nova mensagem.' };
+self.addEventListener('push', (event: any) => {
+  let title = 'Nova Notificação';
+  let body = 'Você tem uma nova mensagem.';
+  let dataPayload: any = {};
   
   if (event.data) {
     try {
       const payload = event.data.json();
-      data = {
-        title: payload.title || data.title,
-        message: payload.body || payload.message || data.message
-      };
+      
+      // Handle standard FCM structure
+      if (payload.notification) {
+        title = payload.notification.title || title;
+        body = payload.notification.body || body;
+      } else if (payload.title || payload.body || payload.message) {
+        title = payload.title || title;
+        body = payload.body || payload.message || body;
+      }
+      
+      if (payload.data) {
+        dataPayload = payload.data;
+      }
     } catch (e) {
-      data.message = event.data.text();
+      body = event.data.text();
     }
   }
 
   event.waitUntil(
-    self.registration.showNotification(data.title, {
-      body: data.message,
+    self.registration.showNotification(title, {
+      body: body,
       icon: '/logo.png',
-      badge: '/logo.png'
+      badge: '/logo.png',
+      data: dataPayload
     })
   );
 });
 
-self.addEventListener('notificationclick', (event) => {
+self.addEventListener('notificationclick', (event: any) => {
   event.notification.close();
+  
   event.waitUntil(
-    self.clients.matchAll({ type: 'window' }).then(windowClients => {
-      // Check if there is already a window/tab open with the target URL
+    self.clients.matchAll({ type: 'window' }).then((windowClients: any) => {
+      let targetUrl = '/';
+      
+      if (event.notification.data) {
+        if (event.notification.data.route) {
+          targetUrl = event.notification.data.route;
+        } else if (event.notification.data.link) {
+          targetUrl = event.notification.data.link;
+        } else if (event.notification.data.communication_id) {
+          targetUrl = '/admin/comunicacoes';
+        } else if (event.notification.data.presenca_id) {
+          targetUrl = '/admin/auditoria';
+        }
+      }
+
+      // Check if there is already a window/tab open
       for (let i = 0; i < windowClients.length; i++) {
         let client = windowClients[i];
-        if (client.url.indexOf('/') !== -1 && 'focus' in client) {
+        if (client.url && 'focus' in client) {
+          client.navigate(targetUrl);
           return client.focus();
         }
       }
+      
       // If not, open a new window
       if (self.clients.openWindow) {
-        return self.clients.openWindow('/');
+        return self.clients.openWindow(targetUrl);
       }
     })
   );

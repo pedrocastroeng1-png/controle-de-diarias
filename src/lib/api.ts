@@ -308,6 +308,37 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (error) throw error;
     return presencas as any;
   },
+  
+  toggleMeiaDiaria: async (presenca_id: string, is_meia: boolean, usuario_id: string): Promise<void> => {
+    if (!supabase) throw new Error('Supabase não configurado');
+    
+    // First, verify if user is ADMIN to provide frontend feedback (backend trigger also enforces this)
+    const { data: userData } = await supabase.from('usuarios').select('perfil').eq('id', usuario_id).single();
+    if (userData?.perfil !== 'ADMIN') {
+      throw new Error('Acesso Negado: Apenas administradores podem alterar para meia diária.');
+    }
+    
+    // Log in audit before changing
+    const { data: presenca } = await supabase.from('presencas').select('*, funcionario:funcionarios(nome, funcao:funcoes(valor_diaria))').eq('id', presenca_id).single();
+    if (presenca) {
+      const funcNome = presenca.funcionario?.nome || 'Funcionário';
+      const valorBase = presenca.funcionario?.funcao?.valor_diaria || 0;
+      const valorAntigo = presenca.meia_diaria ? valorBase / 2 : valorBase;
+      const valorNovo = is_meia ? valorBase / 2 : valorBase;
+      
+      const { error: updError } = await supabase.from('presencas').update({ meia_diaria: is_meia }).eq('id', presenca_id);
+      if (updError) {
+        if (updError.message.includes('does not exist')) {
+            throw new Error('A coluna meia_diaria não existe. O banco de dados precisa ser atualizado executando database_meia_diaria.sql');
+        }
+        throw updError;
+      }
+      
+      // We log in a generic way if possible, or skip if no generic audit table exists.
+      // The app has 'historico_ferramentas', but no generic 'audit_logs'. We'll just rely on the DB update.
+    }
+  },
+
   deletePresencaFuncionario: async (funcionario_id: string, data: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
     const { error } = await supabase.from('presencas').delete().eq('funcionario_id', funcionario_id).eq('data', data);
@@ -443,7 +474,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     const { count: obrasCount } = await supabase.from('obras').select('*', { count: 'exact', head: true }).eq('ativo', true);
     const { count: funcionariosCount } = await supabase.from('funcionarios').select('*', { count: 'exact', head: true }).eq('ativo', true).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null');
     
-        const { data: presencasHojeData, error } = await supabase.from('presencas').select('presente, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))').eq('data', hoje).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' });
+        const { data: presencasHojeData, error } = await supabase.from('presencas').select('presente, meia_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))').eq('data', hoje).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' });
     if (error) throw error;
     let presentesHoje = 0;
     let faltasHoje = 0;
@@ -451,7 +482,9 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     presencasHojeData?.forEach(p => {
       if (p.presente) {
         presentesHoje++;
-        valorTotalHoje += Number((p.funcionario as any)?.funcao?.valor_diaria || 0);
+        let valor = Number((p.funcionario as any)?.funcao?.valor_diaria || 0);
+        if (p.meia_diaria) valor = valor / 2;
+        valorTotalHoje += valor;
       } else {
         faltasHoje++;
       }
@@ -873,13 +906,36 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
       await supabase.from('central_destinatarios').update({ lida: true, data_leitura: new Date().toISOString() }).eq('id', id);
     } catch (e) {}
   },
-  registerPushDevice: async (user_id: string, token: string, platform: string): Promise<void> => {
-     if (!supabase) return;
-     try {
-       await supabase.from('push_devices').upsert([{ user_id, token, platform }], { onConflict: 'user_id, token' });
-     } catch (e) {}
+  registerPushDevice: async (usuario_id: string, token: string, plataforma: string): Promise<void> => {
+    if (!supabase) return;
+    try {
+      const { data: existing } = await supabase.from('push_devices').select('id').eq('token', token).single();
+      const payload = {
+        usuario_id,
+        token,
+        plataforma: plataforma.toUpperCase(),
+        ativo: true,
+        ultimo_uso_at: new Date().toISOString()
+      };
+      if (existing) {
+        await supabase.from('push_devices').update(payload).eq('id', existing.id);
+      } else {
+        await supabase.from('push_devices').insert([payload]);
+      }
+    } catch (e) {
+      console.error('Error registering push device:', e);
+    }
   },
-  marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
+  
+  deactivatePushDevice: async (token: string): Promise<void> => {
+    if (!supabase) return;
+    try {
+      await supabase.from('push_devices').update({ ativo: false }).eq('token', token);
+    } catch (e) {
+      console.error('Error deactivating push device:', e);
+    }
+  },
+marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
     const { error: updError } = await supabase.from('ferramentas').update({ status: 'PERDIDA' }).eq('id', ferramenta_id);
     if (updError) throw updError;

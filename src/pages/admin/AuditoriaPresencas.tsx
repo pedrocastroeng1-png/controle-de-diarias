@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { api } from '../../lib/api';
 import { Funcionario, Presenca } from '../../lib/types';
-import { Search, Loader2, Camera, Calendar, Clock, User, CheckCircle2, ChevronDown } from 'lucide-react';
+import { Search, Loader2, Camera, Calendar, Clock, User, CheckCircle2, ChevronDown, DollarSign } from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function AuditoriaPresencas() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
@@ -24,6 +25,8 @@ export default function AuditoriaPresencas() {
   const [loading, setLoading] = useState(false);
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [togglingMeiaDiaria, setTogglingMeiaDiaria] = useState(false);
+  const { user } = useAuth();
   const [selectedPresenca, setSelectedPresenca] = useState<Presenca | null>(null);
   
   const [registrationPhotoUrl, setRegistrationPhotoUrl] = useState<string>('');
@@ -32,6 +35,38 @@ export default function AuditoriaPresencas() {
   useEffect(() => {
     loadFuncionarios();
   }, []);
+
+
+  const handleToggleMeiaDiaria = async (presenca: Presenca) => {
+    if (!user) return;
+    const isMeia = presenca.meia_diaria;
+    const actionText = isMeia ? 'reverter meia diária para diária normal' : 'transformar em meia diária';
+    const funcRate = presenca.funcionario?.funcao?.valor_diaria || 0;
+    const newRate = isMeia ? funcRate : funcRate / 2;
+    
+    if (!window.confirm(`Confirmar ${actionText}?
+
+O valor desta diária será ajustado para ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(newRate)}.`)) {
+      return;
+    }
+    
+    try {
+      setTogglingMeiaDiaria(true);
+      await api.toggleMeiaDiaria(presenca.id, !isMeia, user.id);
+      
+      // Update local state
+      const updatedPresencas = presencas.map(p => 
+        p.id === presenca.id ? { ...p, meia_diaria: !isMeia } : p
+      );
+      setPresencas(updatedPresencas);
+      setSelectedPresenca({ ...presenca, meia_diaria: !isMeia });
+      alert('Operação realizada com sucesso!');
+    } catch (err: any) {
+      alert(`Erro ao alterar meia diária: ${err.message}`);
+    } finally {
+      setTogglingMeiaDiaria(false);
+    }
+  };
 
   async function loadFuncionarios() {
     try {

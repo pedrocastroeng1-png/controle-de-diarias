@@ -122,9 +122,14 @@ export default function Relatorios() {
             total: 0
           };
         }
+        // Use row's valor_diaria to support different rates (like Meia Diária)
+        const rowValor = Number(p.valor_diaria) || 0;
         if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO') {
           agrupado[fId].dias += 1;
-          agrupado[fId].total += agrupado[fId].valorDiaria;
+          agrupado[fId].total += rowValor;
+        } else if (p.status === 'MEIA DIÁRIA') {
+          agrupado[fId].dias += 1;
+          agrupado[fId].total += rowValor;
         } else if (p.status === 'FALTOU') {
           agrupado[fId].faltas += 1;
         }

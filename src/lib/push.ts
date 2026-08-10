@@ -35,38 +35,42 @@ export async function setupPushNotifications(userId: string) {
       console.log('Push action performed: ', notification);
     });
   } else {
-    // Web Push (PWA)
+    // Web Push (PWA) using Firebase Cloud Messaging
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       console.log('Web Push not supported');
       return;
     }
-
     try {
       const permission = await Notification.requestPermission();
       if (permission !== 'granted') {
         console.log('Web Push permission denied');
         return;
       }
-
+      
       const registration = await navigator.serviceWorker.ready;
       
-      // We would need a VAPID public key from the backend to subscribe
-      // For now, we will just try to get an existing subscription or mock it
-      // since the prompt says "Prepare support for... The architecture should already be designed with this future expansion in mind."
+      const { initFirebase } = await import('./firebase');
+      const { getMessaging, getToken } = await import('firebase/messaging');
+      const { messaging } = initFirebase();
       
-      const VAPID_PUBLIC_KEY = process.env.VITE_VAPID_PUBLIC_KEY || 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U'; 
+      if (!messaging) {
+        console.log('Firebase messaging not initialized (missing config)');
+        return;
+      }
       
-      const subscription = await registration.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlB64ToUint8Array(VAPID_PUBLIC_KEY)
+      const token = await getToken(messaging, {
+        vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
+        serviceWorkerRegistration: registration
       });
       
-      console.log('Web Push subscription successful:', subscription);
-      // We send the endpoint/keys as a JSON string for the token
-      api.registerPushDevice(userId, JSON.stringify(subscription), 'web');
-
+      if (token) {
+        console.log('Web Push subscription successful with FCM token');
+        await api.registerPushDevice(userId, token, 'WEB');
+        localStorage.setItem('@diarias:push_token', token);
+      }
+      
     } catch (e) {
-      console.error('Error subscribing to Web Push', e);
+      console.error('Error subscribing to Web Push via FCM', e);
     }
   }
 }
