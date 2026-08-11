@@ -47,7 +47,14 @@ export async function setupPushNotifications(userId: string) {
         return;
       }
       
-      const registration = await navigator.serviceWorker.ready;
+      let registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        console.log('Registering service worker manually...');
+        registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
+      }
+      
+      registration = await navigator.serviceWorker.ready;
+      console.log('Service worker is ready.');
       
       const { initFirebase } = await import('./firebase');
       const { getMessaging, getToken } = await import('firebase/messaging');
@@ -58,15 +65,20 @@ export async function setupPushNotifications(userId: string) {
         return;
       }
       
+      console.log('VAPID Key available:', !!import.meta.env.VITE_FIREBASE_VAPID_KEY);
+      
       const token = await getToken(messaging, {
         vapidKey: import.meta.env.VITE_FIREBASE_VAPID_KEY,
         serviceWorkerRegistration: registration
       });
       
       if (token) {
-        console.log('Web Push subscription successful with FCM token');
+        console.log(`FCM token generated: true`);
         await api.registerPushDevice(userId, token, 'WEB');
         localStorage.setItem('@diarias:push_token', token);
+      } else {
+        console.log(`FCM token generated: false`);
+        throw new Error('FCM token was not generated');
       }
       
     } catch (e) {
