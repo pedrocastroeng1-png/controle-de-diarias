@@ -13,6 +13,12 @@ export function PushDiagnostic() {
     swScope: string;
     swState: string;
     swCount: number;
+    envApiKey: string;
+    envAuthDomain: string;
+    envProjectId: string;
+    envStorage: string;
+    envSenderId: string;
+    envAppId: string;
     vapid: string;
     firebaseInit: string;
     firebaseError: string;
@@ -38,6 +44,12 @@ export function PushDiagnostic() {
       swScope: '-',
       swState: '-',
       swCount: 0,
+      envApiKey: 'MISSING',
+      envAuthDomain: 'MISSING',
+      envProjectId: 'MISSING',
+      envStorage: 'MISSING',
+      envSenderId: 'MISSING',
+      envAppId: 'MISSING',
       vapid: 'MISSING',
       firebaseInit: 'PENDING',
       firebaseError: '',
@@ -74,7 +86,13 @@ export function PushDiagnostic() {
         }
       }
 
-      // 3. VAPID
+      // 3. Env Vars
+      res.envApiKey = import.meta.env.VITE_FIREBASE_API_KEY ? 'PRESENT' : 'MISSING';
+      res.envAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? 'PRESENT' : 'MISSING';
+      res.envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID ? 'PRESENT' : 'MISSING';
+      res.envStorage = import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ? 'PRESENT' : 'MISSING';
+      res.envSenderId = import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ? 'PRESENT' : 'MISSING';
+      res.envAppId = import.meta.env.VITE_FIREBASE_APP_ID ? 'PRESENT' : 'MISSING';
       res.vapid = import.meta.env.VITE_FIREBASE_VAPID_KEY ? 'CONFIGURED' : 'MISSING';
 
       // 4. Firebase Init
@@ -177,7 +195,13 @@ export function PushDiagnostic() {
           </Section>
 
           <Section title="Firebase">
-            <Row label="VAPID" value={results.vapid} highlight={results.vapid !== 'CONFIGURED'} />
+            <Row label="VITE_FIREBASE_API_KEY" value={results.envApiKey} highlight={results.envApiKey !== 'PRESENT'} />
+            <Row label="VITE_FIREBASE_AUTH_DOMAIN" value={results.envAuthDomain} highlight={results.envAuthDomain !== 'PRESENT'} />
+            <Row label="VITE_FIREBASE_PROJECT_ID" value={results.envProjectId} highlight={results.envProjectId !== 'PRESENT'} />
+            <Row label="VITE_FIREBASE_STORAGE_BUCKET" value={results.envStorage} highlight={results.envStorage !== 'PRESENT'} />
+            <Row label="VITE_FIREBASE_MESSAGING_SENDER_ID" value={results.envSenderId} highlight={results.envSenderId !== 'PRESENT'} />
+            <Row label="VITE_FIREBASE_APP_ID" value={results.envAppId} highlight={results.envAppId !== 'PRESENT'} />
+            <Row label="VITE_FIREBASE_VAPID_KEY" value={results.vapid} highlight={results.vapid !== 'CONFIGURED'} />
             <Row label="Firebase Init" value={results.firebaseInit} highlight={results.firebaseInit !== 'OK'} />
             {results.firebaseError && <Row label="Firebase Error" value={results.firebaseError} isError />}
             <Row label="getMessaging()" value={results.messagingInit} highlight={results.messagingInit !== 'OK'} />

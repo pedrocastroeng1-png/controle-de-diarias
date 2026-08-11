@@ -949,38 +949,27 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
       await supabase.from('communication_recipients').update({ read_at: new Date().toISOString() }).eq('id', id);
     } catch (e) {}
   },
-  registerPushDevice: async (usuario_id: string, token: string, plataforma: string): Promise<void> => {
+  registerPushDevice: async (usuario_id: string, token: string, plataforma: string, dispositivo_id?: string): Promise<void> => {
     if (!supabase) return;
     try {
-      const { data: existing, error: queryError } = await supabase.from('push_devices').select('id').eq('token', token).maybeSingle();
-      if (queryError) {
-        console.error('Push device query failed', { code: queryError.code, message: queryError.message, details: queryError.details, hint: queryError.hint });
-        throw queryError;
-      }
-      
-      const payload = {
-        usuario_id,
-        token,
-        plataforma: plataforma.toUpperCase(),
-        ativo: true,
-        ultimo_uso_at: new Date().toISOString()
-      };
-      
-      if (existing) {
-        const { error: updateError } = await supabase.from('push_devices').update(payload).eq('id', existing.id);
-        if (updateError) {
-           console.error('Push device update failed', { code: updateError.code, message: updateError.message, details: updateError.details, hint: updateError.hint });
-           throw updateError;
-        }
-      } else {
-        const { error: insertError } = await supabase.from('push_devices').insert([payload]);
-        if (insertError) {
-           console.error('Push device insert failed', { code: insertError.code, message: insertError.message, details: insertError.details, hint: insertError.hint });
-           throw insertError;
-        }
+      const { error } = await supabase.rpc('registrar_push_device', {
+        p_usuario_id: usuario_id,
+        p_token: token,
+        p_plataforma: plataforma.toUpperCase(),
+        p_dispositivo_id: dispositivo_id ?? null
+      });
+
+      if (error) {
+        console.error('Push device registration failed', {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw error;
       }
     } catch (e) {
-      console.error('Error registering push device:', e);
+      console.error('Error registering push device (catch block):', e);
       throw e;
     }
   },
