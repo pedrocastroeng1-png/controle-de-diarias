@@ -357,10 +357,18 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
 
   salvarPresencas: async (presencas: Array<any>): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await supabase
+    if (!presencas || presencas.length === 0) return;
+    
+    const { data, error } = await supabase
       .from('presencas')
-      .upsert(presencas, { onConflict: 'funcionario_id,data' });
+      .upsert(presencas, { onConflict: 'funcionario_id,data' })
+      .select();
+      
     if (error) throw error;
+    
+    if (!data || data.length === 0) {
+      throw new Error('A operação falhou silenciosamente: nenhum registro foi salvo. Verifique as permissões de acesso ou restrições do banco de dados.');
+    }
   },
 
   getRelatorio: async (dataInicial?: string, dataFinal?: string, obraId?: string): Promise<any[]> => {
