@@ -12,7 +12,7 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   
-  const { login } = useAuth();
+  const { login, usuario: authUsuario, loading: authLoading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -21,6 +21,16 @@ export default function Login() {
       setShowWhatsNew(true);
     }
   }, []);
+
+  useEffect(() => {
+    if (!authLoading && authUsuario) {
+      if (authUsuario.perfil === 'ADMIN') {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/operador/presenca', { replace: true });
+      }
+    }
+  }, [authLoading, authUsuario, navigate]);
 
   const handleContinueWhatsNew = () => {
     localStorage.setItem('@diarias:whatsNewViewedVersion', version);
@@ -49,6 +59,15 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+        <p className="text-gray-500 font-medium animate-pulse">Carregando sessão...</p>
+      </div>
+    );
+  }
 
   if (showWhatsNew) {
     return <WhatsNewScreen onContinue={handleContinueWhatsNew} />;

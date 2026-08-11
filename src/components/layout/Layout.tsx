@@ -12,12 +12,15 @@ import { version } from '../../config/appVersion';
 import { format } from 'date-fns';
 
 export function AdminLayout() {
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, loading } = useAuth();
   const location = useLocation();
 
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  }
+
   if (!usuario) {
-    window.location.href = '/login';
-    return null;
+    return <Navigate to="/login" replace />;
   }
   
   if (usuario.perfil !== 'ADMIN') {
@@ -107,7 +110,7 @@ export function AdminLayout() {
 }
 
 export function OperadorLayout() {
-  const { usuario, logout } = useAuth();
+  const { usuario, logout, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -118,6 +121,8 @@ export function OperadorLayout() {
   const [checkingPresenca, setCheckingPresenca] = useState(true);
 
   useEffect(() => {
+    if (loading) return;
+    
     if (usuario && usuario.perfil === 'OPERADOR') {
       const hoje = format(new Date(), 'yyyy-MM-dd');
       
@@ -140,19 +145,24 @@ export function OperadorLayout() {
       setLoadingComms(false);
       setCheckingPresenca(false);
     }
-  }, [usuario]);
+  }, [usuario, loading]);
 
   useEffect(() => {
+    if (loading) return;
+    
     if (!checkingPresenca) {
       if (!presencaHojeConcluida && location.pathname !== '/operador/presenca') {
         navigate('/operador/presenca', { replace: true });
       }
     }
-  }, [checkingPresenca, presencaHojeConcluida, location.pathname, navigate]);
+  }, [checkingPresenca, presencaHojeConcluida, location.pathname, navigate, loading]);
+  
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
+  }
 
   if (!usuario) {
-    window.location.href = '/login';
-    return null;
+    return <Navigate to="/login" replace />;
   }
   
   if (usuario.perfil === 'ADMIN' && location.pathname.startsWith('/operador')) {
