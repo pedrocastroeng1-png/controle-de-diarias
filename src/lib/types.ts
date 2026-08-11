@@ -66,6 +66,9 @@ export interface RelatorioPresenca {
   funcionario: string;
   funcao: string;
   valor_diaria: number;
+  tipo_diaria: string;
+  percentual_diaria: number;
+  valor_calculado: number;
   obra: string;
 }
 

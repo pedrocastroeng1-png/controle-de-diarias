@@ -18,10 +18,11 @@ export default function Relatorios() {
   const [dataInicial, setDataInicial] = useState('');
   const [dataFinal, setDataFinal] = useState('');
   
-  const [relatorio, setRelatorio] = useState<Presenca[]>([]);
+  const [relatorio, setRelatorio] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [visaoDetalhada, setVisaoDetalhada] = useState(false);
 
   useEffect(() => {
     loadObras();
@@ -131,12 +132,12 @@ export default function Relatorios() {
             total: 0
           };
         }
-        // Use row's valor_diaria to support different rates (like Meia Diária)
-        const rowValor = Number(p.valor_diaria) || 0;
-        if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO') {
-          agrupado[fId].dias += 1;
-          agrupado[fId].total += rowValor;
-        } else if (p.status === 'MEIA DIÁRIA') {
+        
+        // Use row's valor_calculado for the exact amount (fallback to valor_diaria if old record)
+        const rowValor = Number(p.valor_calculado) || Number(p.valor_diaria) || 0;
+        
+        if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO' || p.status === 'MEIA_DIARIA' || p.tipo_diaria === 'MEIA_DIARIA') {
+          // If it's half day, we count as 1 presence but total will be 50%
           agrupado[fId].dias += 1;
           agrupado[fId].total += rowValor;
         } else if (p.status === 'FALTOU') {
@@ -266,7 +267,9 @@ export default function Relatorios() {
       if (!obrasGroup[obraName]) obrasGroup[obraName] = [];
       obrasGroup[obraName].push(p);
       
-      if (p.status === 'PRESENTE') totalPresentes++;
+      if (p.status === 'PRESENTE' && p.tipo_diaria === 'MEIA_DIARIA') totalPresentes += 0.5;
+      else if (p.status === 'PRESENTE') totalPresentes += 1;
+      else if (p.status === 'MEIA DIÁRIA') totalPresentes += 0.5;
       else if (p.status === 'FALTOU') totalFaltas++;
     });
 
@@ -292,14 +295,13 @@ export default function Relatorios() {
           doc.addPage();
           currentY = 20;
         }
-        const status = f.status === 'PRESENTE' ? '✅' : '❌';
-        // jsPDF doesn't support emojis well in standard fonts, so we'll use text or a simple symbol
-        // For '✅' and '❌' we can just use '[P]' and '[F]' or text, but user requested '✅' and '❌'.
-        // Wait, standard jsPDF won't render emojis properly, it renders ??.
-        // I will use text Presente / Falta if emoji fails, but let's try to pass the emoji and see. Or maybe better:
-        // For PDF, let's use standard strings: 'P' and 'F' or full text. The request showed: '✅ Alef Santos Rodrigues'
-        // I'll try to just include it, if it breaks it breaks, but usually jsPDF with autoTable works with some characters. Wait, we are writing directly with text().
-        doc.text(`[${f.status === 'PRESENTE' ? ' P ' : ' F '}] ${f.funcionario_nome || f.funcionario}`, 14, currentY);
+        let marker = ' F ';
+        if (f.status === 'ATESTADO MÉDICO') marker = '🩺 Atestado';
+        else if (f.status === 'PRESENTE' && f.tipo_diaria === 'MEIA_DIARIA') marker = '🌗 Meia Diária';
+        else if (f.status === 'MEIA DIÁRIA') marker = '🌗 Meia Diária';
+        else if (f.status === 'PRESENTE') marker = ' P ';
+        
+        doc.text(`[${marker}] ${f.funcionario_nome || f.funcionario}`, 14, currentY);
         currentY += 7;
       });
       currentY += 5;
@@ -314,7 +316,7 @@ export default function Relatorios() {
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
     doc.text(`Total de Funcionários: ${dailyData.length}`, 14, currentY);
-    doc.text(`Presentes: ${totalPresentes}`, 14, currentY + 7);
+    doc.text(`Presentes (Diárias): ${totalPresentes}`, 14, currentY + 7);
     doc.text(`Faltas: ${totalFaltas}`, 14, currentY + 14);
 
     doc.setFont("helvetica", "normal");
@@ -342,24 +344,35 @@ export default function Relatorios() {
         { header: 'Funcionário', key: 'funcionario', width: 30 },
         { header: 'Função', key: 'funcao', width: 20 },
         { header: 'Obra', key: 'obra', width: 20 },
-        { header: 'Valor da Diária', key: 'valor', width: 15 },
         { header: 'Data', key: 'data', width: 15 },
-        { header: 'Status', key: 'status', width: 15 }
+        { header: 'Status', key: 'status', width: 20 },
+        { header: 'Tipo da Diária', key: 'tipo_diaria', width: 15 },
+        { header: 'Percentual', key: 'percentual', width: 15 },
+        { header: 'Valor da Diária', key: 'valor_base', width: 15 },
+        { header: 'Valor Calculado', key: 'valor', width: 15 }
       ];
 
       const relatorioOrdenado = [...relatorio].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
       
       relatorioOrdenado.forEach((p) => {
         const funcName = p.funcionario_nome || p.funcionario || '';
-        const isPresente = p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO';
+        let pStatus = '✘ Faltou';
+        if (p.status === 'ATESTADO MÉDICO') pStatus = '🩺 Atestado Médico';
+        else if (p.status === 'PRESENTE' && p.tipo_diaria === 'MEIA_DIARIA') pStatus = '🌗 Meia Diária';
+        else if (p.status === 'MEIA DIÁRIA') pStatus = '🌗 Meia Diária';
+        else if (p.status === 'PRESENTE') pStatus = '✔ Presente';
+        
         wsBD.addRow({
           helper: '', 
           funcionario: funcName,
           funcao: p.funcao || '',
           obra: p.obra_nome || p.obra || '',
-          valor: p.valor_diaria || p.valorDiaria || 0,
           data: p.data ? format(parseISO(p.data), 'dd/MM/yyyy') : '',
-          status: p.status === 'ATESTADO MÉDICO' ? '🩺 Atestado Médico' : (p.status === 'PRESENTE' ? '✔ Presente' : '✘ Faltou')
+          status: pStatus,
+          tipo_diaria: p.tipo_diaria === 'MEIA_DIARIA' ? 'Meia Diária' : 'Diária',
+          percentual: (p.percentual_diaria || (p.tipo_diaria === 'MEIA_DIARIA' ? 50 : 100)) + '%',
+          valor_base: Number(p.valor_diaria) || Number(p.valorDiaria) || 0,
+          valor: Number(p.valor_calculado) || Number(p.valor_diaria) || Number(p.valorDiaria) || 0
         });
       });
       
@@ -678,6 +691,18 @@ const handlePrint = () => {
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
+                onClick={() => setVisaoDetalhada(!visaoDetalhada)}
+                className={`flex items-center px-4 py-2 border rounded-lg shadow-sm text-sm font-medium focus:outline-none transition-colors ${
+                  visaoDetalhada 
+                    ? 'border-indigo-200 text-indigo-700 bg-indigo-50 hover:bg-indigo-100' 
+                    : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                }`}
+              >
+                <TableIcon className="h-4 w-4 mr-2" /> 
+                {visaoDetalhada ? 'Visão Agrupada' : 'Visão Detalhada'}
+              </button>
+              <button
+                type="button"
                 onClick={handlePrint}
                 className="flex items-center px-4 py-2 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none transition-colors"
               >
@@ -721,60 +746,129 @@ const handlePrint = () => {
             {erro && (<div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg">{erro}</div>)}
             
         <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Funcionário
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Função
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Obra
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor da Diária
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Dias Trabalhados
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total Recebido
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {relatorioAgrupado.length === 0 ? (
+            {visaoDetalhada ? (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                     <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">
-                       Nenhum registro encontrado para este período.
-                     </td>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Funcionário</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Obra</th>
+                    <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Tipo da Diária</th>
+                    <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Percentual</th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor da Diária</th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Calculado</th>
                   </tr>
-                ) : relatorioAgrupado.map((item, idx) => (
-                  <tr key={idx} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {item.nome}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.funcao}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.obra}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valorDiaria)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center font-medium">
-                      {item.dias}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
-                    </td>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {relatorio.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="px-6 py-8 text-center text-sm text-gray-500">
+                        Nenhum registro encontrado para este período.
+                      </td>
+                    </tr>
+                  ) : [...relatorio].sort((a,b) => new Date(b.data).getTime() - new Date(a.data).getTime() || (a.funcionario_nome || a.funcionario || '').localeCompare(b.funcionario_nome || b.funcionario || '')).filter(p => (p.funcionario_nome || p.funcionario || '').toLowerCase().includes(searchTerm.toLowerCase())).map((p: any, idx) => {
+                    let pStatus = 'Faltou';
+                    let statusClass = 'bg-red-100 text-red-800';
+                    if (p.status === 'ATESTADO MÉDICO') { pStatus = 'Atestado Médico'; statusClass = 'bg-blue-100 text-blue-800'; }
+                    else if (p.status === 'PRESENTE') { pStatus = 'Presente'; statusClass = 'bg-green-100 text-green-800'; }
+                    else if (p.status === 'MEIA DIÁRIA') { pStatus = 'Presente'; statusClass = 'bg-green-100 text-green-800'; }
+                    
+                    const tipoDiaria = p.tipo_diaria === 'MEIA_DIARIA' || p.status === 'MEIA DIÁRIA' ? 'MEIA DIÁRIA' : 'DIÁRIA';
+                    const percent = p.percentual_diaria || (tipoDiaria === 'MEIA DIÁRIA' ? 50 : 100);
+                    const vBase = Number(p.valor_diaria) || Number(p.valorDiaria) || 0;
+                    const vCalc = Number(p.valor_calculado) || vBase;
+
+                    return (
+                      <tr key={idx} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {p.data ? format(parseISO(p.data), 'dd/MM/yyyy') : ''}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {p.funcionario_nome || p.funcionario}
+                          <div className="text-xs text-gray-500">{p.funcao}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {p.obra_nome || p.obra || 'Sem obra'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-center">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusClass}`}>
+                            {pStatus}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                          {p.status === 'FALTOU' ? '-' : tipoDiaria}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                          {p.status === 'FALTOU' ? '-' : `${percent}%`}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                          {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(vBase)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
+                          {p.status === 'FALTOU' ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(vCalc)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            ) : (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Funcionário
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Função
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Obra
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Valor da Diária
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dias Trabalhados
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total Recebido
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {relatorioAgrupado.length === 0 ? (
+                    <tr>
+                       <td colSpan={6} className="px-6 py-8 text-center text-sm text-gray-500">
+                         Nenhum registro encontrado para este período.
+                       </td>
+                    </tr>
+                  ) : relatorioAgrupado.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {item.nome}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.funcao}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.obra}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valorDiaria)}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center font-medium">
+                        {item.dias}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
           
           {relatorioAgrupado.length > 0 && (

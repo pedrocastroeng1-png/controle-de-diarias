@@ -26,7 +26,7 @@ export default function AuditoriaPresencas() {
   const [loadingInitial, setLoadingInitial] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
   const [togglingMeiaDiaria, setTogglingMeiaDiaria] = useState(false);
-  const { user } = useAuth();
+  const { usuario } = useAuth();
   const [selectedPresenca, setSelectedPresenca] = useState<Presenca | null>(null);
   
   const [registrationPhotoUrl, setRegistrationPhotoUrl] = useState<string>('');
@@ -36,9 +36,8 @@ export default function AuditoriaPresencas() {
     loadFuncionarios();
   }, []);
 
-
   const handleToggleMeiaDiaria = async (presenca: Presenca) => {
-    if (!user) return;
+    if (!usuario) return;
     const isMeia = presenca.tipo_diaria === 'MEIA_DIARIA';
     const actionText = isMeia ? 'reverter meia diária para diária normal' : 'transformar em meia diária';
     const funcRate = presenca.funcionario?.funcao?.valor_diaria || 0;
@@ -52,7 +51,7 @@ O valor desta diária será ajustado para ${new Intl.NumberFormat('pt-BR', { sty
     
     try {
       setTogglingMeiaDiaria(true);
-      await api.toggleMeiaDiaria(presenca.id, !isMeia, user.id);
+      await api.toggleMeiaDiaria(presenca.id, !isMeia, usuario.id);
       
       // Update local state
       const updatedPresencas = presencas.map(p => 
@@ -310,12 +309,28 @@ O valor desta diária será ajustado para ${new Intl.NumberFormat('pt-BR', { sty
                               </p>
                             </div>
                           </div>
-                          <button
-                            onClick={() => openModal(p)}
-                            className="px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                          >
-                            Ver Foto
-                          </button>
+                          <div className="flex items-center gap-2">
+                            {p.presente && p.funcionario?.tipo_colaborador === 'DIARISTA' && (
+                              <button
+                                onClick={() => handleToggleMeiaDiaria(p)}
+                                disabled={togglingMeiaDiaria}
+                                className={`px-3 py-2 border text-sm font-medium rounded-lg flex items-center gap-1 transition-colors disabled:opacity-50 ${
+                                  p.tipo_diaria === 'MEIA_DIARIA' 
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200 hover:bg-amber-100' 
+                                    : 'border-gray-200 text-gray-700 hover:bg-gray-100'
+                                }`}
+                              >
+                                <DollarSign className="w-4 h-4" />
+                                {p.tipo_diaria === 'MEIA_DIARIA' ? 'Reverter para Diária' : 'Transformar em Meia'}
+                              </button>
+                            )}
+                            <button
+                              onClick={() => openModal(p)}
+                              className="px-4 py-2 border border-gray-200 text-sm font-medium rounded-lg text-gray-700 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                              Ver Foto
+                            </button>
+                          </div>
                         </div>
                       </li>
                     );
