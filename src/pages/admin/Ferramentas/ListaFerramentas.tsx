@@ -81,7 +81,7 @@ export default function ListaFerramentas() {
 
     try {
       setSaving(true);
-      const data = {
+      const data: any = {
         codigo_interno: codigoInterno,
         nome,
         marca,
@@ -89,10 +89,21 @@ export default function ListaFerramentas() {
         observacoes,
       };
 
+      if (removeFoto) {
+        data.foto_path = null;
+      } else if (foto) {
+        const fileExt = foto.name.split('.').pop();
+        const fileName = `${Math.random()}.${fileExt}`;
+        const filePath = await api.uploadPhoto('ferramentas-fotos', foto, fileName);
+        if (filePath) {
+           data.foto_path = filePath;
+        }
+      }
+
       if (editId) {
-        await api.updateFerramenta(editId, data, foto, removeFoto, usuario!.id);
+        await api.updateFerramenta(editId, data, usuario!.id);
       } else {
-        await api.createFerramenta(data, foto, usuario!.id);
+        await api.createFerramenta(data, usuario!.id);
       }
       
       setShowModal(false);
@@ -108,7 +119,7 @@ export default function ListaFerramentas() {
     if (confirm(`Deseja ${f.status === 'INATIVA' ? 'reativar' : 'inativar'} esta ferramenta?`)) {
       try {
         if (f.status === 'INATIVA') {
-          await api.updateFerramenta(f.id, { status: 'ATIVA' }, null, false, usuario!.id);
+          await api.updateFerramenta(f.id, { status: 'ATIVA' }, usuario!.id);
         } else {
           await api.inativarFerramenta(f.id, 'Inativada pelo usuário', usuario!.id);
         }

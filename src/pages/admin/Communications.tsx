@@ -1,3 +1,4 @@
+import { supabase } from '../../lib/supabase';
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Communication, Usuario } from '../../lib/types';
@@ -109,7 +110,7 @@ export default function Communications() {
         priority: form.priority,
         expiration_date: form.expiration_date || null,
         target_audience: form.target_audience,
-        target_operator_id: form.target_audience === 'SPECIFIC' ? form.target_operator_id : null,
+        target_operator_id: form.target_audience === 'OPERATOR' ? form.target_operator_id : null,
         is_active: form.is_active,
         created_by: usuario?.id
       };
@@ -126,6 +127,9 @@ export default function Communications() {
       } else {
         const created = await api.createCommunication(payload);
         commId = created.id;
+        if (payload.target_audience === 'OPERATOR' && payload.target_operator_id) {
+           await api.createCommunicationRecipient(commId, payload.target_operator_id);
+        }
       }
 
       // Handle file uploads
@@ -143,6 +147,22 @@ export default function Communications() {
             file_type: file.type || 'application/octet-stream'
           });
         }
+      }
+
+      if (!editingId && commId && usuario?.id) {
+         try {
+           const { error: rpcError } = await supabase.rpc('request_communication_push', {
+             p_communication_id: commId,
+             p_usuario_id: usuario.id
+           });
+           if (rpcError) {
+             console.error("RPC Push error:", rpcError);
+             alert('Comunicação salva, mas falha ao despachar notificação Push.');
+           }
+         } catch (e) {
+           console.error("RPC Push exception:", e);
+           alert('Comunicação salva, mas falha ao despachar notificação Push.');
+         }
       }
 
       setModalOpen(false);
@@ -267,6 +287,15 @@ export default function Communications() {
                       
                       <div className="flex items-center flex-wrap gap-4 mt-2 text-xs text-gray-500">
                         <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/> Criado em {format(parseISO(c.created_at), 'dd/MM/yyyy')}</span>
+                        {c.push_dispatch_status && (
+                          <span className={`flex items-center font-semibold ${c.push_dispatch_status === 'FAILED' ? 'text-red-500' : 'text-blue-600'}`}>
+                            {c.push_dispatch_status === 'QUEUED' && 'Push na fila...'}
+                            {c.push_dispatch_status === 'SENDING' && 'Enviando...'}
+                            {c.push_dispatch_status === 'SENT' && 'Push enviado'}
+                            {c.push_dispatch_status === 'PARTIAL' && 'Push parcialmente enviado'}
+                            {c.push_dispatch_status === 'FAILED' && 'Falha no Push'}
+                          </span>
+                        )}
                         <span className="flex items-center">
                           <Users className="w-3 h-3 mr-1"/> 
                           {c.target_audience === 'ALL' ? 'Todos os Operadores' : (c.target_operator ? (c.target_operator as any).usuario : 'Operador Específico')}
@@ -389,11 +418,11 @@ export default function Communications() {
                           className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md disabled:bg-gray-100"
                         >
                           <option value="ALL">Todos os Operadores</option>
-                          <option value="SPECIFIC">Operador Específico</option>
+                          <option value="OPERATOR">Operador Específico</option>
                         </select>
                       </div>
 
-                      {form.target_audience === 'SPECIFIC' && (
+                      {form.target_audience === 'OPERATOR' && (
                         <div>
                           <label className="block text-sm font-medium text-gray-700">Operador</label>
                           <select

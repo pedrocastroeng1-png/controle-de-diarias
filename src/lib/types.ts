@@ -37,7 +37,7 @@ export interface Presenca {
   tipo_colaborador?: "DIARISTA" | "CLT";
   data: string;
   presente: boolean;
-  meia_diaria?: boolean;
+  tipo_diaria?: string;
   photo_path?: string | null;
   photo_taken_at?: string;
   photo_taken_by?: string;
@@ -70,7 +70,7 @@ export interface RelatorioPresenca {
 }
 
 
-export type TargetAudience = 'ALL' | 'SPECIFIC';
+export type TargetAudience = 'ALL' | 'OPERATOR';
 export type Priority = 'NORMAL' | 'URGENT';
 export type CommunicationType = 'INFO' | 'ATTENTION' | 'URGENT' | 'EMPLOYEE' | 'WORKSITE' | 'MATERIAL' | 'MEDICAL_CERTIFICATE';
 

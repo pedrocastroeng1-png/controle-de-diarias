@@ -21,35 +21,48 @@ export const api = {
     const now = new Date();
     const today = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
     
-    // Get all mandatory communications that are active, not expired, and target this operator or ALL
+    // Get all active communications
     const { data: comms, error: commsError } = await supabase
       .from('communications')
       .select('*, creator:usuarios!created_by(id, usuario), attachments:communication_attachments(*)')
       .eq('is_active', true);
       
     if (commsError) throw commsError;
+
+    // Get all recipient records for this operator
+    const commIds = (comms || []).map(c => c.id);
+    let reads: any[] = [];
+    if (commIds.length > 0) {
+      const { data, error: readsError } = await supabase
+        .from('communication_recipients')
+        .select('communication_id, read_at')
+        .eq('operator_id', operatorId)
+        .in('communication_id', commIds);
+      if (readsError) throw readsError;
+      reads = data || [];
+    }
+
+    const recipientRecords = new Map(reads.map(r => [r.communication_id, r]));
     
     const validComms = (comms || []).filter(c => {
       // Check expiration
       if (c.expiration_date && c.expiration_date < today) return false;
+      
+      const rec = recipientRecords.get(c.id);
+      
       // Check audience
-      if (c.target_audience === 'SPECIFIC' && c.target_operator_id !== operatorId) return false;
+      if (c.target_audience === 'OPERATOR') {
+        // Must be explicitly targeted via target_operator_id or recipient table
+        if (c.target_operator_id !== operatorId && !rec) return false;
+      }
+      
+      // Check if read
+      if (rec && rec.read_at) return false; // Already read
+      
       return true;
     });
     
-    if (validComms.length === 0) return [];
-    
-    // Now check which ones have been read
-    const { data: reads, error: readsError } = await supabase
-      .from('communication_recipients')
-      .select('communication_id')
-      .eq('operator_id', operatorId)
-      .in('communication_id', validComms.map(c => c.id));
-      
-    if (readsError) throw readsError;
-    
-    const readIds = new Set((reads || []).map(r => r.communication_id));
-    return validComms.filter(c => !readIds.has(c.id)).sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return validComms.sort((a, b) => a.created_at.localeCompare(b.created_at));
   },
   
   getCommunicationRecipients: async (communicationId: string): Promise<any[]> => {
@@ -88,6 +101,11 @@ export const api = {
     return data;
   },
 
+  
+  createCommunicationRecipient: async (communication_id: string, operator_id: string): Promise<void> => {
+    if (!supabase) throw new Error('Supabase não configurado');
+    await supabase.from('communication_recipients').insert([{ communication_id, operator_id }]);
+  },
   createCommunication: async (payload: any): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
@@ -278,7 +296,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   },
   getFuncionariosPorObra: async (obra_id: string, apenasDiaristas = false): Promise<Funcionario[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
+    let query = supabase
       .from('funcionarios')
       .select(`*, funcao:funcoes(*), obra:obras(*)`)
       .eq('obra_id', obra_id)
@@ -287,6 +305,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
       query = query.or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null');
     }
     query = query.order('nome');
+    const { data, error } = await query;
     if (error) throw error;
     return data as any;
   },
@@ -311,31 +330,22 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   
   toggleMeiaDiaria: async (presenca_id: string, is_meia: boolean, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    
-    // First, verify if user is ADMIN to provide frontend feedback (backend trigger also enforces this)
-    const { data: userData } = await supabase.from('usuarios').select('perfil').eq('id', usuario_id).single();
-    if (userData?.perfil !== 'ADMIN') {
-      throw new Error('Acesso Negado: Apenas administradores podem alterar para meia diária.');
-    }
-    
-    // Log in audit before changing
-    const { data: presenca } = await supabase.from('presencas').select('*, funcionario:funcionarios(nome, funcao:funcoes(valor_diaria))').eq('id', presenca_id).single();
-    if (presenca) {
-      const funcNome = presenca.funcionario?.nome || 'Funcionário';
-      const valorBase = presenca.funcionario?.funcao?.valor_diaria || 0;
-      const valorAntigo = presenca.meia_diaria ? valorBase / 2 : valorBase;
-      const valorNovo = is_meia ? valorBase / 2 : valorBase;
-      
-      const { error: updError } = await supabase.from('presencas').update({ meia_diaria: is_meia }).eq('id', presenca_id);
-      if (updError) {
-        if (updError.message.includes('does not exist')) {
-            throw new Error('A coluna meia_diaria não existe. O banco de dados precisa ser atualizado executando database_meia_diaria.sql');
-        }
-        throw updError;
+    try {
+      if (is_meia) {
+        const { error } = await supabase.rpc('definir_meia_diaria', {
+          p_presenca_id: presenca_id,
+          p_usuario_id: usuario_id
+        });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.rpc('reverter_meia_diaria', {
+          p_presenca_id: presenca_id,
+          p_usuario_id: usuario_id
+        });
+        if (error) throw error;
       }
-      
-      // We log in a generic way if possible, or skip if no generic audit table exists.
-      // The app has 'historico_ferramentas', but no generic 'audit_logs'. We'll just rely on the DB update.
+    } catch (e: any) {
+        throw e;
     }
   },
 
@@ -474,7 +484,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     const { count: obrasCount } = await supabase.from('obras').select('*', { count: 'exact', head: true }).eq('ativo', true);
     const { count: funcionariosCount } = await supabase.from('funcionarios').select('*', { count: 'exact', head: true }).eq('ativo', true).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null');
     
-        const { data: presencasHojeData, error } = await supabase.from('presencas').select('presente, meia_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))').eq('data', hoje).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' });
+        const { data: presencasHojeData, error } = await supabase.from('presencas').select('presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))').eq('data', hoje).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' });
     if (error) throw error;
     let presentesHoje = 0;
     let faltasHoje = 0;
@@ -483,7 +493,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
       if (p.presente) {
         presentesHoje++;
         let valor = Number((p.funcionario as any)?.funcao?.valor_diaria || 0);
-        if (p.meia_diaria) valor = valor / 2;
+        if (p.tipo_diaria === 'MEIA_DIARIA') valor = valor / 2;
         valorTotalHoje += valor;
       } else {
         faltasHoje++;
@@ -531,7 +541,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('medical_certificates')
-      .select('*, funcionario:funcionarios(*)');
+      .select('*, tipo_diaria, percentual_diaria, funcionario:funcionarios(*)');
     if (error) throw error;
     return data;
   },
@@ -573,7 +583,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('medical_certificates')
-      .select('*, funcionario:funcionarios(*)')
+      .select('*, tipo_diaria, percentual_diaria, funcionario:funcionarios(*)')
       .lte('start_date', dateStr)
       .gte('end_date', dateStr);
     if (error) throw error;
@@ -821,51 +831,54 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
 
   // Central de Comunicações
   getCentralSugestoes: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('central_sugestoes')
-      .select('*')
-      .eq('status', 'PENDENTE')
-      .order('created_at', { ascending: false });
-    
-    if (error) {
-       // Ignore error if table doesn't exist yet, just return empty to prevent crash
-       console.log("central_sugestoes table missing or error", error);
-       return [
-         { id: '1', titulo: 'Ferramenta não devolvida', mensagem: 'A ferramenta Martelete Bosch continua registrada como emprestada.\n\nFavor verificar se houve esquecimento na devolução.', tipo: 'ferramenta_pendente', created_at: new Date().toISOString() },
-         { id: '2', titulo: 'Ferramenta Quebrada', mensagem: 'O operador João relatou que a Furadeira de Bancada quebrou durante o uso.', tipo: 'ferramenta_quebrada', created_at: new Date().toISOString() },
-         { id: '3', titulo: 'Novo Atestado', mensagem: 'João enviou um atestado de 2 dias.', tipo: 'novo_atestado', created_at: new Date().toISOString() },
-         { id: '4', titulo: 'Comunicação Não Visualizada', mensagem: 'A comunicação "Aviso Geral" enviada há 2 dias ainda não foi visualizada por 3 operadores.', tipo: 'comunicacao_nao_visualizada', created_at: new Date().toISOString() }
-       ];
-    }
-    return data || [];
+    return []; // Disabled because central_sugestoes table does not exist in production yet
   },
 
   getCentralComunicacoes: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
-      .from('central_comunicacoes')
+      .from('communications')
       .select(`
         *,
-        remetente:usuarios!remetente_id(id, usuario),
-        destinatarios:central_destinatarios(id, lida, data_leitura, usuario:usuarios!usuario_id(id, usuario))
+        remetente:usuarios!created_by(id, usuario),
+        destinatarios:communication_recipients(id, read_at, confirmed, usuario:usuarios!operator_id(id, usuario))
       `)
       .order('created_at', { ascending: false });
 
     if (error) {
-      console.log("central_comunicacoes table missing or error", error);
+      console.log("communications table missing or error", error);
       return [];
     }
-    return data || [];
+    return data.map((item: any) => ({
+      id: item.id,
+      titulo: item.title,
+      mensagem: item.message,
+      data_envio: item.created_at,
+      created_at: item.created_at,
+      remetente: item.remetente,
+      destinatarios: item.destinatarios ? item.destinatarios.map((d: any) => ({
+        id: d.id,
+        lida: d.read_at !== null,
+        data_leitura: d.read_at,
+        usuario: d.usuario
+      })) : []
+    }));
   },
 
-  sendCentralCommunication: async ({ titulo, mensagem, destinatarios, sugestao_id }: { titulo: string, mensagem: string, destinatarios: string[], sugestao_id?: string }): Promise<void> => {
+  sendCentralCommunication: async ({ titulo, mensagem, destinatarios, sugestao_id, usuario_id }: { titulo: string, mensagem: string, destinatarios: string[], sugestao_id?: string, usuario_id?: string }): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
     
     // In a real scenario we'd do a transaction, here we insert and map
     const { data: comm, error } = await supabase
-      .from('central_comunicacoes')
-      .insert([{ titulo, mensagem }])
+      .from('communications')
+      .insert([{ 
+        title: titulo, 
+        message: mensagem,
+        type: 'INFO',
+        priority: 'NORMAL',
+        target_audience: 'OPERATOR',
+        created_by: usuario_id || null
+      }])
       .select('id')
       .single();
       
@@ -873,14 +886,25 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     
     if (destinatarios && destinatarios.length > 0) {
        const dests = destinatarios.map(d => ({
-          comunicacao_id: comm.id,
-          usuario_id: d
+          communication_id: comm.id,
+          operator_id: d
        }));
-       await supabase.from('central_destinatarios').insert(dests);
+       await supabase.from('communication_recipients').insert(dests);
+    }
+    
+    if (usuario_id) {
+       const { error: rpcError } = await supabase.rpc('request_communication_push', {
+         p_communication_id: comm.id,
+         p_usuario_id: usuario_id
+       });
+       if (rpcError) {
+         console.error("RPC Push error:", rpcError);
+         throw new Error('Comunicação salva, mas falha ao despachar notificação Push.');
+       }
     }
     
     if (sugestao_id) {
-       await supabase.from('central_sugestoes').update({ status: 'ENVIADA' }).eq('id', sugestao_id);
+       // Table does not exist in production yet
     }
   },
   
@@ -889,12 +913,23 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (!supabase) return [];
     try {
       const { data, error } = await supabase
-        .from('central_destinatarios')
-        .select('*, comunicacao:central_comunicacoes(*)')
-        .eq('usuario_id', usuario_id)
-        .eq('lida', false);
+        .from('communication_recipients')
+        .select('*, comunicacao:communications(*)')
+        .eq('operator_id', usuario_id)
+        .is('read_at', null);
       if (error) return [];
-      return data || [];
+      return data.map((item: any) => ({
+        id: item.id,
+        lida: item.read_at !== null,
+        data_leitura: item.read_at,
+        comunicacao: {
+           id: item.comunicacao.id,
+           titulo: item.comunicacao.title,
+           mensagem: item.comunicacao.message,
+           data_envio: item.comunicacao.created_at,
+           created_at: item.comunicacao.created_at
+        }
+      }));
     } catch (e) {
       return [];
     }
@@ -903,13 +938,13 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   markCentralCommunicationAsRead: async (id: string): Promise<void> => {
     if (!supabase) return;
     try {
-      await supabase.from('central_destinatarios').update({ lida: true, data_leitura: new Date().toISOString() }).eq('id', id);
+      await supabase.from('communication_recipients').update({ read_at: new Date().toISOString() }).eq('id', id);
     } catch (e) {}
   },
   registerPushDevice: async (usuario_id: string, token: string, plataforma: string): Promise<void> => {
     if (!supabase) return;
     try {
-      const { data: existing } = await supabase.from('push_devices').select('id').eq('token', token).single();
+      const { data: existing } = await supabase.from('push_devices').select('id').eq('token', token).maybeSingle();
       const payload = {
         usuario_id,
         token,

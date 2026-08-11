@@ -13,7 +13,7 @@ export function CentralCommunicationViewer({ communications, onComplete }: { com
     if (marking) return;
     setMarking(true);
     try {
-      // Mark as read in central_destinatarios
+      // Mark as read in communication_recipients
       const supabase = (api as any)._supabase; // We need a way to update it. Let's add it to api.ts instead!
       await api.markCentralCommunicationAsRead(currentComm.id);
       

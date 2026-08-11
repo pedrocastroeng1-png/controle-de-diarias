@@ -3,7 +3,15 @@ import re
 with open('src/lib/api.ts', 'r') as f:
     content = f.read()
 
-old_push = """       try {
+old_try = """       try {
+         await supabase.functions.invoke('send-push', {
+           body: { communication_id: comm.id }
+         });
+       } catch (e) {
+         console.error('Error invoking send-push:', e);
+       }"""
+
+new_try = """       try {
          const { error: pushError } = await supabase.functions.invoke('send-push', {
            body: { communication_id: comm.id }
          });
@@ -13,13 +21,10 @@ old_push = """       try {
          throw new Error('Comunicação salva, mas falha ao despachar notificação Push (Edge Function erro).');
        }"""
 
-new_push = """       // Push dispatch will be implemented server-side
-       // The frontend should no longer call the Edge Function directly"""
-
-if old_push in content:
-    content = content.replace(old_push, new_push)
+if old_try in content:
+    content = content.replace(old_try, new_try)
 else:
-    print("old_push not found")
+    print("old_try not found")
 
 with open('src/lib/api.ts', 'w') as f:
     f.write(content)

@@ -104,7 +104,8 @@ function SugestoesTab() {
   );
 }
 
-function SugestaoCard({ sugestao, onUpdate }: { sugestao: any, onUpdate: () => void }) {
+const SugestaoCard: React.FC<{ sugestao: any, onUpdate: () => void | Promise<void> }> = ({ sugestao, onUpdate }) => {
+  const { usuario } = useAuth();
   const [modalOpen, setModalOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
@@ -124,7 +125,8 @@ function SugestaoCard({ sugestao, onUpdate }: { sugestao: any, onUpdate: () => v
         titulo: title,
         mensagem: message,
         destinatarios: sugestao.destinatarios || [],
-        sugestao_id: sugestao.id
+        sugestao_id: sugestao.id,
+        usuario_id: usuario?.id
       });
       setModalOpen(false);
       onUpdate();
@@ -219,6 +221,7 @@ function SugestaoCard({ sugestao, onUpdate }: { sugestao: any, onUpdate: () => v
 // TAB 2: NOVA COMUNICAÇÃO
 // -------------------------------------------------------------
 function NovaComunicacaoTab() {
+  const { usuario } = useAuth();
   const [title, setTitle] = useState('');
   const [message, setMessage] = useState('');
   const [destinatarios, setDestinatarios] = useState<string[]>([]);
@@ -256,7 +259,8 @@ function NovaComunicacaoTab() {
       await api.sendCentralCommunication({
         titulo: title,
         mensagem: message,
-        destinatarios: destinatarios
+        destinatarios: destinatarios,
+        usuario_id: usuario?.id
       });
       alert('Comunicação enviada com sucesso!');
       setTitle('');
@@ -385,15 +389,22 @@ function HistoricoTab() {
           <div key={h.id} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
             <div className="p-5">
               <div className="flex justify-between items-start mb-2">
-                <h3 className="font-bold text-gray-900 text-lg">{h.titulo}</h3>
+                <h3 className="font-bold text-gray-900 text-lg">{h.title || h.titulo}</h3>
                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-md">
                   {format(new Date(h.created_at), 'dd/MM/yyyy HH:mm')}
                 </span>
               </div>
-              <p className="text-gray-700 mb-4">{h.mensagem}</p>
+              <p className="text-gray-700 mb-4">{h.message || h.mensagem}</p>
               
-              <div className="text-xs text-gray-500 mb-4">
-                Enviado por: <span className="font-medium text-gray-700">{h.remetente?.usuario || 'Sistema'}</span>
+              <div className="flex justify-between items-center text-xs text-gray-500 mb-4">
+                <div>Enviado por: <span className="font-medium text-gray-700">{h.remetente?.usuario || h.creator?.usuario || 'Sistema'}</span></div>
+                <div className="font-semibold text-blue-600">
+                  {h.push_dispatch_status === 'QUEUED' && 'Push na fila...'}
+                  {h.push_dispatch_status === 'SENDING' && 'Enviando...'}
+                  {h.push_dispatch_status === 'SENT' && 'Push enviado'}
+                  {h.push_dispatch_status === 'PARTIAL' && 'Push parcialmente enviado'}
+                  {h.push_dispatch_status === 'FAILED' && <span className="text-red-500">Falha no Push</span>}
+                </div>
               </div>
 
               <div className="border-t border-gray-100 pt-4">

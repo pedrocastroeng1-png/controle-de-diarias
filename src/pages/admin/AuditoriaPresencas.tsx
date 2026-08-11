@@ -39,7 +39,7 @@ export default function AuditoriaPresencas() {
 
   const handleToggleMeiaDiaria = async (presenca: Presenca) => {
     if (!user) return;
-    const isMeia = presenca.meia_diaria;
+    const isMeia = presenca.tipo_diaria === 'MEIA_DIARIA';
     const actionText = isMeia ? 'reverter meia diária para diária normal' : 'transformar em meia diária';
     const funcRate = presenca.funcionario?.funcao?.valor_diaria || 0;
     const newRate = isMeia ? funcRate : funcRate / 2;
@@ -56,10 +56,10 @@ O valor desta diária será ajustado para ${new Intl.NumberFormat('pt-BR', { sty
       
       // Update local state
       const updatedPresencas = presencas.map(p => 
-        p.id === presenca.id ? { ...p, meia_diaria: !isMeia } : p
+        p.id === presenca.id ? { ...p, tipo_diaria: !isMeia ? 'MEIA_DIARIA' : 'DIARIA' } : p
       );
       setPresencas(updatedPresencas);
-      setSelectedPresenca({ ...presenca, meia_diaria: !isMeia });
+      setSelectedPresenca({ ...presenca, tipo_diaria: !isMeia ? 'MEIA_DIARIA' : 'DIARIA' });
       alert('Operação realizada com sucesso!');
     } catch (err: any) {
       alert(`Erro ao alterar meia diária: ${err.message}`);
