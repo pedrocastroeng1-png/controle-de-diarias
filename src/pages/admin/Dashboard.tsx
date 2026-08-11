@@ -4,6 +4,8 @@ import { HardHat, Users, CheckCircle, XCircle, DollarSign, ArrowRight, Activity,
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
+import { PushDiagnostic } from '../../components/PushDiagnostic';
+
 export default function Dashboard() {
   const [totalObras, setTotalObras] = useState(0);
   const [totalFuncionarios, setTotalFuncionarios] = useState(0);
@@ -137,6 +139,8 @@ export default function Dashboard() {
            </div>
         </div>
       </div>
+      
+      <PushDiagnostic />
       
       <div className="text-center pt-8">
          <span className="text-xs font-medium text-gray-400">Versão 2.0.0</span>
