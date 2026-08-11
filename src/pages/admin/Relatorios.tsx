@@ -40,12 +40,21 @@ export default function Relatorios() {
   async function loadRelatorio(inicio: string, fim: string, obra: string) {
     setLoading(true);
     setErro('');
+    let data: any[] = [];
+    let atestados: any[] = [];
+    let funcionarios: any[] = [];
+
     try {
-      const [data, atestados, funcionarios] = await Promise.all([
+      [data, funcionarios] = await Promise.all([
         api.getRelatorio(inicio, fim, obra),
-        api.getAtestados(), // Fetch all or we could create a date-filtered one
         api.getFuncionarios('todos', true)
       ]);
+      
+      try {
+        atestados = await api.getAtestados(); // Fetch all or we could create a date-filtered one
+      } catch (err) {
+        console.error("Erro ao carregar atestados", err);
+      }
       
       const funcionariosMap = new Map(funcionarios.map(f => [f.id, f]));
       const atestadoRecords = [];

@@ -549,7 +549,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('medical_certificates')
-      .select('*, tipo_diaria, percentual_diaria, funcionario:funcionarios(*)');
+      .select('*, funcionario:funcionarios(*)');
     if (error) throw error;
     return data;
   },
@@ -591,7 +591,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('medical_certificates')
-      .select('*, tipo_diaria, percentual_diaria, funcionario:funcionarios(*)')
+      .select('*, funcionario:funcionarios(*)')
       .lte('start_date', dateStr)
       .gte('end_date', dateStr);
     if (error) throw error;

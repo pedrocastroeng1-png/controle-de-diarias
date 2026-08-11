@@ -109,10 +109,14 @@ O valor desta diária será ajustado para ${new Intl.NumberFormat('pt-BR', { sty
         setRegistrationPhotoUrl(url);
       }
       
-      const [history, atestados] = await Promise.all([
-        api.getAuditoriaPresencas(f.id),
-        api.getAtestados()
-      ]);
+      const history = await api.getAuditoriaPresencas(f.id);
+      
+      let atestados: any[] = [];
+      try {
+        atestados = await api.getAtestados();
+      } catch (err) {
+        console.error("Erro ao carregar atestados", err);
+      }
       
       const atestadosForFunc = atestados.filter(a => a.employee_id === f.id);
       const generatedAtestados: any[] = [];

@@ -13,7 +13,7 @@ export default function PresencaPage() {
   const isAdmin = usuario?.perfil === 'ADMIN';
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
           const [atestadosAtivos, setAtestadosAtivos] = useState<Record<string, any>>({});
-  const [presencas, setPresencas] = useState<Record<string, boolean>>({});
+  const [presencas, setPresencas] = useState<Record<string, boolean | undefined>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -64,12 +64,16 @@ export default function PresencaPage() {
 
     
 
+     try {
+      const presencasData = await api.getPresencas(selectedDate);
+      
+      let atestados: any[] = [];
       try {
-      const [presencasData, atestados] = await Promise.all([
-
-        api.getPresencas(selectedDate),
-        api.getActiveAtestadosForDate(selectedDate)
-      ]);
+        atestados = await api.getActiveAtestadosForDate(selectedDate);
+      } catch (err) {
+        console.error("Erro ao carregar atestados", err);
+      }
+      
       const atestadosMap: Record<string, any> = {};
       atestados.forEach((a: any) => atestadosMap[a.employee_id] = a);
       setAtestadosAtivos(atestadosMap);
@@ -82,20 +86,12 @@ export default function PresencaPage() {
         setTemRegistros(false);
       }
 
-      const presencasMap: Record<string, boolean> = {};
+      const presencasMap: Record<string, boolean | undefined> = {};
       
-      // Inicializar todos como false primeiro
-      funcs.forEach(f => {
-        presencasMap[f.id] = false;
-      });
-
-      // Sobrescrever com os dados salvos
       const newSavedRecords: Record<string, boolean> = {};
       presencasData.forEach(p => {
-        if (presencasMap[p.funcionario_id] !== undefined) {
-          presencasMap[p.funcionario_id] = p.presente;
-          newSavedRecords[p.funcionario_id] = true;
-        }
+        presencasMap[p.funcionario_id] = p.presente;
+        newSavedRecords[p.funcionario_id] = true;
       });
 
       setPresencas(presencasMap);
@@ -115,12 +111,9 @@ export default function PresencaPage() {
       }));
       setPhotoUrls(newPhotoUrls);
     } catch (error) {
-      // Ignore presence load error, initialize with false
-      const presencasMap: Record<string, boolean> = {};
-      funcs.forEach(f => {
-        presencasMap[f.id] = false;
-      });
-      setPresencas(presencasMap);
+      console.error("Erro ao carregar presenças", error);
+      setErro("Ocorreu um erro ao carregar as presenças.");
+      setPresencas({});
       setJaRegistradoHoje(false);
     } finally {
       setLoading(false);
@@ -136,9 +129,9 @@ export default function PresencaPage() {
       return;
     }
 
-    const isCurrentlyPresent = presencas[funcionarioId] || false;
+    const isCurrentlyPresent = presencas[funcionarioId];
     
-    if (isCurrentlyPresent) {
+    if (isCurrentlyPresent === true) {
       setPresencas(prev => ({ ...prev, [funcionarioId]: false }));
       setSavedSuccess(false);
     } else {
@@ -160,8 +153,8 @@ export default function PresencaPage() {
 
   const handleActionChangeStatus = async () => {
     if (!actionMenuFuncId) return;
-    const isCurrentlyPresent = presencas[actionMenuFuncId] || false;
-    const newStatus = !isCurrentlyPresent;
+    const isCurrentlyPresent = presencas[actionMenuFuncId];
+    const newStatus = isCurrentlyPresent === true ? false : true;
     
     // Optimistic UI update
     setPresencas(prev => ({ ...prev, [actionMenuFuncId]: newStatus }));
@@ -228,7 +221,11 @@ export default function PresencaPage() {
         delete next[funcToDelete];
         return next;
       });
-      setPresencas(prev => ({ ...prev, [funcToDelete]: false }));
+      setPresencas(prev => {
+        const next = { ...prev };
+        delete next[funcToDelete];
+        return next;
+      });
       
       // If no records left, reset temRegistros
       const remainingRecords = Object.keys(savedRecords).filter(k => k !== funcToDelete && savedRecords[k]);
@@ -263,12 +260,15 @@ export default function PresencaPage() {
       const now = new Date().toISOString();
       const userId = usuario?.id || null;
       
-      const registrosToSave = await Promise.all(funcionarios.filter(f => !atestadosAtivos[f.id]).map(async (f) => {
+      const registrosToSave = await Promise.all(
+        funcionarios
+          .filter(f => !atestadosAtivos[f.id] && presencas[f.id] !== undefined)
+          .map(async (f) => {
         let photo_path = undefined;
         let photo_taken_at = undefined;
         let photo_taken_by = undefined;
         
-        if (presencas[f.id]) {
+        if (presencas[f.id] === true) {
            if (!capturedFotos[f.id]) {
               throw new Error(`Falta foto de presença para ${f.nome}`);
            }
@@ -281,12 +281,24 @@ export default function PresencaPage() {
           funcionario_id: f.id,
           obra_id: f.obra_id,
           data: selectedDate,
-          presente: presencas[f.id] || false,
+          presente: presencas[f.id],
           ...(photo_path && { photo_path, photo_taken_at, photo_taken_by })
         };
       }));
 
       await api.salvarPresencas(registrosToSave);
+      
+      // Reload actual records from DB after save
+      const presencasData = await api.getPresencas(selectedDate);
+      const newSavedRecords: Record<string, boolean> = {};
+      const newPresencasMap: Record<string, boolean | undefined> = { ...presencas };
+      presencasData.forEach(p => {
+        newPresencasMap[p.funcionario_id] = p.presente;
+        newSavedRecords[p.funcionario_id] = true;
+      });
+      setPresencas(newPresencasMap);
+      setSavedRecords(newSavedRecords);
+      
       setSavedSuccess(true);
       // showToast('✅ Presença registrada com sucesso!', 'success');
     } catch (error: any) {
@@ -314,12 +326,14 @@ export default function PresencaPage() {
       const sortedFuncionarios = [...funcionarios].sort((a, b) => a.nome.localeCompare(b.nome));
 
       sortedFuncionarios.forEach(f => {
-        if (presencas[f.id] || atestadosAtivos[f.id]) {
+        if (presencas[f.id] === true || atestadosAtivos[f.id]) {
           presentes.push(f.nome);
           totalPresentes++;
-        } else {
+        } else if (presencas[f.id] === false) {
           faltas.push(f.nome);
           totalFaltas++;
+        } else {
+          // NAO_REGISTRADO (não entra nas estatísticas do zap de faltas explícitas)
         }
       });
 
@@ -442,11 +456,13 @@ return (
               )}
               <div className="grid grid-cols-1 gap-4">
                 {funcionarios.map(f => {
-                  const isPresent = presencas[f.id] || false;
+                  const isPresent = presencas[f.id];
                   
-                  const statusBadge = isPresent 
+                  const statusBadge = isPresent === true
                     ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 shadow-sm">🟢 Presente</span>
-                    : <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10 shadow-sm">🔴 Falta</span>;
+                    : isPresent === false
+                    ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10 shadow-sm">🔴 Faltou</span>
+                    : <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-600/20 shadow-sm">⚪ Não Registrado</span>;
                   
                   if (atestadosAtivos[f.id]) {
                     return (
@@ -478,13 +494,15 @@ return (
                       onClick={() => togglePresenca(f.id)}
                       disabled={!isAdmin && (jaRegistradoHoje || saving)}
                       className={`flex flex-col sm:flex-row items-start sm:items-center p-3.5 sm:p-4 rounded-2xl text-left w-full transition-all border ${
-                        isPresent 
+                        isPresent === true
                           ? 'bg-white border-green-200 shadow-sm hover:border-green-300 hover:shadow-md' 
+                          : isPresent === false
+                          ? 'bg-white border-red-200 shadow-sm hover:border-red-300 hover:shadow-md'
                           : 'bg-white border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md'
                       } ${(!isAdmin && (jaRegistradoHoje || saving)) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} relative group`}
                     >
                       <div className="flex items-center w-full">
-                        <div className={`flex-shrink-0 mr-3.5 h-12 w-12 bg-slate-50 rounded-full overflow-hidden border shadow-sm flex items-center justify-center transition-colors ${isPresent ? 'border-green-200 ring-4 ring-green-50' : 'border-slate-200'}`}>
+                        <div className={`flex-shrink-0 mr-3.5 h-12 w-12 bg-slate-50 rounded-full overflow-hidden border shadow-sm flex items-center justify-center transition-colors ${isPresent === true ? 'border-green-200 ring-4 ring-green-50' : 'border-slate-200'}`}>
                           {photoUrls[f.id] ? (
                             <img src={photoUrls[f.id]} alt={f.nome} className="h-full w-full object-cover" onError={(e) => { console.error('Failed to load image on Presenca card:', photoUrls[f.id]); e.currentTarget.style.display = 'none'; e.currentTarget.nextElementSibling?.classList.remove('hidden'); }} />
                           ) : null}
