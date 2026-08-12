@@ -14,6 +14,7 @@ export default function PresencaPage() {
   const [funcionarios, setFuncionarios] = useState<Funcionario[]>([]);
           const [atestadosAtivos, setAtestadosAtivos] = useState<Record<string, any>>({});
   const [presencas, setPresencas] = useState<Record<string, boolean | undefined>>({});
+  const [fullPresencas, setFullPresencas] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -27,6 +28,26 @@ export default function PresencaPage() {
   const [savedRecords, setSavedRecords] = useState<Record<string, boolean>>({});
   const [photoUrls, setPhotoUrls] = useState<Record<string, string>>({});
   const [actionMenuFuncId, setActionMenuFuncId] = useState<string | null>(null);
+  const [togglingMeiaDiaria, setTogglingMeiaDiaria] = useState(false);
+
+  const handleToggleMeiaDiaria = async (presenca: any) => {
+    if (!usuario) return;
+    const isMeia = presenca.tipo_diaria === 'MEIA_DIARIA';
+    
+    try {
+      setTogglingMeiaDiaria(true);
+      await api.toggleMeiaDiaria(presenca.id, !isMeia, usuario.id);
+      
+      // Reload single record or all records
+      await loadFuncionariosEPresencas();
+      setActionMenuFuncId(null);
+      showToast(isMeia ? '✅ Revertido para Diária' : '✅ Meia Diária registrada', 'success');
+    } catch (err: any) {
+      setErro(err.message || 'Erro ao alterar diária');
+    } finally {
+      setTogglingMeiaDiaria(false);
+    }
+  };
   const [funcToDelete, setFuncToDelete] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [erro, setErro] = useState('');
@@ -87,15 +108,17 @@ export default function PresencaPage() {
       }
 
       const presencasMap: Record<string, boolean | undefined> = {};
-      
       const newSavedRecords: Record<string, boolean> = {};
+      const newFullPresencas: Record<string, any> = {};
       presencasData.forEach(p => {
         presencasMap[p.funcionario_id] = p.presente;
         newSavedRecords[p.funcionario_id] = true;
+        newFullPresencas[p.funcionario_id] = p;
       });
 
       setPresencas(presencasMap);
       setSavedRecords(newSavedRecords);
+      setFullPresencas(newFullPresencas);
       
       // Load signed URLs for photos
       const newPhotoUrls: Record<string, string> = {};
@@ -292,12 +315,15 @@ export default function PresencaPage() {
       const presencasData = await api.getPresencas(selectedDate);
       const newSavedRecords: Record<string, boolean> = {};
       const newPresencasMap: Record<string, boolean | undefined> = { ...presencas };
+      const newFullPresencas: Record<string, any> = { ...fullPresencas };
       presencasData.forEach(p => {
         newPresencasMap[p.funcionario_id] = p.presente;
         newSavedRecords[p.funcionario_id] = true;
+        newFullPresencas[p.funcionario_id] = p;
       });
       setPresencas(newPresencasMap);
       setSavedRecords(newSavedRecords);
+      setFullPresencas(newFullPresencas);
       
       setSavedSuccess(true);
       // showToast('✅ Presença registrada com sucesso!', 'success');
@@ -457,12 +483,16 @@ return (
               <div className="grid grid-cols-1 gap-4">
                 {funcionarios.map(f => {
                   const isPresent = presencas[f.id];
+                  const fullRecord = fullPresencas[f.id];
+                  const isMeia = fullRecord?.tipo_diaria === 'MEIA_DIARIA';
                   
                   const statusBadge = isPresent === true
-                    ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 shadow-sm">🟢 Presente</span>
+                    ? (isMeia 
+                       ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 shadow-sm">🟢 MEIA-DIÁRIA</span>
+                       : <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 shadow-sm">🟢 PRESENTE</span>)
                     : isPresent === false
-                    ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10 shadow-sm">🔴 Faltou</span>
-                    : <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-600/20 shadow-sm">⚪ Não Registrado</span>;
+                    ? <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/10 shadow-sm">🔴 FALTOU</span>
+                    : <span className="inline-flex items-center px-2.5 py-1 rounded-full text-[11px] font-bold tracking-wide bg-gray-50 text-gray-700 ring-1 ring-inset ring-gray-600/20 shadow-sm">⚪ NÃO REGISTRADO</span>;
                   
                   if (atestadosAtivos[f.id]) {
                     return (
@@ -680,6 +710,20 @@ return (
               >
                 <span className="text-2xl">🔄</span> <span className="font-medium text-lg">Alterar Status</span>
               </button>
+
+              {isAdmin && presencas[actionMenuFuncId] === true && funcionarios.find(f => f.id === actionMenuFuncId)?.tipo_colaborador === 'DIARISTA' && fullPresencas[actionMenuFuncId] && (
+                <button 
+                  onClick={() => handleToggleMeiaDiaria(fullPresencas[actionMenuFuncId])}
+                  disabled={togglingMeiaDiaria}
+                  className={`w-full px-4 py-4 font-medium rounded-2xl transition-colors flex items-center gap-4 text-left disabled:opacity-50 ${fullPresencas[actionMenuFuncId].tipo_diaria === 'MEIA_DIARIA' ? 'text-amber-700 bg-amber-50 hover:bg-amber-100' : 'text-gray-700 bg-gray-50 hover:bg-gray-100'}`}
+                >
+                  <span className="text-2xl">{fullPresencas[actionMenuFuncId].tipo_diaria === 'MEIA_DIARIA' ? '↩️' : '💰'}</span> 
+                  <span className="font-medium text-lg">
+                    {fullPresencas[actionMenuFuncId].tipo_diaria === 'MEIA_DIARIA' ? 'Reverter para Diária' : 'Meia Diária'}
+                  </span>
+                </button>
+              )}
+
               <button 
                 onClick={handleActionReplacePhoto}
                 className="w-full px-4 py-4 font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors flex items-center gap-4 text-left"
