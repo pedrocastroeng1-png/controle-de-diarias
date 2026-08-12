@@ -150,8 +150,8 @@ export const api = {
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, usuario')
-      .eq('perfil', 'OPERADOR')
+      .select('id, usuario, perfil')
+      .in('perfil', ['OPERADOR', 'ADMIN', 'CONSULTA'])
       .eq('ativo', true);
     if (error) throw error;
     return data || [];

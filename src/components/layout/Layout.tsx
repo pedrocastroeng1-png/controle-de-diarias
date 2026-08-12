@@ -15,7 +15,31 @@ export function AdminLayout() {
   const { usuario, logout, loading } = useAuth();
   const location = useLocation();
 
-  if (loading) {
+  const [unreadComms, setUnreadComms] = useState<any[]>([]);
+  const [unreadCentralComms, setUnreadCentralComms] = useState<any[]>([]);
+  const [loadingComms, setLoadingComms] = useState(true);
+
+  useEffect(() => {
+    if (loading) return;
+    
+    if (usuario) {
+      Promise.all([
+        api.getUnreadCommunications(usuario.id),
+        api.getUnreadCentralCommunications(usuario.id)
+      ]).then(([comms, centralComms]) => {
+        setUnreadCentralComms(centralComms);
+        setUnreadComms(comms);
+        setLoadingComms(false);
+      }).catch(err => {
+        console.error(err);
+        setLoadingComms(false);
+      });
+    } else {
+      setLoadingComms(false);
+    }
+  }, [usuario, loading]);
+
+  if (loading || loadingComms) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>;
   }
 
@@ -23,11 +47,23 @@ export function AdminLayout() {
     return <Navigate to="/login" replace />;
   }
   
-  if (usuario.perfil !== 'ADMIN') {
+  if (usuario.perfil !== 'ADMIN' && usuario.perfil !== 'CONSULTA') {
     return <Navigate to="/operador/presenca" replace />;
   }
 
-  const menuItems = [
+  // Block CONSULTA from unauthorized routes
+  if (usuario.perfil === 'CONSULTA' && !location.pathname.startsWith('/admin/relatorios') && !location.pathname.startsWith('/admin/auditoria')) {
+    return <Navigate to="/admin/relatorios" replace />;
+  }
+
+  if (unreadCentralComms.length > 0) {
+    return <CentralCommunicationViewer communications={unreadCentralComms} onComplete={() => setUnreadCentralComms([])} />;
+  }
+  if (unreadComms.length > 0) {
+    return <CommunicationViewer communications={unreadComms} onComplete={() => setUnreadComms([])} />;
+  }
+
+  const allMenuItems = [
     { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
     { name: 'Obras', path: '/admin/obras', icon: HardHat },
     { name: 'Funções', path: '/admin/funcoes', icon: Briefcase },
@@ -41,6 +77,10 @@ export function AdminLayout() {
 
     { name: 'Auditoria de Presenças', path: '/admin/auditoria', icon: Camera },
   ];
+
+  const menuItems = usuario.perfil === 'CONSULTA' 
+    ? allMenuItems.filter(item => item.path === '/admin/relatorios' || item.path === '/admin/auditoria')
+    : allMenuItems;
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -167,6 +207,10 @@ export function OperadorLayout() {
   
   if (usuario.perfil === 'ADMIN' && location.pathname.startsWith('/operador')) {
      return <Navigate to="/admin/dashboard" replace />;
+  }
+  
+  if (usuario.perfil === 'CONSULTA' && location.pathname.startsWith('/operador')) {
+     return <Navigate to="/admin/relatorios" replace />;
   }
 
   if (loadingComms || checkingPresenca) {

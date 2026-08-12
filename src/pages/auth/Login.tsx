@@ -26,6 +26,8 @@ export default function Login() {
     if (!authLoading && authUsuario) {
       if (authUsuario.perfil === 'ADMIN') {
         navigate('/admin/dashboard', { replace: true });
+      } else if (authUsuario.perfil === 'CONSULTA') {
+        navigate('/admin/relatorios', { replace: true });
       } else {
         navigate('/operador/presenca', { replace: true });
       }
@@ -50,6 +52,8 @@ export default function Login() {
         const user = JSON.parse(userStr);
         if (user.perfil === 'ADMIN') {
           navigate('/admin/dashboard');
+        } else if (user.perfil === 'CONSULTA') {
+          navigate('/admin/relatorios');
         } else {
           navigate('/operador/presenca');
         }
