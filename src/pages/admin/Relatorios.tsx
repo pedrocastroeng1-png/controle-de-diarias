@@ -172,10 +172,11 @@ export default function Relatorios() {
     return base + range;
   };
 
-    const handleExportPDF = async () => {
+        const handleExportPDF = async () => {
     try {
       setLoading(true);
       console.log('[PDF] Iniciando geração');
+      
       const doc = new jsPDF();
       const obraNome = obras.find(o => o.id === obraId)?.nome || 'Todas';
       const periodStr = dataInicial && dataFinal 
@@ -187,33 +188,12 @@ export default function Relatorios() {
       const totalDiarias = totaisDias;
       const totalFuncionarios = agrupado.length;
       
-      // Fetch photos metadata for current dataset
-      const presencaIds = relatorio
-        .filter((r: any) => (r.status === 'PRESENTE' || r.status === 'MEIA DIÁRIA') && r.id)
-        .map((r: any) => r.id);
-        
-      const photosMap: Record<string, { path: string; taken_at: string }> = {};
-      
-      if (presencaIds.length > 0 && supabase) {
-        const chunkSize = 500;
-        for (let i = 0; i < presencaIds.length; i += chunkSize) {
-          const chunk = presencaIds.slice(i, i + chunkSize);
-          const { data } = await supabase.from('presencas')
-            .select('id, photo_path, photo_taken_at')
-            .in('id', chunk)
-            .not('photo_path', 'is', null);
-            
-          if (data) {
-            data.forEach(d => {
-              photosMap[d.id] = { path: d.photo_path, taken_at: d.photo_taken_at };
-            });
-          }
-        }
-      }
-
       const fetchImageAsBase64 = async (url: string) => {
         try {
-          const response = await fetch(url);
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 sec timeout per image
+          const response = await fetch(url, { signal: controller.signal });
+          clearTimeout(timeoutId);
           if (!response.ok) return null;
           const blob = await response.blob();
           return new Promise<string | null>((resolve) => {
@@ -341,8 +321,24 @@ export default function Relatorios() {
               currentY += 6;
             }
             
-            const photoMeta = photosMap[record.id];
-            if (photoMeta || record.atestado_photo_path) {
+            // INDIVIDUAL PHOTO FETCH
+            let photoMeta: any = null;
+            if (record.id && supabase) {
+                try {
+                    const fetchMetaPromise = supabase.from('presencas').select('photo_path, photo_taken_at').eq('id', record.id).single();
+                    const fetchMetaRes: any = await Promise.race([
+                        fetchMetaPromise,
+                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Supabase Meta')), 3000))
+                    ]);
+                    if (fetchMetaRes && fetchMetaRes.data) {
+                        photoMeta = { path: fetchMetaRes.data.photo_path, taken_at: fetchMetaRes.data.photo_taken_at };
+                    }
+                } catch (e) {
+                    console.warn(`Falha ao buscar metadados da foto do registro ${record.id}`, e);
+                }
+            }
+
+            if ((photoMeta && photoMeta.path) || record.atestado_photo_path) {
                doc.text(`Foto da presença:`, 14, currentY);
                currentY += 6;
                
@@ -359,8 +355,13 @@ export default function Relatorios() {
                  try {
                    const bucket = record.status === 'ATESTADO MÉDICO' ? 'medical-certificates' : 'attendance-photos';
                    const path = photoMeta ? photoMeta.path : record.atestado_photo_path;
-                   const url = await api.getPhotoUrl(bucket, path);
+                   const urlPromise = api.getPhotoUrl(bucket, path);
+                   const url = await Promise.race([
+                     urlPromise,
+                     new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Timeout URL')), 4000))
+                   ]);
                    const imgData = await fetchImageAsBase64(url);
+                   
                    if (imgData) {
                      const pdfWidth = 50;
                      const pdfHeight = 65; 
@@ -373,13 +374,13 @@ export default function Relatorios() {
                      currentY += pdfHeight + 8;
                    } else {
                      doc.setTextColor(156, 163, 175);
-                     doc.text(`📸 FOTO EXPIRADA`, 14, currentY + 10);
+                     doc.text(`📸 FOTO INDISPONÍVEL`, 14, currentY + 10);
                      doc.setTextColor(0, 0, 0);
                      currentY += 25;
                    }
                  } catch (e) {
                    doc.setTextColor(156, 163, 175);
-                   doc.text(`📸 FOTO EXPIRADA`, 14, currentY + 10);
+                   doc.text(`📸 FOTO INDISPONÍVEL`, 14, currentY + 10);
                    doc.setTextColor(0, 0, 0);
                    currentY += 25;
                  }
@@ -430,9 +431,10 @@ export default function Relatorios() {
       }
       
       doc.save(`${getFileNameBase()}.pdf`);
+      console.log('[PDF] PDF gerado com sucesso');
     } catch (e: any) {
-      console.error(e);
-      setErro('Ocorreu um erro ao gerar o PDF.');
+      console.error('[PDF] Ocorreu uma exceção no fluxo:', e);
+      setErro('Ocorreu um erro ao gerar o PDF. Verifique o console.');
     } finally {
       setLoading(false);
     }
