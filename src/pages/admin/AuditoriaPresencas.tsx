@@ -118,7 +118,7 @@ export default function AuditoriaPresencas() {
     }
   }
 
-  async function openModal(presenca: Presenca) {
+    async function openModal(presenca: Presenca) {
     console.log('--- DEBUG AUDITORIA ---');
     console.log('Opening modal for presenca:', presenca);
     console.log('Photo path:', presenca.photo_path);
@@ -128,14 +128,25 @@ export default function AuditoriaPresencas() {
     
     try {
       if (presenca.photo_path) {
-         const bucket = (presenca as any).is_atestado ? 'medical-certificates' : 'attendance-photos';
-         console.log(`Generating signed URL for ${bucket}:`, presenca.photo_path);
-         const url = await api.getPhotoUrl(bucket, presenca.photo_path);
-         console.log('Generated Signed URL:', url);
-         setAttendancePhotoUrl(url);
+         // Check if photo is expired (older than 20 days)
+         const photoDate = (presenca as any).photo_taken_at ? new Date((presenca as any).photo_taken_at) : new Date((presenca as any).created_at || presenca.data);
+         const twentyDaysAgo = new Date();
+         twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
+         
+         if (photoDate < twentyDaysAgo) {
+            console.log('Photo is expired based on retention policy (> 20 days).');
+            setAttendancePhotoUrl('EXPIRED');
+         } else {
+            const bucket = (presenca as any).is_atestado ? 'medical-certificates' : 'attendance-photos';
+            console.log(`Generating signed URL for ${bucket}:`, presenca.photo_path);
+            const url = await api.getPhotoUrl(bucket, presenca.photo_path);
+            console.log('Generated Signed URL:', url);
+            setAttendancePhotoUrl(url);
+         }
       } else {
          console.log('No photo_path found for this attendance record.');
       }
+
     } catch (err: any) {
       console.error('Erro ao carregar foto de presença', err);
       console.error('Error details:', err.message || err);
@@ -334,12 +345,18 @@ export default function AuditoriaPresencas() {
                       <div className="flex flex-col items-center">
                         <span className="text-sm font-bold text-blue-600 uppercase tracking-wider mb-4">{(selectedPresenca as any)?.is_atestado ? "Atestado Médico" : "Foto da Presença"}</span>
                         <div className="h-64 w-64 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center">
-                          {attendancePhotoUrl ? (
+                          {attendancePhotoUrl === 'EXPIRED' ? (
+                            <span className="text-gray-400 text-sm font-medium flex flex-col items-center">
+                              <Camera className="h-12 w-12 text-gray-300 mb-2 opacity-50" />
+                              Foto Expirada
+                              <span className="text-xs text-gray-400 mt-1">(Retenção de 20 dias)</span>
+                            </span>
+                          ) : attendancePhotoUrl ? (
                             <img src={attendancePhotoUrl} alt="Presença" className="h-full w-full object-cover" onError={(e) => {
                               console.error('Failed to load image from URL:', attendancePhotoUrl);
                               e.currentTarget.style.display = 'none';
                               e.currentTarget.parentElement?.classList.add('flex', 'flex-col', 'items-center', 'justify-center');
-                              e.currentTarget.parentElement?.insertAdjacentHTML('beforeend', '<span class="text-xs text-red-500 mt-2 text-center p-2">Erro ao carregar imagem</span>');
+                              e.currentTarget.parentElement?.insertAdjacentHTML('beforeend', '<span class="text-xs text-red-500 mt-2 text-center p-2">Foto Expirada ou Inacessível</span>');
                             }} />
                           ) : (
                             <span className="text-gray-400 text-sm font-medium flex flex-col items-center">

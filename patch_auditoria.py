@@ -3,76 +3,64 @@ import re
 with open('src/pages/admin/AuditoriaPresencas.tsx', 'r') as f:
     content = f.read()
 
-# Add state and context for MEIA DIARIA
-if 'const [togglingMeiaDiaria, setTogglingMeiaDiaria] = useState(false);' not in content:
-    content = content.replace(
-        'const [modalOpen, setModalOpen] = useState(false);',
-        'const [modalOpen, setModalOpen] = useState(false);\n  const [togglingMeiaDiaria, setTogglingMeiaDiaria] = useState(false);\n  const { user } = useAuth();'
-    )
-    content = content.replace(
-        "import { Search, Loader2, Camera, Calendar, Clock, User, CheckCircle2, ChevronDown } from 'lucide-react';",
-        "import { Search, Loader2, Camera, Calendar, Clock, User, CheckCircle2, ChevronDown, DollarSign } from 'lucide-react';\nimport { useAuth } from '../../contexts/AuthContext';"
-    )
+# Replace the attendance photo URL logic to check if photo_taken_at > 20 days
+# and set a flag or just use the onError approach.
+# It's better to check photo_taken_at.
 
-# Add toggle handler
-handler = """
-  const handleToggleMeiaDiaria = async (presenca: Presenca) => {
-    if (!user) return;
-    const isMeia = presenca.meia_diaria;
-    const actionText = isMeia ? 'reverter meia diária para diária normal' : 'transformar em meia diária';
-    const funcRate = presenca.funcionario?.funcao?.valor_diaria || 0;
-    const newRate = isMeia ? funcRate : funcRate / 2;
+open_modal_replacement = """  async function openModal(presenca: Presenca) {
+    console.log('--- DEBUG AUDITORIA ---');
+    console.log('Opening modal for presenca:', presenca);
+    console.log('Photo path:', presenca.photo_path);
     
-    if (!window.confirm(`Confirmar ${actionText}?\n\nO valor desta diária será ajustado para ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(newRate)}.`)) {
-      return;
-    }
+    setSelectedPresenca(presenca);
+    setAttendancePhotoUrl('');
     
     try {
-      setTogglingMeiaDiaria(true);
-      await api.toggleMeiaDiaria(presenca.id, !isMeia, user.id);
-      
-      // Update local state
-      const updatedPresencas = presencas.map(p => 
-        p.id === presenca.id ? { ...p, meia_diaria: !isMeia } : p
-      );
-      setPresencas(updatedPresencas);
-      setSelectedPresenca({ ...presenca, meia_diaria: !isMeia });
-      alert('Operação realizada com sucesso!');
-    } catch (err: any) {
-      alert(`Erro ao alterar meia diária: ${err.message}`);
-    } finally {
-      setTogglingMeiaDiaria(false);
-    }
-  };
+      if (presenca.photo_path) {
+         // Check if photo is expired (older than 20 days)
+         const photoDate = (presenca as any).photo_taken_at ? new Date((presenca as any).photo_taken_at) : new Date(presenca.created_at || presenca.data);
+         const twentyDaysAgo = new Date();
+         twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
+         
+         if (photoDate < twentyDaysAgo) {
+            console.log('Photo is expired based on retention policy (> 20 days).');
+            setAttendancePhotoUrl('EXPIRED');
+         } else {
+            const bucket = (presenca as any).is_atestado ? 'medical-certificates' : 'attendance-photos';
+            console.log(`Generating signed URL for ${bucket}:`, presenca.photo_path);
+            const url = await api.getPhotoUrl(bucket, presenca.photo_path);
+            console.log('Generated Signed URL:', url);
+            setAttendancePhotoUrl(url);
+         }
+      } else {
+         console.log('No photo_path found for this attendance record.');
+      }
 """
 
-if 'handleToggleMeiaDiaria' not in content:
-    content = content.replace(
-        '  async function loadFuncionarios() {',
-        handler + '\n  async function loadFuncionarios() {'
-    )
+content = re.sub(r'async function openModal\(presenca: Presenca\) \{[\s\S]*?if \(presenca\.photo_path\) \{[\s\S]*?const url = await api\.getPhotoUrl\([\s\S]*?setAttendancePhotoUrl\(url\);\s*\}\s*else\s*\{\s*console\.log\(\'No photo_path found for this attendance record\.\'\);\s*\}', open_modal_replacement, content)
 
-# Add button to the modal
-button_jsx = """
-                      {/* Actions */}
-                      <div className="md:col-span-2 flex justify-center mt-4 pt-4 border-t border-gray-100">
-                        {user?.perfil === 'ADMIN' && selectedPresenca?.presente && (
-                          <button
-                            onClick={() => handleToggleMeiaDiaria(selectedPresenca)}
-                            disabled={togglingMeiaDiaria}
-                            className={`flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${selectedPresenca.meia_diaria ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'}`}
-                          >
-                            <DollarSign className="h-4 w-4 mr-2" />
-                            {selectedPresenca.meia_diaria ? 'Reverter para Diária Normal' : 'Transformar em Meia Diária'}
-                          </button>
-                        )}
-                      </div>
-"""
-if '{/* Actions */}' not in content:
-    content = content.replace(
-        '                    </div>\n                    \n                  </div>',
-        '                    </div>\n' + button_jsx + '\n                  </div>'
-    )
+# Replace rendering
+render_replacement = """{attendancePhotoUrl === 'EXPIRED' ? (
+                            <span className="text-gray-400 text-sm font-medium flex flex-col items-center">
+                              <Camera className="h-12 w-12 text-gray-300 mb-2 opacity-50" />
+                              Foto Expirada
+                              <span className="text-xs text-gray-400 mt-1">(Retenção de 20 dias)</span>
+                            </span>
+                          ) : attendancePhotoUrl ? (
+                            <img src={attendancePhotoUrl} alt="Presença" className="h-full w-full object-cover" onError={(e) => {
+                              console.error('Failed to load image from URL:', attendancePhotoUrl);
+                              e.currentTarget.style.display = 'none';
+                              e.currentTarget.parentElement?.classList.add('flex', 'flex-col', 'items-center', 'justify-center');
+                              e.currentTarget.parentElement?.insertAdjacentHTML('beforeend', '<span class="text-xs text-red-500 mt-2 text-center p-2">Foto Expirada ou Inacessível</span>');
+                            }} />
+                          ) : (
+                            <span className="text-gray-400 text-sm font-medium flex flex-col items-center">
+                              <User className="h-12 w-12 text-gray-300 mb-2" />
+                              Sem Foto
+                            </span>
+                          )}"""
+
+content = re.sub(r'\{attendancePhotoUrl \? \([\s\S]*?\}\} />[\s\S]*?\) : \([\s\S]*?Sem Foto[\s\S]*?</span>[\s\S]*?\)\}', render_replacement, content)
 
 with open('src/pages/admin/AuditoriaPresencas.tsx', 'w') as f:
     f.write(content)

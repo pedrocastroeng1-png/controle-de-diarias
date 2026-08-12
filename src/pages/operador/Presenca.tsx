@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Funcionario } from '../../lib/types';
 import { format, parseISO } from 'date-fns';
+import { compressImage } from '../../lib/imageUtils';
 import { useAuth } from '../../contexts/AuthContext';
 import { User, Camera, CheckCircle } from 'lucide-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
@@ -614,9 +615,14 @@ return (
                        onChange={(e) => {
                         const file = e.target.files?.[0];
                         if (file) {
-                          setPreviewPhoto({
-                            file,
-                            url: URL.createObjectURL(file)
+                          compressImage(file).then(compressedFile => {
+                            setPreviewPhoto({
+                              file: compressedFile,
+                              url: URL.createObjectURL(compressedFile)
+                            });
+                          }).catch(err => {
+                            console.error('Erro na compressão:', err);
+                            setPreviewPhoto({ file, url: URL.createObjectURL(file) });
                           });
                         }
                       }} 
