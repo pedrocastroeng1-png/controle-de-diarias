@@ -173,17 +173,21 @@ export default function Relatorios() {
 
   const handleExportPDF = () => {
     try {
+    console.log('[PDF] Iniciando geração');
     const doc = new jsPDF();
     const obraNome = obras.find(o => o.id === obraId)?.nome || 'Todas';
     const periodStr = dataInicial && dataFinal 
       ? `${format(parseISO(dataInicial), 'dd/MM/yyyy')} a ${format(parseISO(dataFinal), 'dd/MM/yyyy')}`
       : 'Todos os períodos';
     
+    console.log('[PDF] Dataset recebido');
     const agrupado = relatorioAgrupado;
     const totalFolha = valorTotal;
     const totalDiarias = totaisDias;
     const totalFuncionarios = agrupado.length;
+    console.log(`[PDF] Quantidade de registros: ${totalFuncionarios}`);
 
+    console.log('[PDF] Preparando documento');
     doc.setFontSize(22);
     doc.setFont("helvetica", "bold");
     doc.text('TARGOS ENGENHARIA', 14, 22);
@@ -196,6 +200,7 @@ export default function Relatorios() {
     doc.text(`Obra: ${obraNome}`, 14, 42);
     doc.text(`Período: ${periodStr}`, 14, 48);
 
+    console.log('[PDF] Gerando tabela');
     const tableColumn = ["Funcionário", "Função", "Obra", "Valor da Diária", "Dias Trabalhados", "Total Recebido"];
     const tableRows = agrupado.map(f => [
       f.nome,
@@ -215,6 +220,7 @@ export default function Relatorios() {
       headStyles: { fillColor: [37, 99, 235] }
     });
 
+    console.log('[PDF] Finalizando documento');
     const finalY = (doc as any).lastAutoTable.finalY || 55;
     
     doc.setFontSize(11);
@@ -234,8 +240,13 @@ export default function Relatorios() {
       doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 35, doc.internal.pageSize.height - 10);
     }
 
+    console.log('[PDF] Criando Blob/download');
     doc.save(`${getFileNameBase()}.pdf`);
-    } catch (e) {
+    console.log('[PDF] PDF gerado com sucesso');
+    } catch (e: any) {
+      console.error('[PDF] ERRO COMPLETO:', e);
+      console.error('[PDF] message:', e instanceof Error ? e.message : e);
+      console.error('[PDF] stack:', e instanceof Error ? e.stack : undefined);
       setErro('Ocorreu um erro ao gerar o PDF.');
     }
   };
