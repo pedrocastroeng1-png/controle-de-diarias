@@ -46,7 +46,7 @@ export function CentralCommunicationViewer({ communications, onComplete }: { com
         </div>
 
         <div className="flex-1 overflow-y-auto p-6">
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 whitespace-pre-wrap text-gray-700 text-lg leading-relaxed">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] text-gray-700 text-lg leading-relaxed">
             {currentComm.comunicacao.mensagem}
           </div>
         </div>

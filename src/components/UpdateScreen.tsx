@@ -24,27 +24,28 @@ export function UpdateScreen({ latestVersion, onUpdateNow, onUpdateLater, isUpda
           </div>
           
           <h2 className="text-[32px] sm:text-[36px] leading-tight font-extrabold text-[#0F172A] tracking-tight mb-4">
-            Nova versão disponível
+            Nova atualização
           </h2>
           
           <p className="text-[15px] sm:text-[16px] text-[#64748B] font-medium leading-relaxed mb-8">
             Uma nova versão do Controle de Diárias foi publicada.<br/><br/>
             Atualize agora para continuar utilizando o aplicativo com melhorias, correções e novos recursos.
           </p>
-
-          <div className="flex justify-center items-center gap-6 mb-10 w-full px-4">
-            <div className="flex flex-col items-center">
-              <span className="text-[12px] uppercase tracking-wider font-bold text-slate-400 mb-1">Atual</span>
-              <span className="text-[16px] font-semibold text-slate-700 bg-slate-100 px-3 py-1 rounded-lg">{version}</span>
+          {latestVersion !== version && (
+            <div className="flex justify-center items-center gap-6 mb-10 w-full px-4">
+              <div className="flex flex-col items-center">
+                <span className="text-[12px] uppercase tracking-wider font-bold text-slate-400 mb-1">Antiga</span>
+                <span className="text-[16px] font-semibold text-slate-700 bg-slate-100 px-3 py-1 rounded-lg">{version}</span>
+              </div>
+              <div className="text-slate-300">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+              </div>
+              <div className="flex flex-col items-center">
+                <span className="text-[12px] uppercase tracking-wider font-bold text-blue-500 mb-1">Nova</span>
+                <span className="text-[16px] font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">{latestVersion}</span>
+              </div>
             </div>
-            <div className="text-slate-300">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
-            </div>
-            <div className="flex flex-col items-center">
-              <span className="text-[12px] uppercase tracking-wider font-bold text-blue-500 mb-1">Nova</span>
-              <span className="text-[16px] font-semibold text-blue-600 bg-blue-50 px-3 py-1 rounded-lg">{latestVersion}</span>
-            </div>
-          </div>
+          )}
 
           <div className="w-full flex flex-col gap-3">
             <button

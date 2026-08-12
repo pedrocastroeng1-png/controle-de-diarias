@@ -120,7 +120,7 @@ export function CommunicationViewer({ communications, onComplete }: Props) {
               {comm.title}
             </h2>
 
-            <div className="prose prose-lg max-w-none text-gray-700 whitespace-pre-wrap mb-10">
+            <div className="prose prose-lg max-w-none text-gray-700 whitespace-pre-wrap break-words [word-break:break-word] [overflow-wrap:anywhere] mb-10">
               {comm.message}
             </div>
 

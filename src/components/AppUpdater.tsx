@@ -64,8 +64,8 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
     if (needRefresh) {
       setIsOutdated(true);
       if (latestVersion === version) {
-        // If we don't know the new version string yet, just append a '+' or mark as Nova
-        setLatestVersion('Nova Atualização');
+        // Fetch the actual latest version instead of using a placeholder text
+        checkVersion();
       }
     }
   }, [needRefresh, latestVersion]);
