@@ -172,26 +172,91 @@ export default function Relatorios() {
     return base + range;
   };
 
-        const handleExportPDF = async () => {
+          const handleExportPDF = async () => {
     try {
       setLoading(true);
-      console.log('[PDF] Iniciando geração');
       
       const doc = new jsPDF();
-      const obraNome = obras.find(o => o.id === obraId)?.nome || 'Todas';
+      const obraNome = obras.find(o => o.id === obraId)?.nome || 'Todas as obras';
       const periodStr = dataInicial && dataFinal 
         ? `${format(parseISO(dataInicial), 'dd/MM/yyyy')} a ${format(parseISO(dataFinal), 'dd/MM/yyyy')}`
         : 'Todos os períodos';
+        
+      const emitDateStr = format(new Date(), 'dd/MM/yyyy HH:mm');
       
-      const agrupado = relatorioAgrupado;
-      const totalFolha = valorTotal;
-      const totalDiarias = totaisDias;
+      // Safe Date Filtering
+      const startD = dataInicial ? new Date(`${dataInicial}T00:00:00`) : null;
+      const endD = dataFinal ? new Date(`${dataFinal}T23:59:59`) : null;
+      
+      const filteredRelatorio = relatorio.filter((r: any) => {
+        if (!r.data) return false;
+        const rDate = new Date(`${r.data}T12:00:00`);
+        if (startD && rDate < startD) return false;
+        if (endD && rDate > endD) return false;
+        return true;
+      });
+
+      const fAgrupado: Record<string, any> = {};
+      filteredRelatorio.forEach((p: any) => {
+        const fId = p.funcionario_id || p.funcionario_nome || p.funcionario;
+        if (fId) {
+          if (!fAgrupado[fId]) {
+            fAgrupado[fId] = {
+              nome: p.funcionario_nome || p.funcionario || '',
+              funcao: p.funcao_nome || p.funcao || '',
+              obra: p.obra_nome || p.obra || '',
+              dias: 0,
+              faltas: 0,
+              inteiras: 0,
+              meias: 0,
+              valorDiaria: Number(p.valor_diaria) || 0,
+              total: 0,
+              records: []
+            };
+          }
+          const rowValor = Number(p.valor_calculado) || Number(p.valor_diaria) || 0;
+          fAgrupado[fId].records.push(p);
+
+          if (p.status === 'PRESENTE') {
+            if (p.tipo_diaria === 'MEIA_DIARIA') {
+               fAgrupado[fId].dias += 0.5;
+               fAgrupado[fId].meias += 1;
+               fAgrupado[fId].total += rowValor;
+            } else {
+               fAgrupado[fId].dias += 1;
+               fAgrupado[fId].inteiras += 1;
+               fAgrupado[fId].total += rowValor;
+            }
+          } else if (p.status === 'MEIA DIÁRIA') {
+            fAgrupado[fId].dias += 0.5;
+            fAgrupado[fId].meias += 1;
+            fAgrupado[fId].total += rowValor;
+          } else if (p.status === 'FALTOU') {
+            fAgrupado[fId].faltas += 1;
+          }
+        }
+      });
+      const agrupado = Object.values(fAgrupado).sort((a: any, b: any) => a.nome.localeCompare(b.nome));
+
+      let inteirasGeral = 0;
+      let meiasGeral = 0;
+      let faltasGeral = 0;
+      let totalFolha = 0;
+      
+      filteredRelatorio.forEach((r: any) => {
+        if (r.status === 'PRESENTE' && r.tipo_diaria !== 'MEIA_DIARIA') inteirasGeral++;
+        if (r.status === 'MEIA DIÁRIA' || r.tipo_diaria === 'MEIA_DIARIA') meiasGeral++;
+        if (r.status === 'FALTOU') faltasGeral++;
+        if (r.status === 'PRESENTE' || r.status === 'MEIA DIÁRIA') {
+             totalFolha += (Number(r.valor_calculado) || Number(r.valor_diaria) || 0);
+        }
+      });
       const totalFuncionarios = agrupado.length;
       
       const fetchImageAsBase64 = async (url: string) => {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000); // 6 sec timeout per image
+          const timeoutId = setTimeout(() => controller.abort(), 6000);
           const response = await fetch(url, { signal: controller.signal });
           clearTimeout(timeoutId);
           if (!response.ok) return null;
@@ -209,119 +274,156 @@ export default function Relatorios() {
 
       // Page 1: Resumo
       doc.setFontSize(22);
+      doc.setTextColor(30, 58, 95);
       doc.setFont("helvetica", "bold");
       doc.text('CONTROLE DE DIÁRIAS', 14, 22);
       
-      doc.setFontSize(16);
+      doc.setFontSize(14);
+      doc.setTextColor(100, 116, 139);
       doc.setFont("helvetica", "normal");
-      doc.text('RELATÓRIO DE DIÁRIAS', 14, 32);
+      doc.text('RELATÓRIO DE DIÁRIAS', 14, 30);
       
-      doc.setFontSize(11);
-      doc.text(`Período: ${periodStr}`, 14, 42);
-      doc.text(`Obra: ${obraNome}`, 14, 48);
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
+      doc.text(`Período: ${periodStr}`, 14, 40);
+      doc.text(`Obra: ${obraNome}`, 14, 46);
+      doc.text(`Data de emissão: ${emitDateStr}`, 14, 52);
 
-      let inteirasGeral = 0;
-      let meiasGeral = 0;
-      let faltasGeral = 0;
-      relatorio.forEach((r: any) => {
-        if (r.status === 'PRESENTE' && r.tipo_diaria !== 'MEIA_DIARIA') inteirasGeral++;
-        if (r.status === 'MEIA DIÁRIA' || r.tipo_diaria === 'MEIA_DIARIA') meiasGeral++;
-        if (r.status === 'FALTOU') faltasGeral++;
-      });
+      // Indicadores Blocks
+      const formatCurrency = (val: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(val);
       
-      doc.text(`FUNCIONÁRIOS: ${totalFuncionarios}`, 14, 60);
-      doc.text(`DIÁRIAS INTEIRAS: ${inteirasGeral}`, 14, 66);
-      doc.text(`MEIAS-DIÁRIAS: ${meiasGeral}`, 14, 72);
-      doc.text(`FALTAS: ${faltasGeral}`, 14, 78);
+      doc.setFillColor(248, 250, 252);
+      doc.setDrawColor(226, 232, 240);
+      doc.rect(14, 60, 182, 22, 'FD'); // Box around indicators
       
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text("FUNCIONÁRIOS", 20, 68);
+      doc.text("DIÁRIAS INTEIRAS", 55, 68);
+      doc.text("MEIAS-DIÁRIAS", 95, 68);
+      doc.text("FALTAS", 135, 68);
+      doc.text("TOTAL CALCULADO", 160, 68);
+      
+      doc.setFontSize(12);
+      doc.setTextColor(30, 58, 95);
       doc.setFont("helvetica", "bold");
-      doc.text(`TOTAL CALCULADO: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalFolha)}`, 14, 86);
-      
-      const tableColumn = ["Funcionário", "Função", "Diárias", "Meias", "Faltas", "Total"];
+      doc.text(`${totalFuncionarios}`, 20, 76);
+      doc.text(`${inteirasGeral}`, 55, 76);
+      doc.text(`${meiasGeral}`, 95, 76);
+      doc.text(`${faltasGeral}`, 135, 76);
+      doc.text(`${formatCurrency(totalFolha)}`, 160, 76);
+
+      // Table Resumo
+      const tableColumn = ["Funcionário", "Função", "Obra", "Valor da Diária", "Inteiras", "Meias", "Faltas", "Total"];
       const tableRows = agrupado.map(f => [
         f.nome,
         f.funcao,
-        f.dias.toString(),
+        f.obra || obraNome,
+        formatCurrency(f.valorDiaria),
+        f.inteiras.toString(),
+        f.meias.toString(),
         f.faltas.toString(),
-        (relatorio.filter((r: any) => (r.funcionario_nome === f.nome || r.funcionario === f.nome) && r.status === 'FALTOU').length).toString(),
-        new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(f.total)
+        formatCurrency(f.total)
       ]);
       
       autoTable(doc, {
         head: [tableColumn],
         body: tableRows,
-        startY: 95,
+        startY: 90,
         theme: 'striped',
-        styles: { fontSize: 9 },
-        headStyles: { fillColor: [37, 99, 235] }
+        styles: { fontSize: 8, textColor: [30, 58, 95] },
+        headStyles: { fillColor: [30, 58, 95], textColor: 255 },
+        alternateRowStyles: { fillColor: [248, 250, 252] }
       });
       
-      const relatorioPorFunc = {};
-      relatorio.forEach((r: any) => {
-        const fId = r.funcionario_id || r.funcionario_nome || r.funcionario;
-        if (!relatorioPorFunc[fId]) relatorioPorFunc[fId] = [];
-        relatorioPorFunc[fId].push(r);
-      });
+      let currentY = (doc as any).lastAutoTable.finalY + 15;
       
-      // Page 2+: Individual Details
+      // Page 2+: Individual Details (Continuous flow)
       for (const resumoFunc of agrupado) {
-        doc.addPage();
-        doc.setFontSize(16);
+        
+        // Header needs ~45 units. If not enough space, new page.
+        if (currentY > 240) {
+          doc.addPage();
+          currentY = 20;
+        }
+        
+        doc.setFillColor(30, 58, 95);
+        doc.rect(14, currentY, 182, 8, 'F');
+        doc.setFontSize(10);
+        doc.setTextColor(255, 255, 255);
         doc.setFont("helvetica", "bold");
-        doc.text('CONTROLE DE DIÁRIAS', 14, 20);
+        doc.text('CONTROLE INDIVIDUAL DE DIÁRIAS', 16, currentY + 6);
+        currentY += 14;
         
         doc.setFontSize(12);
-        doc.text(`FUNCIONÁRIO: ${resumoFunc.nome}`, 14, 30);
+        doc.setTextColor(0, 0, 0);
+        doc.text(resumoFunc.nome.toUpperCase(), 14, currentY);
+        currentY += 6;
+        
+        doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`Função: ${resumoFunc.funcao}`, 14, 36);
-        doc.text(`Obra: ${resumoFunc.obra || obraNome}`, 14, 42);
-        doc.text(`Período: ${periodStr}`, 14, 48);
-
-        let currentY = 60;
+        doc.text(`Função: ${resumoFunc.funcao}`, 14, currentY); currentY += 5;
+        doc.text(`Obra: ${resumoFunc.obra || obraNome}`, 14, currentY); currentY += 5;
+        doc.text(`Período: ${periodStr}`, 14, currentY); currentY += 7;
         
-        const key = relatorio.find((r: any) => r.funcionario === resumoFunc.nome || r.funcionario_nome === resumoFunc.nome)?.funcionario_id || resumoFunc.nome;
-        const records = (relatorioPorFunc[key] || relatorioPorFunc[resumoFunc.nome] || []).sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+        doc.setFont("helvetica", "bold");
+        doc.text("Resumo:", 14, currentY); currentY += 5;
+        doc.setFont("helvetica", "normal");
+        doc.text(`Diárias inteiras: ${resumoFunc.inteiras} | Meias-diárias: ${resumoFunc.meias} | Faltas: ${resumoFunc.faltas} | Total calculado: ${formatCurrency(resumoFunc.total)}`, 14, currentY);
+        currentY += 10;
         
-        for (const record of records) {
-          if (currentY > 240) {
+        const records = resumoFunc.records.sort((a: any, b: any) => new Date(a.data).getTime() - new Date(b.data).getTime());
+        
+                for (const record of records) {
+          const dataStr = format(parseISO(record.data), 'dd/MM/yyyy');
+          const isFalta = record.status === 'FALTOU';
+          const isAtestado = record.status === 'ATESTADO MÉDICO';
+          const isFerias = record.status === 'FÉRIAS';
+          const isFolga = record.status === 'FOLGA';
+          const isMeia = record.tipo_diaria === 'MEIA_DIARIA' || record.status === 'MEIA DIÁRIA';
+          const isPresente = record.status === 'PRESENTE' || isMeia;
+          
+          const blockHeight = isPresente ? 35 : 12; 
+          
+          if (currentY + blockHeight > 280) {
             doc.addPage();
             currentY = 20;
           }
           
-          const dataStr = format(parseISO(record.data), 'dd/MM/yyyy');
-          doc.setFontSize(11);
+          doc.setDrawColor(226, 232, 240);
+          doc.line(14, currentY, 196, currentY);
+          currentY += 6;
+          
+          doc.setFontSize(9);
           doc.setFont("helvetica", "bold");
           
-          if (record.status === 'FALTOU') {
-            doc.setTextColor(220, 38, 38);
-            doc.text(`${dataStr}  🔴 FALTOU`, 14, currentY);
+          // Date
+          doc.setTextColor(0, 0, 0);
+          doc.text(`${dataStr}`, 14, currentY);
+          
+          if (isFalta) {
+            doc.setTextColor(185, 28, 28);
+            doc.text(`FALTOU`, 45, currentY);
             doc.setTextColor(0, 0, 0);
             doc.setFont("helvetica", "normal");
-            currentY += 6;
-            doc.text(`Valor: R$ 0,00`, 14, currentY);
-            currentY += 12;
-          } else if (record.status === 'PRESENTE' || record.status === 'MEIA DIÁRIA') {
-            doc.setTextColor(22, 163, 74);
-            doc.text(`${dataStr}  🟢 PRESENTE`, 14, currentY);
+            doc.text(`VALOR: R$ 0,00`, 110, currentY);
+            currentY += 4;
+          } else if (isAtestado || isFerias || isFolga) {
+            doc.setTextColor(180, 83, 9);
+            doc.text(`${record.status}`, 45, currentY);
             doc.setTextColor(0, 0, 0);
             doc.setFont("helvetica", "normal");
-            currentY += 6;
+            currentY += 4;
+          } else if (isPresente) {
+            doc.setTextColor(21, 128, 61);
+            const statusLabel = isMeia ? 'MEIA DIÁRIA' : 'PRESENTE';
+            doc.text(statusLabel, 45, currentY);
             
-            const isMeia = record.tipo_diaria === 'MEIA_DIARIA' || record.status === 'MEIA DIÁRIA';
-            doc.text(`Diária: ${isMeia ? 'MEIA DIÁRIA' : 'INTEIRA'}`, 14, currentY);
-            currentY += 6;
+            doc.setTextColor(0, 0, 0);
+            doc.setFont("helvetica", "normal");
+            const vCalc = Number(record.valor_calculado) || 0;
+            doc.text(`VALOR: ${formatCurrency(vCalc)}`, 110, currentY);
             
-            const vBase = record.valor_diaria || 0;
-            const vCalc = record.valor_calculado || 0;
-            doc.text(`Valor: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(vBase)}`, 14, currentY);
-            currentY += 6;
-            
-            if (isMeia) {
-              doc.text(`Valor calculado: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(vCalc)}`, 14, currentY);
-              currentY += 6;
-            }
-            
-            // INDIVIDUAL PHOTO FETCH
             let photoMeta: any = null;
             if (record.id && supabase) {
                 try {
@@ -334,23 +436,21 @@ export default function Relatorios() {
                         photoMeta = { path: fetchMetaRes.data.photo_path, taken_at: fetchMetaRes.data.photo_taken_at };
                     }
                 } catch (e) {
-                    console.warn(`Falha ao buscar metadados da foto do registro ${record.id}`, e);
+                    console.warn(`Falha metadados foto ${record.id}`);
                 }
             }
 
             if ((photoMeta && photoMeta.path) || record.atestado_photo_path) {
-               doc.text(`Foto da presença:`, 14, currentY);
-               currentY += 6;
-               
                const photoDate = new Date((photoMeta && photoMeta.taken_at) ? photoMeta.taken_at : record.data);
                const twentyDaysAgo = new Date();
                twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
                
                if (photoDate < twentyDaysAgo) {
-                 doc.setTextColor(156, 163, 175);
-                 doc.text(`📸 FOTO EXPIRADA`, 14, currentY + 10);
+                 doc.setFontSize(8);
+                 doc.setTextColor(100, 116, 139);
+                 doc.text(`FOTO EXPIRADA`, 150, currentY);
                  doc.setTextColor(0, 0, 0);
-                 currentY += 25;
+                 currentY += 4;
                } else {
                  try {
                    const bucket = record.status === 'ATESTADO MÉDICO' ? 'medical-certificates' : 'attendance-photos';
@@ -363,75 +463,53 @@ export default function Relatorios() {
                    const imgData = await fetchImageAsBase64(url);
                    
                    if (imgData) {
-                     const pdfWidth = 50;
-                     const pdfHeight = 65; 
-                     
-                     if (currentY + pdfHeight > 275) {
-                       doc.addPage();
-                       currentY = 20;
-                     }
-                     doc.addImage(imgData, 'JPEG', 14, currentY, pdfWidth, pdfHeight);
-                     currentY += pdfHeight + 8;
+                     const pdfWidth = 20;
+                     const pdfHeight = 26; 
+                     doc.addImage(imgData, 'JPEG', 150, currentY - 4, pdfWidth, pdfHeight);
+                     currentY += 26; // move past the miniature
                    } else {
-                     doc.setTextColor(156, 163, 175);
-                     doc.text(`📸 FOTO INDISPONÍVEL`, 14, currentY + 10);
+                     doc.setFontSize(8);
+                     doc.setTextColor(100, 116, 139);
+                     doc.text(`FOTO INDISPONÍVEL`, 150, currentY);
                      doc.setTextColor(0, 0, 0);
-                     currentY += 25;
+                     currentY += 4;
                    }
                  } catch (e) {
-                   doc.setTextColor(156, 163, 175);
-                   doc.text(`📸 FOTO INDISPONÍVEL`, 14, currentY + 10);
+                   doc.setFontSize(8);
+                   doc.setTextColor(100, 116, 139);
+                   doc.text(`FOTO INDISPONÍVEL`, 150, currentY);
                    doc.setTextColor(0, 0, 0);
-                   currentY += 25;
+                   currentY += 4;
                  }
                }
             } else {
-              currentY += 6;
+               currentY += 4;
             }
-          } else if (record.status === 'ATESTADO MÉDICO') {
-            doc.setTextColor(37, 99, 235);
-            doc.text(`${dataStr}  🩺 ATESTADO MÉDICO`, 14, currentY);
-            doc.setTextColor(0, 0, 0);
-            doc.setFont("helvetica", "normal");
-            currentY += 12;
           }
         }
         
-        if (currentY > 230) {
-          doc.addPage();
-          currentY = 20;
-        }
-        
         currentY += 10;
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "bold");
-        doc.text('RESUMO DO FUNCIONÁRIO', 14, currentY);
-        currentY += 8;
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "normal");
-        
-        const fMeias = records.filter((r: any) => r.status === 'MEIA DIÁRIA' || r.tipo_diaria === 'MEIA_DIARIA').length;
-        const fInteiras = records.filter((r: any) => r.status === 'PRESENTE' && r.tipo_diaria !== 'MEIA_DIARIA').length;
-        const fFaltas = records.filter((r: any) => r.status === 'FALTOU').length;
-        
-        doc.text(`Diárias inteiras: ${fInteiras}`, 14, currentY); currentY += 6;
-        doc.text(`Meias-diárias: ${fMeias}`, 14, currentY); currentY += 6;
-        doc.text(`Faltas: ${fFaltas}`, 14, currentY); currentY += 10;
-        
-        doc.setFont("helvetica", "bold");
-        doc.text(`Valor total calculado:`, 14, currentY); currentY += 6;
-        doc.text(`${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(resumoFunc.total)}`, 14, currentY);
       }
       
       const pageCount = (doc as any).internal.getNumberOfPages();
       for (let i = 1; i <= pageCount; i++) {
         doc.setPage(i);
-        doc.setFontSize(10);
-        doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 35, doc.internal.pageSize.height - 10);
+        
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text('CONTROLE DE DIÁRIAS', 14, 10);
+        
+        doc.text(`Documento interno`, 14, doc.internal.pageSize.height - 10);
+        doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
       }
       
-      doc.save(`${getFileNameBase()}.pdf`);
-      console.log('[PDF] PDF gerado com sucesso');
+      let baseFileName = 'controle_diarias';
+      if (obraNome !== 'Todas as obras') {
+         baseFileName += '_' + obraNome.replace(/[^a-zA-Z0-9]/g, '_').toLowerCase();
+      }
+      const dateName = (dataInicial && dataFinal) ? `${dataInicial}_ate_${dataFinal}` : format(new Date(), 'dd-MM-yyyy');
+      doc.save(`${baseFileName}_${dateName}.pdf`);
+      
     } catch (e: any) {
       console.error('[PDF] Ocorreu uma exceção no fluxo:', e);
       setErro('Ocorreu um erro ao gerar o PDF. Verifique o console.');
@@ -440,27 +518,30 @@ export default function Relatorios() {
     }
   };
 
-  const handleExportDailyPDF = async () => {
+    const handleExportDailyPDF = async () => {
     const targetDate = dataInicial || hoje;
-    const dailyData = relatorio;
+    
+    // Filter by exact date
+    const dailyData = relatorio.filter(r => r.data === targetDate);
+    const emitDateStr = format(new Date(), 'dd/MM/yyyy HH:mm');
 
     const doc = new jsPDF();
     
     doc.setFontSize(22);
+    doc.setTextColor(30, 58, 95);
     doc.setFont("helvetica", "bold");
-    doc.text('TARGOS ENGENHARIA', 14, 22);
-
-    doc.setFontSize(16);
-    doc.setFont("helvetica", "normal");
-    doc.text('CONTROLE DE PRESENÇA', 14, 32);
+    doc.text('CONTROLE DE PRESENÇA', 14, 22);
     
     doc.setFontSize(11);
-    doc.text(`Data: ${format(parseISO(targetDate), 'dd/MM/yyyy')}`, 14, 42);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Data: ${format(parseISO(targetDate), 'dd/MM/yyyy')}`, 14, 32);
+    doc.text(`Data de emissão: ${emitDateStr}`, 14, 38);
 
-    // Group by obra
     const obrasGroup: Record<string, any[]> = {};
     let totalPresentes = 0;
     let totalFaltas = 0;
+    let totalAtestados = 0;
 
     dailyData.forEach(p => {
       const obraName = p.obra_nome || p.obra || 'Sem Obra';
@@ -471,9 +552,10 @@ export default function Relatorios() {
       else if (p.status === 'PRESENTE') totalPresentes += 1;
       else if (p.status === 'MEIA DIÁRIA') totalPresentes += 0.5;
       else if (p.status === 'FALTOU') totalFaltas++;
+      else if (p.status === 'ATESTADO MÉDICO') totalAtestados++;
     });
 
-    let currentY = 55;
+    let currentY = 50;
 
     Object.keys(obrasGroup).sort().forEach(obraName => {
       if (currentY > 250) {
@@ -481,12 +563,16 @@ export default function Relatorios() {
         currentY = 20;
       }
       
-      doc.setFontSize(12);
-      doc.setFont("helvetica", "bold");
-      doc.text(`Obra: ${obraName}`, 14, currentY);
-      currentY += 8;
-
+      doc.setFillColor(30, 58, 95);
+      doc.rect(14, currentY, 182, 8, 'F');
       doc.setFontSize(11);
+      doc.setTextColor(255, 255, 255);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Obra: ${obraName}`, 16, currentY + 6);
+      currentY += 12;
+
+      doc.setFontSize(10);
+      doc.setTextColor(0, 0, 0);
       doc.setFont("helvetica", "normal");
       
       const funcs = obrasGroup[obraName].sort((a, b) => (a.funcionario_nome || a.funcionario || '').localeCompare(b.funcionario_nome || b.funcionario || ''));
@@ -495,37 +581,54 @@ export default function Relatorios() {
           doc.addPage();
           currentY = 20;
         }
-        let marker = ' F ';
-        if (f.status === 'ATESTADO MÉDICO') marker = '🩺 Atestado';
-        else if (f.status === 'PRESENTE' && f.tipo_diaria === 'MEIA_DIARIA') marker = '🌗 Meia Diária';
-        else if (f.status === 'MEIA DIÁRIA') marker = '🌗 Meia Diária';
-        else if (f.status === 'PRESENTE') marker = ' P ';
+        let statusText = 'PRESENTE';
+        if (f.status === 'ATESTADO MÉDICO') statusText = 'ATESTADO MÉDICO';
+        else if (f.status === 'PRESENTE' && f.tipo_diaria === 'MEIA_DIARIA') statusText = 'MEIA DIÁRIA';
+        else if (f.status === 'MEIA DIÁRIA') statusText = 'MEIA DIÁRIA';
+        else if (f.status === 'FALTOU') statusText = 'FALTOU';
+        else if (f.status === 'FÉRIAS') statusText = 'FÉRIAS';
+        else if (f.status === 'FOLGA') statusText = 'FOLGA';
         
-        doc.text(`[${marker}] ${f.funcionario_nome || f.funcionario}`, 14, currentY);
-        currentY += 7;
+        doc.text(`${f.funcionario_nome || f.funcionario}`, 14, currentY);
+        doc.text(`[${statusText}]`, 130, currentY);
+        currentY += 6;
       });
-      currentY += 5;
+      currentY += 6;
     });
 
-    currentY += 5;
-    if (currentY > 240) {
+    if (currentY > 230) {
       doc.addPage();
       currentY = 20;
     }
 
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(226, 232, 240);
+    doc.rect(14, currentY, 182, 35, 'FD');
+
     doc.setFontSize(11);
     doc.setFont("helvetica", "bold");
-    doc.text(`Total de Funcionários: ${dailyData.length}`, 14, currentY);
-    doc.text(`Presentes (Diárias): ${totalPresentes}`, 14, currentY + 7);
-    doc.text(`Faltas: ${totalFaltas}`, 14, currentY + 14);
-
+    doc.text(`RESUMO GERAL`, 20, currentY + 8);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(10);
-    doc.text(`Operador Responsável: ${usuario?.usuario || 'Sistema'}`, 14, currentY + 28);
-    doc.text(`Emitido em: ${format(new Date(), 'dd/MM/yyyy HH:mm')}`, 14, currentY + 35);
+    doc.text(`Total de Funcionários: ${dailyData.length}`, 20, currentY + 16);
+    doc.text(`Presentes (Diárias): ${totalPresentes}`, 20, currentY + 22);
+    doc.text(`Faltas: ${totalFaltas}`, 20, currentY + 28);
+    
+    currentY += 45;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`Operador Responsável: ${usuario?.usuario || 'Sistema'}`, 14, currentY);
 
-    const baseName = obraId ? obras.find(o => o.id === obraId)?.nome?.replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_') + '_' : '';
-    doc.save(`relatorio_diario_${baseName}${format(parseISO(targetDate), 'dd-MM-yyyy')}.pdf`);
+    const pageCount = (doc as any).internal.getNumberOfPages();
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i);
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text('CONTROLE DE DIÁRIAS', 14, 10);
+      doc.text(`Documento interno`, 14, doc.internal.pageSize.height - 10);
+      doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
+    }
+    
+    doc.save(`relatorio_diario_${targetDate}.pdf`);
   };
 
   const handleExportExcel = async () => {
