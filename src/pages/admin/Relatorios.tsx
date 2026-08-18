@@ -696,7 +696,7 @@ export default function Relatorios() {
       
       wsResumo.mergeCells('A1:F1');
       const cellA1 = wsResumo.getCell('A1');
-      cellA1.value = 'TARGOS ENGENHARIA';
+      cellA1.value = 'CONTROLE DE DIÁRIAS';
       cellA1.font = { size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
       cellA1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
       cellA1.alignment = { vertical: 'middle', horizontal: 'center' };

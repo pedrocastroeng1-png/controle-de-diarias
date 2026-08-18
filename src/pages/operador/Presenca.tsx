@@ -20,6 +20,8 @@ export default function PresencaPage() {
   const [saving, setSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showNaoRegistradosModal, setShowNaoRegistradosModal] = useState(false);
+  const [funcionariosNaoRegistrados, setFuncionariosNaoRegistrados] = useState<Funcionario[]>([]);
   const [toast, setToast] = useState<{message: string, type: 'success'|'error'} | null>(null);
   
   const showToast = (message: string, type: 'success'|'error' = 'success') => {
@@ -266,6 +268,17 @@ export default function PresencaPage() {
 
   const handleSalvarClick = () => {
     if (jaRegistradoHoje) return;
+
+    const naoIdentificados = funcionarios.filter(
+      f => !atestadosAtivos[f.id] && presencas[f.id] === undefined
+    );
+
+    if (naoIdentificados.length > 0) {
+      setFuncionariosNaoRegistrados(naoIdentificados);
+      setShowNaoRegistradosModal(true);
+      return;
+    }
+
     setShowConfirm(true);
   };
 
@@ -801,6 +814,38 @@ return (
                 className="w-full sm:w-auto px-6 py-3 font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors order-1 sm:order-2"
               >
                 Salvar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showNaoRegistradosModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-t-3xl sm:rounded-2xl p-6 w-full max-w-sm shadow-xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0">
+            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6 sm:hidden"></div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2 text-center text-red-600">Atenção</h3>
+            <p className="text-gray-600 mb-4 text-center text-lg">
+              {funcionariosNaoRegistrados.length === 1 
+                ? `Você não identificou se ${funcionariosNaoRegistrados[0].nome} está presente.` 
+                : 'Você não identificou se os seguintes funcionários estão presentes:'}
+            </p>
+            {funcionariosNaoRegistrados.length > 1 && (
+              <ul className="mb-6 text-gray-700 text-left list-disc pl-5 max-h-40 overflow-y-auto bg-gray-50 p-3 rounded-lg border border-gray-100">
+                {funcionariosNaoRegistrados.map(f => (
+                  <li key={f.id} className="mb-1">{f.nome}</li>
+                ))}
+              </ul>
+            )}
+            <p className="text-gray-500 mb-6 text-center text-sm">
+              Por favor, registre PRESENTE ou FALTOU para todos antes de finalizar a diária.
+            </p>
+            <div className="flex flex-col justify-end">
+              <button 
+                onClick={() => setShowNaoRegistradosModal(false)}
+                className="w-full px-6 py-3 font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors"
+              >
+                Entendi
               </button>
             </div>
           </div>

@@ -8,7 +8,7 @@ import './index.css';
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data && event.data.type === 'ASSET_404_RELOAD') {
-      window.location.reload();
+      console.warn('ASSET_404_RELOAD recebido do SW, ignorando reload forçado.');
     }
   });
 }
@@ -31,7 +31,7 @@ async function verifyAssets() {
         }
       }
       sessionStorage.setItem('asset_checked', 'failed');
-      window.location.reload();
+      // window.location.reload removido para evitar reloads agressivos
     } else {
       sessionStorage.setItem('asset_checked', 'ok');
     }

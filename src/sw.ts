@@ -46,25 +46,6 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 7. Intercept 404s to unregister SW and clear caches
-const assetErrorPlugin = {
-  fetchDidSucceed: async ({ response, request }) => {
-    if (response.status === 404) {
-      console.error('[Service Worker] Asset 404 detected, unregistering...', request.url);
-      
-      const cacheNames = await caches.keys();
-      await Promise.all(cacheNames.map(name => caches.delete(name)));
-      
-      await self.registration.unregister();
-      
-      const clients = await self.clients.matchAll({ type: 'window' });
-      for (const client of clients) {
-        client.postMessage({ type: 'ASSET_404_RELOAD' });
-      }
-    }
-    return response;
-  }
-};
 
 // precache manifest from VitePWA
 const manifest = self.__WB_MANIFEST || [];
@@ -80,8 +61,7 @@ precacheAndRoute(filteredManifest);
 registerRoute(
   ({ request, url }) => request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html',
   new NetworkFirst({
-    cacheName: HTML_CACHE,
-    plugins: [assetErrorPlugin]
+    cacheName: HTML_CACHE
   })
 );
 
@@ -94,8 +74,7 @@ registerRoute(
     request.destination === 'font' ||
     request.destination === 'manifest',
   new StaleWhileRevalidate({
-    cacheName: ASSETS_CACHE,
-    plugins: [assetErrorPlugin]
+    cacheName: ASSETS_CACHE
   })
 );
 
