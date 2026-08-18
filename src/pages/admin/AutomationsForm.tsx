@@ -195,14 +195,14 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
                   <label className="block text-sm font-medium text-slate-700">Dias da Semana</label>
                   <div className="flex flex-wrap gap-2">
                     {DIAS_SEMANA.map(dia => (
-                      <label key={dia} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
+                      <label key={dia.value} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
                         <input
                           type="checkbox"
-                          checked={(formData.days_of_week || []).includes(dia)}
-                          onChange={() => toggleArrayItem('days_of_week', dia)}
+                          checked={(formData.days_of_week || []).includes(dia.value)}
+                          onChange={() => toggleArrayItem('days_of_week', dia.value)}
                           className="rounded text-blue-600 focus:ring-blue-500"
                         />
-                        <span className="text-sm text-slate-700">{dia}</span>
+                        <span className="text-sm text-slate-700">{dia.label}</span>
                       </label>
                     ))}
                   </div>
@@ -238,14 +238,14 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
                 <label className="block text-sm font-medium text-slate-700">Destinatários</label>
                 <div className="space-y-2">
                   {DESTINATARIOS.map(dest => (
-                    <label key={dest} className="flex items-center gap-2 cursor-pointer">
+                    <label key={dest.value} className="flex items-center gap-2 cursor-pointer">
                       <input
                         type="checkbox"
-                        checked={(formData.recipients || []).includes(dest)}
-                        onChange={() => toggleArrayItem('recipients', dest)}
+                        checked={(formData.recipients || []).includes(dest.value)}
+                        onChange={() => toggleArrayItem('recipients', dest.value)}
                         className="rounded text-blue-600 focus:ring-blue-500"
                       />
-                      <span className="text-sm text-slate-700">{dest}</span>
+                      <span className="text-sm text-slate-700">{dest.label}</span>
                     </label>
                   ))}
                 </div>
