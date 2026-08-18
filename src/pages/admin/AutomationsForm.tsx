@@ -10,8 +10,20 @@ interface AutomationsFormProps {
   onSave: (rule: Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>) => void;
 }
 
-const DIAS_SEMANA = ['Domingo', 'Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado'];
-const DESTINATARIOS = ['ADMINISTRADORES', 'OPERADORES', 'CONSULTA'];
+const DIAS_SEMANA = [
+  { value: 0, label: 'Domingo' },
+  { value: 1, label: 'Segunda' },
+  { value: 2, label: 'Terça' },
+  { value: 3, label: 'Quarta' },
+  { value: 4, label: 'Quinta' },
+  { value: 5, label: 'Sexta' },
+  { value: 6, label: 'Sábado' }
+];
+const DESTINATARIOS = [
+  { value: 'ADMIN', label: 'Administradores' },
+  { value: 'OPERADORES', label: 'Operadores' },
+  { value: 'TODOS', label: 'Todos' }
+];
 const CANAIS = ['CENTRAL', 'PUSH'];
 const TIPOS = ['PROGRAMADA', 'CONDICIONAL', 'EVENTO'] as const;
 
@@ -41,11 +53,11 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
         message_template: rule.message_template || '',
         title_template: rule.title_template || '',
         days_of_week: rule.days_of_week || [],
-        schedule_time: rule.schedule_time || '',
-        timezone: rule.timezone || 'America/Maceio',
+        schedule_time: rule.schedule_time !== null && rule.schedule_time !== undefined ? rule.schedule_time : null as any,
+        timezone: rule.timezone !== null && rule.timezone !== undefined ? rule.timezone : null as any,
         recipients: rule.recipients || [],
         channels: rule.channels || [],
-        trigger_code: rule.trigger_code || ''
+        trigger_code: rule.trigger_code !== null && rule.trigger_code !== undefined ? rule.trigger_code : null as any
       });
     }
   }, [rule]);
@@ -57,10 +69,33 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
     e.preventDefault();
     if (!formData.name.trim()) return alert('Nome da automação é obrigatório.');
     if (!formData.message_template.trim()) return alert('Mensagem é obrigatória.');
-    onSave(formData);
+    if (!formData.recipients || formData.recipients.length === 0) return alert('Selecione pelo menos um destinatário.');
+    if (!formData.channels || formData.channels.length === 0) return alert('Selecione pelo menos um canal.');
+
+    const payload = { ...formData };
+    
+    // Normalize empty strings
+    if (!payload.title_template) payload.title_template = '';
+    
+    if (payload.kind === 'EVENTO') {
+      if (!payload.trigger_code) return alert('Selecione o evento que irá disparar a automação.');
+      payload.schedule_time = null as any;
+      payload.timezone = null as any;
+      payload.days_of_week = [];
+    } else if (payload.kind === 'PROGRAMADA') {
+      if (!payload.schedule_time) return alert('Horário é obrigatório para automações programadas.');
+      if (!payload.days_of_week || payload.days_of_week.length === 0) return alert('Selecione pelo menos um dia da semana.');
+      payload.trigger_code = null as any;
+    } else if (payload.kind === 'CONDICIONAL') {
+      if (!payload.schedule_time) return alert('Horário é obrigatório para automações condicionais.');
+      if (!payload.days_of_week || payload.days_of_week.length === 0) return alert('Selecione pelo menos um dia da semana.');
+      if (!payload.trigger_code) return alert('Selecione o evento condicional.');
+    }
+
+    onSave(payload);
   };
 
-  const toggleArrayItem = (field: 'days_of_week' | 'recipients' | 'channels', item: string) => {
+  const toggleArrayItem = (field: 'days_of_week' | 'recipients' | 'channels', item: any) => {
     setFormData(prev => {
       const current = prev[field] || [];
       if (current.includes(item)) {
