@@ -24,6 +24,8 @@ export default function Relatorios() {
   const [erro, setErro] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [visaoDetalhada, setVisaoDetalhada] = useState(false);
+  const [viewMode, setViewMode] = useState<'relatorios' | 'pagamentos'>('relatorios');
+  const [funcionariosBase, setFuncionariosBase] = useState<any[]>([]);
 
   useEffect(() => {
     loadObras();
@@ -103,6 +105,7 @@ export default function Relatorios() {
       });
       
       setRelatorio(merged);
+      setFuncionariosBase(funcionarios);
     } catch (e) {
       setErro('Ocorreu um erro ao gerar o relatório.');
     } finally {
@@ -117,13 +120,14 @@ export default function Relatorios() {
   }
 
   const agruparPorFuncionario = () => {
-    const agrupado: Record<string, { nome: string, funcao: string, obra: string, dias: number, faltas: number, valorDiaria: number, total: number }> = {};
+    const agrupado: Record<string, { id: string, nome: string, funcao: string, obra: string, dias: number, faltas: number, valorDiaria: number, total: number }> = {};
     
     relatorio.forEach((p: any) => {
       const fId = p.funcionario_id || p.funcionario_nome || p.funcionario;
       if (fId) {
         if (!agrupado[fId]) {
           agrupado[fId] = {
+            id: p.funcionario_id || fId,
             nome: p.funcionario_nome || p.funcionario || '',
             funcao: p.funcao_nome || p.funcao || '',
             obra: p.obra_nome || p.obra || '',
@@ -156,6 +160,16 @@ export default function Relatorios() {
   
   const valorTotal = relatorioAgrupado.reduce((acc, curr) => acc + curr.total, 0);
   const totaisDias = relatorioAgrupado.reduce((acc, curr) => acc + curr.dias, 0);
+
+  const pagamentosCaixa = relatorioAgrupado.map(agrupado => {
+    const funcionario = funcionariosBase.find(f => f.id === agrupado.id) || funcionariosBase.find(f => f.nome === agrupado.nome);
+    return { ...agrupado, funcionario };
+  }).filter(item => item.funcionario && item.funcionario.forma_pagamento === 'CAIXA ECONOMICA FEDERAL');
+
+  const pagamentosPix = relatorioAgrupado.map(agrupado => {
+    const funcionario = funcionariosBase.find(f => f.id === agrupado.id) || funcionariosBase.find(f => f.nome === agrupado.nome);
+    return { ...agrupado, funcionario };
+  }).filter(item => item.funcionario && item.funcionario.forma_pagamento === 'PIX');
 
   const getFileNameBase = () => {
     const dInicial = dataInicial ? format(parseISO(dataInicial), 'dd-MM-yyyy') : '';
@@ -908,11 +922,143 @@ const handlePrint = () => {
     window.print();
   };
 
+  const handleExportPagamentosCaixa = () => {
+    const doc = new jsPDF();
+    const periodStr = (dataInicial && dataFinal) 
+      ? `${format(parseISO(dataInicial), 'dd/MM/yyyy')} a ${format(parseISO(dataFinal), 'dd/MM/yyyy')}`
+      : 'Todos os períodos';
+    
+    doc.setFontSize(18);
+    doc.setTextColor(30, 58, 95);
+    doc.setFont("helvetica", "bold");
+    doc.text('CONTROLE DE PAGAMENTOS', 14, 22);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "normal");
+    doc.text('PAGAMENTOS — CAIXA ECONÔMICA FEDERAL', 14, 30);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`PERÍODO: ${periodStr}`, 14, 40);
+    
+    const totalPagar = pagamentosCaixa.reduce((acc, curr) => acc + curr.total, 0);
+    doc.text(`FUNCIONÁRIOS: ${pagamentosCaixa.length}`, 14, 46);
+    doc.setFont("helvetica", "bold");
+    doc.text(`TOTAL A PAGAR: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPagar)}`, 14, 52);
+    doc.setFont("helvetica", "normal");
+
+    const tableData: any[] = [];
+    
+    pagamentosCaixa.forEach(item => {
+      const valor = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total);
+      const agencia = item.funcionario?.agencia || '';
+      const tipoConta = item.funcionario?.tipo_conta === 'CONTA CORRENTE' ? 'Corrente' : (item.funcionario?.tipo_conta === 'CONTA POUPANÇA' ? 'Poupança' : '');
+      const conta = item.funcionario?.conta || '';
+      
+      tableData.push([item.nome, valor, agencia, tipoConta, conta]);
+      
+      if (item.funcionario?.observacao_pagamento) {
+        tableData.push([{ content: `OBSERVAÇÃO: ${item.funcionario.observacao_pagamento}`, colSpan: 5, styles: { fontStyle: 'italic', textColor: [100, 116, 139] } }]);
+      }
+    });
+
+    autoTable(doc, {
+      startY: 60,
+      head: [['FUNCIONÁRIO', 'VALOR', 'AGÊNCIA', 'TIPO', 'CONTA']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [248, 250, 252], textColor: [71, 85, 105], fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 4 },
+      didDrawPage: function (data) {
+        const str = 'Página ' + (doc as any).internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+      }
+    });
+
+    const fileName = `pagamentos_caixa_${getFileNameBase()}.pdf`;
+    doc.save(fileName);
+  };
+
+  const handleExportPagamentosPix = () => {
+    const doc = new jsPDF();
+    const periodStr = (dataInicial && dataFinal) 
+      ? `${format(parseISO(dataInicial), 'dd/MM/yyyy')} a ${format(parseISO(dataFinal), 'dd/MM/yyyy')}`
+      : 'Todos os períodos';
+    
+    doc.setFontSize(18);
+    doc.setTextColor(30, 58, 95);
+    doc.setFont("helvetica", "bold");
+    doc.text('CONTROLE DE PAGAMENTOS', 14, 22);
+    
+    doc.setFontSize(12);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "normal");
+    doc.text('PAGAMENTOS — PIX', 14, 30);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(0, 0, 0);
+    doc.text(`PERÍODO: ${periodStr}`, 14, 40);
+    
+    const totalPagar = pagamentosPix.reduce((acc, curr) => acc + curr.total, 0);
+    doc.text(`FUNCIONÁRIOS: ${pagamentosPix.length}`, 14, 46);
+    doc.setFont("helvetica", "bold");
+    doc.text(`TOTAL A PAGAR: ${new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(totalPagar)}`, 14, 52);
+    doc.setFont("helvetica", "normal");
+
+    const tableData: any[] = [];
+    
+    pagamentosPix.forEach(item => {
+      const valor = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total);
+      const chavePix = item.funcionario?.chave_pix || '';
+      
+      tableData.push([item.nome, valor, chavePix]);
+      
+      if (item.funcionario?.observacao_pagamento) {
+        tableData.push([{ content: `OBSERVAÇÃO: ${item.funcionario.observacao_pagamento}`, colSpan: 3, styles: { fontStyle: 'italic', textColor: [100, 116, 139] } }]);
+      }
+    });
+
+    autoTable(doc, {
+      startY: 60,
+      head: [['FUNCIONÁRIO', 'VALOR', 'CHAVE PIX']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [248, 250, 252], textColor: [71, 85, 105], fontStyle: 'bold' },
+      styles: { fontSize: 9, cellPadding: 4 },
+      didDrawPage: function (data) {
+        const str = 'Página ' + (doc as any).internal.getNumberOfPages();
+        doc.setFontSize(8);
+        doc.text(str, data.settings.margin.left, doc.internal.pageSize.height - 10);
+      }
+    });
+
+    const fileName = `pagamentos_pix_${getFileNameBase()}.pdf`;
+    doc.save(fileName);
+  };
+
   return (
     <div className="max-w-6xl mx-auto">
-      <div className="flex justify-between items-center mb-6 print:hidden">
-        <h2 className="text-2xl font-bold text-gray-900">Relatórios</h2>
-        <div className="relative w-64">
+      <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-6 print:hidden gap-4">
+        <div className="flex items-center gap-4">
+          <h2 className="text-2xl font-bold text-gray-900">Resultados</h2>
+          <div className="flex bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setViewMode('relatorios')}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'relatorios' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Relatórios
+            </button>
+            <button
+              onClick={() => setViewMode('pagamentos')}
+              className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${viewMode === 'pagamentos' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Pagamentos
+            </button>
+          </div>
+        </div>
+        <div className="relative w-full md:w-64">
           <input
             type="text"
             placeholder="Pesquisar funcionário..."
@@ -983,9 +1129,10 @@ const handlePrint = () => {
         </form>
       </div>
 
-      <div className="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
-          <div>
+      {viewMode === 'relatorios' ? (
+        <div className="bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+          <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 print:hidden">
+            <div>
               <h3 className="text-lg font-medium text-gray-900">Resultado do Relatório</h3>
               <p className="text-sm text-gray-500">
                 Resumo de folha de pagamento para o período selecionado.
@@ -1201,6 +1348,105 @@ const handlePrint = () => {
             </p>
           </div>
         </div>
+      ) : (
+        <div className="space-y-8">
+          <div className="bg-white shadow-sm rounded-xl border border-gray-100 p-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
+              <h3 className="text-xl font-bold text-gray-900">Resumo de Pagamentos</h3>
+              <div className="flex gap-2 w-full sm:w-auto">
+                <button
+                  onClick={handleExportPagamentosCaixa}
+                  className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-sm text-sm font-medium transition-colors"
+                  title="Gerar PDF - CAIXA"
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  PDF CAIXA
+                </button>
+                <button
+                  onClick={handleExportPagamentosPix}
+                  className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-sm text-sm font-medium transition-colors"
+                  title="Gerar PDF - PIX"
+                >
+                  <FileDown className="h-4 w-4 mr-2" />
+                  PDF PIX
+                </button>
+              </div>
+            </div>
+            <p className="text-sm text-gray-600 mb-6">
+              <strong>PERÍODO:</strong> {dataInicial && dataFinal 
+                ? `${format(parseISO(dataInicial), 'dd/MM/yyyy')} a ${format(parseISO(dataFinal), 'dd/MM/yyyy')}`
+                : 'Todos os períodos'}
+            </p>
+            
+            <div className="mb-8">
+              <h4 className="text-lg font-semibold text-gray-800 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                FUNCIONÁRIOS COM CAIXA ECONÔMICA FEDERAL
+              </h4>
+              {pagamentosCaixa.length === 0 ? (
+                <p className="text-sm text-gray-500 italic px-4">Nenhum funcionário encontrado nesta categoria para o período.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pagamentosCaixa.map((item, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="font-bold text-gray-900 text-lg">{item.nome}</div>
+                        <div className="text-blue-700 font-semibold text-lg mt-1 mb-3">
+                          Valor a receber: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
+                        </div>
+                        <div className="text-sm text-gray-700 space-y-1 bg-gray-50 p-3 rounded-md border border-gray-100">
+                          <div className="font-medium">Caixa Econômica Federal</div>
+                          <div><span className="text-gray-500">Agência:</span> {item.funcionario?.agencia || 'Não informada'}</div>
+                          <div><span className="text-gray-500">Conta:</span> {item.funcionario?.tipo_conta === 'CONTA CORRENTE' ? 'Corrente' : (item.funcionario?.tipo_conta === 'CONTA POUPANÇA' ? 'Poupança' : 'Não informado')}</div>
+                          <div><span className="text-gray-500">Número:</span> {item.funcionario?.conta || 'Não informada'}</div>
+                        </div>
+                        {item.funcionario?.observacao_pagamento && (
+                          <div className="mt-3 text-sm text-gray-700 bg-amber-50 p-3 rounded-md border border-amber-100">
+                            <div className="font-semibold text-amber-800 mb-1">OBSERVAÇÃO:</div>
+                            <div className="italic">{item.funcionario.observacao_pagamento}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <h4 className="text-lg font-semibold text-gray-800 mb-4 bg-gray-50 p-3 rounded-lg border border-gray-200">
+                FUNCIONÁRIOS COM PIX
+              </h4>
+              {pagamentosPix.length === 0 ? (
+                <p className="text-sm text-gray-500 italic px-4">Nenhum funcionário encontrado nesta categoria para o período.</p>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {pagamentosPix.map((item, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded-lg p-4 bg-white shadow-sm flex flex-col justify-between">
+                      <div>
+                        <div className="font-bold text-gray-900 text-lg">{item.nome}</div>
+                        <div className="text-blue-700 font-semibold text-lg mt-1 mb-3">
+                          Valor a receber: {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
+                        </div>
+                        <div className="text-sm text-gray-700 space-y-1 bg-gray-50 p-3 rounded-md border border-gray-100">
+                          <div className="font-medium">PIX</div>
+                          <div><span className="text-gray-500">Chave:</span> {item.funcionario?.chave_pix || 'Não informada'}</div>
+                        </div>
+                        {item.funcionario?.observacao_pagamento && (
+                          <div className="mt-3 text-sm text-gray-700 bg-amber-50 p-3 rounded-md border border-amber-100">
+                            <div className="font-semibold text-amber-800 mb-1">OBSERVAÇÃO:</div>
+                            <div className="italic">{item.funcionario.observacao_pagamento}</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+          </div>
+        </div>
+      )}
     </div>
   );
 }

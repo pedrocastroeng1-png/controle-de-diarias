@@ -102,14 +102,6 @@ export default function PresencaPage() {
       atestados.forEach((a: any) => atestadosMap[a.employee_id] = a);
       setAtestadosAtivos(atestadosMap);
       
-      if (presencasData.length > 0) {
-        setJaRegistradoHoje(!isAdmin);
-        setTemRegistros(true);
-      } else {
-        setJaRegistradoHoje(false);
-        setTemRegistros(false);
-      }
-
       const presencasMap: Record<string, boolean | undefined> = {};
       const newSavedRecords: Record<string, boolean> = {};
       const newFullPresencas: Record<string, any> = {};
@@ -118,6 +110,26 @@ export default function PresencaPage() {
         newSavedRecords[p.funcionario_id] = true;
         newFullPresencas[p.funcionario_id] = p;
       });
+
+      const ativosEsperados = funcs.filter(f => !atestadosMap[f.id]);
+      let todosIdentificados = true;
+      ativosEsperados.forEach(f => {
+        if (presencasMap[f.id] === undefined) {
+          todosIdentificados = false;
+        }
+      });
+
+      if (presencasData.length > 0) {
+        setTemRegistros(true);
+        if (!isAdmin && todosIdentificados) {
+          setJaRegistradoHoje(true);
+        } else {
+          setJaRegistradoHoje(false);
+        }
+      } else {
+        setJaRegistradoHoje(false);
+        setTemRegistros(false);
+      }
 
       setPresencas(presencasMap);
       setSavedRecords(newSavedRecords);
@@ -147,11 +159,17 @@ export default function PresencaPage() {
   }
 
   
-  const togglePresenca = async (funcionarioId: string) => {
+  const togglePresenca = async (funcionarioId: string, pretendStatus: boolean) => {
     if (jaRegistradoHoje || saving) return;
     
     if (isAdmin && savedRecords[funcionarioId]) {
       setActionMenuFuncId(funcionarioId);
+      return;
+    }
+
+    if (pretendStatus === false) {
+      setPresencas(prev => ({ ...prev, [funcionarioId]: false }));
+      setSavedSuccess(false);
       return;
     }
 
@@ -335,6 +353,24 @@ export default function PresencaPage() {
         newSavedRecords[p.funcionario_id] = true;
         newFullPresencas[p.funcionario_id] = p;
       });
+
+      const ativosEsperados = funcionarios.filter(f => !atestadosAtivos[f.id]);
+      let todosIdentificados = true;
+      ativosEsperados.forEach(f => {
+        if (newPresencasMap[f.id] === undefined) {
+          todosIdentificados = false;
+        }
+      });
+
+      if (presencasData.length > 0) {
+        setTemRegistros(true);
+        if (!isAdmin && todosIdentificados) {
+          setJaRegistradoHoje(true);
+        } else {
+          setJaRegistradoHoje(false);
+        }
+      }
+
       setPresencas(newPresencasMap);
       setSavedRecords(newSavedRecords);
       setFullPresencas(newFullPresencas);
@@ -533,17 +569,15 @@ return (
                     );
                   }
                   return (
-                    <button 
+                    <div 
                       key={f.id}
-                      onClick={() => togglePresenca(f.id)}
-                      disabled={!isAdmin && (jaRegistradoHoje || saving)}
                       className={`flex flex-col sm:flex-row items-start sm:items-center p-3.5 sm:p-4 rounded-2xl text-left w-full transition-all border ${
                         isPresent === true
-                          ? 'bg-white border-green-200 shadow-sm hover:border-green-300 hover:shadow-md' 
+                          ? 'bg-white border-green-200 shadow-sm' 
                           : isPresent === false
-                          ? 'bg-white border-red-200 shadow-sm hover:border-red-300 hover:shadow-md'
-                          : 'bg-white border-slate-200 shadow-sm hover:border-slate-300 hover:shadow-md'
-                      } ${(!isAdmin && (jaRegistradoHoje || saving)) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'} relative group`}
+                          ? 'bg-white border-red-200 shadow-sm'
+                          : 'bg-white border-slate-200 shadow-sm'
+                      } ${(!isAdmin && (jaRegistradoHoje || saving)) ? 'opacity-70' : ''} relative group`}
                     >
                       <div className="flex items-center w-full">
                         <div className={`flex-shrink-0 mr-3.5 h-12 w-12 bg-slate-50 rounded-full overflow-hidden border shadow-sm flex items-center justify-center transition-colors ${isPresent === true ? 'border-green-200 ring-4 ring-green-50' : 'border-slate-200'}`}>
@@ -553,14 +587,39 @@ return (
                           <User className={`h-6 w-6 text-slate-400 ${photoUrls[f.id] ? 'hidden' : ''}`} />
                         </div>
                         <div className="flex-1 min-w-0 pr-3">
-                          <p className="text-base sm:text-lg font-bold text-slate-800 leading-tight group-hover:text-slate-900 transition-colors">{f.nome}</p>
+                          <p className="text-base sm:text-lg font-bold text-slate-800 leading-tight transition-colors">{f.nome}</p>
                           <p className="text-xs font-medium text-slate-500 mt-1 truncate">{f.funcao?.nome || 'Função não definida'}</p>
                         </div>
                         <div className="flex-shrink-0 ml-2">
-                          {statusBadge}
+                          {isPresent === undefined ? (
+                             <div className="flex flex-col sm:flex-row gap-2">
+                               <button 
+                                 onClick={(e) => { e.stopPropagation(); togglePresenca(f.id, false); }}
+                                 disabled={!isAdmin && (jaRegistradoHoje || saving)}
+                                 className="px-3 py-1.5 rounded-full text-xs font-bold tracking-wide bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 shadow-sm hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                               >
+                                 FALTOU
+                               </button>
+                               <button 
+                                 onClick={(e) => { e.stopPropagation(); togglePresenca(f.id, true); }}
+                                 disabled={!isAdmin && (jaRegistradoHoje || saving)}
+                                 className="px-3 py-1.5 rounded-full text-xs font-bold tracking-wide bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 shadow-sm hover:bg-green-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                               >
+                                 PRESENTE
+                               </button>
+                             </div>
+                          ) : (
+                             <button
+                               onClick={() => togglePresenca(f.id, !isPresent)}
+                               disabled={!isAdmin && (jaRegistradoHoje || saving)}
+                               className="cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+                             >
+                               {statusBadge}
+                             </button>
+                          )}
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
               </div>

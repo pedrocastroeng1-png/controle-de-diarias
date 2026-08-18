@@ -26,6 +26,12 @@ export interface Funcionario {
   tipo_colaborador?: "DIARISTA" | "CLT";
   ativo?: boolean;
   photo_path?: string | null;
+  forma_pagamento?: "CAIXA ECONOMICA FEDERAL" | "PIX" | null;
+  agencia?: string | null;
+  tipo_conta?: "CONTA CORRENTE" | "CONTA POUPANÇA" | null;
+  conta?: string | null;
+  chave_pix?: string | null;
+  observacao_pagamento?: string | null;
   funcao?: Funcao;
   obra?: Obra;
 }

@@ -17,6 +17,12 @@ export default function Funcionarios() {
   const [funcaoId, setFuncaoId] = useState('');
   const [obraId, setObraId] = useState('');
   const [tipoColaborador, setTipoColaborador] = useState<'DIARISTA' | 'CLT'>('DIARISTA');
+  const [formaPagamento, setFormaPagamento] = useState<"CAIXA ECONOMICA FEDERAL" | "PIX" | ''>('');
+  const [agencia, setAgencia] = useState('');
+  const [tipoConta, setTipoConta] = useState<"CONTA CORRENTE" | "CONTA POUPANÇA" | ''>('');
+  const [conta, setConta] = useState('');
+  const [chavePix, setChavePix] = useState('');
+  const [observacaoPagamento, setObservacaoPagamento] = useState('');
   const [foto, setFoto] = useState<File | null>(null);
   const [removeFoto, setRemoveFoto] = useState(false);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
@@ -51,12 +57,37 @@ export default function Funcionarios() {
     setSaving(true);
     setErro('');
     try {
+      const payload: Partial<Funcionario> = { 
+        nome, 
+        funcao_id: funcaoId, 
+        obra_id: obraId,
+        tipo_colaborador: tipoColaborador,
+        forma_pagamento: (formaPagamento as any) || null,
+        observacao_pagamento: observacaoPagamento.trim() || null
+      };
+
+      if (formaPagamento === 'CAIXA ECONOMICA FEDERAL') {
+         payload.agencia = agencia || null;
+         payload.tipo_conta = (tipoConta as any) || null;
+         payload.conta = conta || null;
+         payload.chave_pix = null;
+      } else if (formaPagamento === 'PIX') {
+         payload.chave_pix = chavePix || null;
+         payload.agencia = null;
+         payload.tipo_conta = null;
+         payload.conta = null;
+      } else {
+         payload.agencia = null;
+         payload.tipo_conta = null;
+         payload.conta = null;
+         payload.chave_pix = null;
+      }
+
       let fId = editId;
       if (editId) {
-        await api.updateFuncionario(editId, { nome, funcao_id: funcaoId, obra_id: obraId,
-        tipo_colaborador: tipoColaborador });
+        await api.updateFuncionario(editId, payload);
       } else {
-        const created = await api.createFuncionario({ nome, funcao_id: funcaoId, obra_id: obraId, tipo_colaborador: tipoColaborador });
+        const created = await api.createFuncionario(payload as any);
         fId = created.id;
       }
 
@@ -70,6 +101,12 @@ export default function Funcionarios() {
       setNome('');
       setFuncaoId('');
       setObraId(''); setTipoColaborador('DIARISTA');
+      setFormaPagamento('');
+      setAgencia('');
+      setTipoConta('');
+      setConta('');
+      setChavePix('');
+      setObservacaoPagamento('');
       setFoto(null);
       setEditId(null);
       await loadData();
@@ -117,6 +154,13 @@ export default function Funcionarios() {
     setNome(funcionario.nome);
     setFuncaoId(funcionario.funcao_id);
     setObraId(funcionario.obra_id);
+    setTipoColaborador(funcionario.tipo_colaborador || 'DIARISTA');
+    setFormaPagamento(funcionario.forma_pagamento || '');
+    setAgencia(funcionario.agencia || '');
+    setTipoConta(funcionario.tipo_conta || '');
+    setConta(funcionario.conta || '');
+    setChavePix(funcionario.chave_pix || '');
+    setObservacaoPagamento(funcionario.observacao_pagamento || '');
   }
 
   const filteredFuncionarios = funcionarios.filter(f => 
@@ -230,7 +274,102 @@ export default function Funcionarios() {
               <option value="CLT">CLT</option>
             </select>
           </div>
-          <div className="col-span-1 md:col-span-5">
+          
+          <div className="col-span-1 md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <div>
+              <label htmlFor="formaPagamento" className="block text-sm font-medium text-gray-700 mb-1">
+                Forma de Pagamento
+              </label>
+              <select
+                id="formaPagamento"
+                value={formaPagamento}
+                onChange={(e) => setFormaPagamento(e.target.value as any)}
+                className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option value="">Não informada</option>
+                <option value="CAIXA ECONOMICA FEDERAL">Caixa Econômica Federal</option>
+                <option value="PIX">PIX</option>
+              </select>
+            </div>
+            
+            {formaPagamento === 'CAIXA ECONOMICA FEDERAL' && (
+              <>
+                <div>
+                  <label htmlFor="agencia" className="block text-sm font-medium text-gray-700 mb-1">
+                    Agência
+                  </label>
+                  <input
+                    type="text"
+                    id="agencia"
+                    value={agencia}
+                    onChange={(e) => setAgencia(e.target.value)}
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Ex: 1234"
+                  />
+                </div>
+                <div>
+                  <label htmlFor="tipoConta" className="block text-sm font-medium text-gray-700 mb-1">
+                    Tipo de Conta
+                  </label>
+                  <select
+                    id="tipoConta"
+                    value={tipoConta}
+                    onChange={(e) => setTipoConta(e.target.value as any)}
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="CONTA CORRENTE">Conta Corrente</option>
+                    <option value="CONTA POUPANÇA">Conta Poupança</option>
+                  </select>
+                </div>
+                <div>
+                  <label htmlFor="conta" className="block text-sm font-medium text-gray-700 mb-1">
+                    Conta
+                  </label>
+                  <input
+                    type="text"
+                    id="conta"
+                    value={conta}
+                    onChange={(e) => setConta(e.target.value)}
+                    className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                    placeholder="Ex: 12345-6"
+                  />
+                </div>
+              </>
+            )}
+
+            {formaPagamento === 'PIX' && (
+              <div className="col-span-1 md:col-span-2">
+                <label htmlFor="chavePix" className="block text-sm font-medium text-gray-700 mb-1">
+                  Chave PIX
+                </label>
+                <input
+                  type="text"
+                  id="chavePix"
+                  value={chavePix}
+                  onChange={(e) => setChavePix(e.target.value)}
+                  className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                  placeholder="CPF, E-mail, Telefone ou Chave Aleatória"
+                />
+              </div>
+            )}
+          </div>
+          
+          <div className="col-span-1 md:col-span-4">
+            <label htmlFor="observacaoPagamento" className="block text-sm font-medium text-gray-700 mb-1">
+              Observação de Pagamento
+            </label>
+            <input
+              type="text"
+              id="observacaoPagamento"
+              value={observacaoPagamento}
+              onChange={(e) => setObservacaoPagamento(e.target.value)}
+              className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              placeholder="Ex: Conta bancária em nome de Maria da Silva, esposa do funcionário."
+            />
+          </div>
+
+          <div className="col-span-1 md:col-span-4">
             <label htmlFor="foto" className="block text-sm font-medium text-gray-700 mb-1">
               Foto do Funcionário
             </label>
