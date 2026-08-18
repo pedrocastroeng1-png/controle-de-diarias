@@ -952,24 +952,29 @@ const handlePrint = () => {
     
     pagamentosCaixa.forEach(item => {
       const valor = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total);
-      const agencia = item.funcionario?.agencia || '';
-      const tipoConta = item.funcionario?.tipo_conta === 'CONTA CORRENTE' ? 'Corrente' : (item.funcionario?.tipo_conta === 'CONTA POUPANÇA' ? 'Poupança' : '');
-      const conta = item.funcionario?.conta || '';
+      const agencia = item.funcionario?.agencia || '-';
+      const tipoConta = item.funcionario?.tipo_conta === 'CONTA CORRENTE' ? 'Corrente' : (item.funcionario?.tipo_conta === 'CONTA POUPANÇA' ? 'Poupança' : '-');
+      const conta = item.funcionario?.conta || '-';
       
-      tableData.push([item.nome, valor, agencia, tipoConta, conta]);
+      let detalhes = `${item.nome.toUpperCase()}\n\nCaixa Econômica Federal\nAgência: ${agencia}   •   Tipo: ${tipoConta}   •   Conta: ${conta}`;
       
       if (item.funcionario?.observacao_pagamento) {
-        tableData.push([{ content: `OBSERVAÇÃO: ${item.funcionario.observacao_pagamento}`, colSpan: 5, styles: { fontStyle: 'italic', textColor: [100, 116, 139] } }]);
+        detalhes += `\n\nObservação: ${item.funcionario.observacao_pagamento}`;
       }
+      
+      tableData.push([
+        { content: detalhes, styles: { halign: 'left', cellPadding: { top: 6, bottom: 6, left: 4, right: 4 } } },
+        { content: valor, styles: { halign: 'right', fontStyle: 'bold', valign: 'top', cellPadding: { top: 6, bottom: 6, left: 4, right: 4 } } }
+      ]);
     });
 
     autoTable(doc, {
       startY: 60,
-      head: [['FUNCIONÁRIO', 'VALOR', 'AGÊNCIA', 'TIPO', 'CONTA']],
+      head: [],
       body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [248, 250, 252], textColor: [71, 85, 105], fontStyle: 'bold' },
-      styles: { fontSize: 9, cellPadding: 4 },
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 4, textColor: [30, 41, 59] },
+      bodyStyles: { lineWidth: { bottom: 0.5 }, lineColor: [226, 232, 240] },
       didDrawPage: function (data) {
         const str = 'Página ' + (doc as any).internal.getNumberOfPages();
         doc.setFontSize(8);
@@ -1011,22 +1016,27 @@ const handlePrint = () => {
     
     pagamentosPix.forEach(item => {
       const valor = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total);
-      const chavePix = item.funcionario?.chave_pix || '';
+      const chavePix = item.funcionario?.chave_pix || '-';
       
-      tableData.push([item.nome, valor, chavePix]);
+      let detalhes = `${item.nome.toUpperCase()}\n\nPIX\nChave: ${chavePix}`;
       
       if (item.funcionario?.observacao_pagamento) {
-        tableData.push([{ content: `OBSERVAÇÃO: ${item.funcionario.observacao_pagamento}`, colSpan: 3, styles: { fontStyle: 'italic', textColor: [100, 116, 139] } }]);
+        detalhes += `\n\nObservação: ${item.funcionario.observacao_pagamento}`;
       }
+      
+      tableData.push([
+        { content: detalhes, styles: { halign: 'left', cellPadding: { top: 6, bottom: 6, left: 4, right: 4 } } },
+        { content: valor, styles: { halign: 'right', fontStyle: 'bold', valign: 'top', cellPadding: { top: 6, bottom: 6, left: 4, right: 4 } } }
+      ]);
     });
 
     autoTable(doc, {
       startY: 60,
-      head: [['FUNCIONÁRIO', 'VALOR', 'CHAVE PIX']],
+      head: [],
       body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [248, 250, 252], textColor: [71, 85, 105], fontStyle: 'bold' },
-      styles: { fontSize: 9, cellPadding: 4 },
+      theme: 'plain',
+      styles: { fontSize: 10, cellPadding: 4, textColor: [30, 41, 59] },
+      bodyStyles: { lineWidth: { bottom: 0.5 }, lineColor: [226, 232, 240] },
       didDrawPage: function (data) {
         const str = 'Página ' + (doc as any).internal.getNumberOfPages();
         doc.setFontSize(8);
