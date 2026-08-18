@@ -50,6 +50,7 @@ function App() {
               <Route path="ferramentas/:id" element={<FerramentaDetalhes />} />
               <Route path="presenca" element={<PresencaPage />} />
               <Route path="relatorios" element={<Relatorios />} />
+              <Route path="automacoes" element={<Automations />} />
               <Route path="atestados" element={<Atestados />} />
               <Route path="comunicacoes" element={<Communications />} />
               <Route path="central-comunicacoes" element={<CentralComunicacoes />} />
