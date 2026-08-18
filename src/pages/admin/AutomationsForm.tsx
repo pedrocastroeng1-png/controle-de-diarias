@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Save, Send } from 'lucide-react';
 import { AutomationRule, AutomationEventCatalog } from '../../lib/types';
 import { api } from '../../lib/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 interface AutomationsFormProps {
   rule: AutomationRule | null;
@@ -28,6 +29,7 @@ const CANAIS = ['CENTRAL', 'PUSH'];
 const TIPOS = ['PROGRAMADA', 'CONDICIONAL', 'EVENTO'] as const;
 
 export default function AutomationsForm({ rule, catalog, onClose, onSave }: AutomationsFormProps) {
+  const { usuario } = useAuth();
   const [formData, setFormData] = useState<Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>>({
     name: '',
     kind: 'PROGRAMADA',
@@ -107,10 +109,27 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
   };
 
   const handleTest = async () => {
+    if (!formData.channels || formData.channels.length === 0) {
+      return alert('Selecione pelo menos um canal para enviar o teste.');
+    }
+    if (!usuario?.id) {
+      return alert('Não foi possível identificar o usuário atual.');
+    }
     try {
-      alert('Teste enviado com sucesso para o seu usuário (via ' + formData.channels?.join(', ') + ').');
-    } catch (error) {
-      alert('Erro ao enviar teste.');
+      await api.sendAutomationTest({
+        title: formData.title_template || 'Teste de Automação',
+        message: formData.message_template || '',
+        channels: formData.channels as string[],
+        userId: usuario.id
+      });
+      alert('Teste enviado com sucesso.');
+    } catch (error: any) {
+      console.error('Erro ao enviar teste:', error);
+      if (error.message === 'PUSH_FAILED') {
+        alert('Comunicação criada, mas o Push não pôde ser enviado.');
+      } else {
+        alert(error.message || 'Erro real da operação.');
+      }
     }
   };
 
