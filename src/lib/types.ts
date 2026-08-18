@@ -161,3 +161,48 @@ export interface HistoricoFerramenta {
   usuario?: Usuario;
   ferramenta?: Ferramenta;
 }
+
+export interface AutomationRule {
+  id: string;
+  name: string;
+  description?: string;
+  kind: 'PROGRAMADA' | 'CONDICIONAL' | 'EVENTO';
+  module: string;
+  trigger_code?: string;
+  days_of_week?: string[];
+  schedule_time?: string;
+  timezone?: string;
+  recipients?: string[];
+  channels?: string[];
+  title_template?: string;
+  message_template: string;
+  condition?: any;
+  priority?: string;
+  is_active: boolean;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AutomationEventCatalog {
+  id: string;
+  module: string;
+  event_code: string;
+  label: string;
+  description?: string;
+  supports_conditions: boolean;
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AutomationRun {
+  id: string;
+  rule_id: string;
+  status: 'EXECUTADA' | 'PARCIAL' | 'FALHOU' | 'IGNORADA';
+  recipients?: string[];
+  message_id?: string;
+  error_message?: string;
+  created_at?: string;
+  rule?: AutomationRule;
+}

@@ -15,6 +15,8 @@ import Funcionarios from './pages/admin/Funcionarios';
 import FerramentasAdmin from './pages/admin/Ferramentas';
 import FerramentaDetalhes from './pages/admin/Ferramentas/FerramentaDetalhes';
 import Relatorios from './pages/admin/Relatorios';
+import Automations from './pages/admin/Automations';
+
 import Atestados from './pages/admin/Atestados';
 import Communications from './pages/admin/Communications';
 import CentralComunicacoes from './pages/admin/CentralComunicacoes';

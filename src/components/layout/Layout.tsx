@@ -71,6 +71,7 @@ export function AdminLayout() {
     { name: 'Ferramentas', path: '/admin/ferramentas', icon: Wrench },
     { name: 'Presença', path: '/admin/presenca', icon: ClipboardCheck },
     { name: 'Relatórios', path: '/admin/relatorios', icon: FileText },
+    { name: 'Automações', path: '/admin/automacoes', icon: Bell },
     { name: 'Atestados', path: '/admin/atestados', icon: Stethoscope },
     { name: 'Comunicações', path: '/admin/comunicacoes', icon: Megaphone },
     { name: 'Central de Comunicações', path: '/admin/central-comunicacoes', icon: Bell },
