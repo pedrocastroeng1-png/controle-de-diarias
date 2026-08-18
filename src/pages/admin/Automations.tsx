@@ -48,7 +48,7 @@ export default function Automations() {
       fetchData();
     } catch (error) {
       console.error('Error saving automation rule:', error);
-      alert('Erro ao salvar automação. Verifique os dados e tente novamente.');
+      throw error;
     }
   };
 

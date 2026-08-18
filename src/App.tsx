@@ -12,6 +12,7 @@ import Dashboard from './pages/admin/Dashboard';
 import Obras from './pages/admin/Obras';
 import Funcoes from './pages/admin/Funcoes';
 import Funcionarios from './pages/admin/Funcionarios';
+import ControleMateriais from './pages/admin/ControleMateriais';
 import FerramentasAdmin from './pages/admin/Ferramentas';
 import FerramentaDetalhes from './pages/admin/Ferramentas/FerramentaDetalhes';
 import Relatorios from './pages/admin/Relatorios';
@@ -47,6 +48,7 @@ function App() {
               <Route path="funcoes" element={<Funcoes />} />
               <Route path="funcionarios" element={<Funcionarios />} />
               <Route path="ferramentas" element={<FerramentasAdmin />} />
+              <Route path="controle-materiais" element={<ControleMateriais />} />
               <Route path="ferramentas/:id" element={<FerramentaDetalhes />} />
               <Route path="presenca" element={<PresencaPage />} />
               <Route path="relatorios" element={<Relatorios />} />
@@ -63,6 +65,7 @@ function App() {
               <Route index element={<Navigate to="/operador/painel" replace />} />
               <Route path="painel" element={<PainelOperador />} />
               <Route path="ferramentas" element={<FerramentasOperador />} />
+              <Route path="controle-materiais" element={<ControleMateriais />} />
               <Route path="presenca" element={<PresencaPage />} />
             </Route>
             

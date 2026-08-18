@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Obra, Presenca } from '../../lib/types';
 import { format, parseISO } from 'date-fns';
+import { useLocation } from 'react-router-dom';
 import { FileDown, Printer, Search, Table as TableIcon, Calendar } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -11,6 +12,7 @@ import { saveAs } from 'file-saver';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function Relatorios() {
+  const location = useLocation();
   const { usuario } = useAuth();
   const [obras, setObras] = useState<Obra[]>([]);
   const [obraId, setObraId] = useState('');
@@ -24,8 +26,16 @@ export default function Relatorios() {
   const [erro, setErro] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [visaoDetalhada, setVisaoDetalhada] = useState(false);
-  const [viewMode, setViewMode] = useState<'relatorios' | 'pagamentos'>('relatorios');
+  const [viewMode, setViewMode] = useState<'relatorios' | 'pagamentos'>(location.search.includes('tab=folha') ? 'pagamentos' : 'relatorios');
   const [funcionariosBase, setFuncionariosBase] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (location.search.includes('tab=folha')) {
+      setViewMode('pagamentos');
+    } else {
+      setViewMode('relatorios');
+    }
+  }, [location.search]);
 
   useEffect(() => {
     loadObras();

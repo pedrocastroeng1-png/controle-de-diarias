@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Save, Send } from 'lucide-react';
+import { X, Save, Send, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { AutomationRule, AutomationEventCatalog } from '../../lib/types';
 import { api } from '../../lib/api';
 import { useAuth } from '../../contexts/AuthContext';
@@ -8,7 +8,7 @@ interface AutomationsFormProps {
   rule: AutomationRule | null;
   catalog: AutomationEventCatalog[];
   onClose: () => void;
-  onSave: (rule: Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>) => void;
+  onSave: (rule: Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
 }
 
 const DIAS_SEMANA = [
@@ -30,6 +30,10 @@ const TIPOS = ['PROGRAMADA', 'CONDICIONAL', 'EVENTO'] as const;
 
 export default function AutomationsForm({ rule, catalog, onClose, onSave }: AutomationsFormProps) {
   const { usuario } = useAuth();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [localError, setLocalError] = useState('');
+  const [localSuccess, setLocalSuccess] = useState('');
   const [formData, setFormData] = useState<Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>>({
     name: '',
     kind: 'PROGRAMADA',
@@ -67,34 +71,44 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
   const availableModules = Array.from(new Set(catalog.map(c => c.module)));
   const availableEvents = catalog.filter(c => c.module === formData.module);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.name.trim()) return alert('Nome da automação é obrigatório.');
-    if (!formData.message_template.trim()) return alert('Mensagem é obrigatória.');
-    if (!formData.recipients || formData.recipients.length === 0) return alert('Selecione pelo menos um destinatário.');
-    if (!formData.channels || formData.channels.length === 0) return alert('Selecione pelo menos um canal.');
+    setLocalError('');
+    setLocalSuccess('');
+    
+    if (!formData.name.trim()) return setLocalError('Nome da automação é obrigatório.');
+    if (!formData.message_template.trim()) return setLocalError('Mensagem é obrigatória.');
+    if (!formData.recipients || formData.recipients.length === 0) return setLocalError('Selecione pelo menos um destinatário.');
+    if (!formData.channels || formData.channels.length === 0) return setLocalError('Selecione pelo menos um canal.');
 
     const payload = { ...formData };
     
-    // Normalize empty strings
     if (!payload.title_template) payload.title_template = '';
     
     if (payload.kind === 'EVENTO') {
-      if (!payload.trigger_code) return alert('Selecione o evento que irá disparar a automação.');
+      if (!payload.trigger_code) return setLocalError('Selecione o evento que irá disparar a automação.');
       payload.schedule_time = null as any;
       payload.timezone = null as any;
       payload.days_of_week = [];
     } else if (payload.kind === 'PROGRAMADA') {
-      if (!payload.schedule_time) return alert('Horário é obrigatório para automações programadas.');
-      if (!payload.days_of_week || payload.days_of_week.length === 0) return alert('Selecione pelo menos um dia da semana.');
+      if (!payload.schedule_time) return setLocalError('Horário é obrigatório para automações programadas.');
+      if (!payload.days_of_week || payload.days_of_week.length === 0) return setLocalError('Selecione pelo menos um dia da semana.');
       payload.trigger_code = null as any;
     } else if (payload.kind === 'CONDICIONAL') {
-      if (!payload.schedule_time) return alert('Horário é obrigatório para automações condicionais.');
-      if (!payload.days_of_week || payload.days_of_week.length === 0) return alert('Selecione pelo menos um dia da semana.');
-      if (!payload.trigger_code) return alert('Selecione o evento condicional.');
+      if (!payload.schedule_time) return setLocalError('Horário é obrigatório para automações condicionais.');
+      if (!payload.days_of_week || payload.days_of_week.length === 0) return setLocalError('Selecione pelo menos um dia da semana.');
+      if (!payload.trigger_code) return setLocalError('Selecione o evento condicional.');
     }
 
-    onSave(payload);
+    try {
+      setIsSubmitting(true);
+      await onSave(payload);
+      setLocalSuccess('Automação salva com sucesso.');
+    } catch (err) {
+      setLocalError('Erro ao salvar automação. Verifique os dados e tente novamente.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const toggleArrayItem = (field: 'days_of_week' | 'recipients' | 'channels', item: any) => {
@@ -109,27 +123,32 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
   };
 
   const handleTest = async () => {
+    setLocalError('');
+    setLocalSuccess('');
     if (!formData.channels || formData.channels.length === 0) {
-      return alert('Selecione pelo menos um canal para enviar o teste.');
+      return setLocalError('Selecione pelo menos um canal para enviar o teste.');
     }
     if (!usuario?.id) {
-      return alert('Não foi possível identificar o usuário atual.');
+      return setLocalError('Não foi possível identificar o usuário atual.');
     }
     try {
+      setIsTesting(true);
       await api.sendAutomationTest({
         title: formData.title_template || 'Teste de Automação',
         message: formData.message_template || '',
         channels: formData.channels as string[],
         userId: usuario.id
       });
-      alert('Teste enviado com sucesso.');
+      setLocalSuccess('Teste enviado com sucesso.');
     } catch (error: any) {
       console.error('Erro ao enviar teste:', error);
       if (error.message === 'PUSH_FAILED') {
-        alert('Comunicação criada, mas o Push não pôde ser enviado.');
+        setLocalError('Comunicação criada, mas o Push não pôde ser enviado.');
       } else {
-        alert(error.message || 'Erro real da operação.');
+        setLocalError(error.message || 'Erro real da operação.');
       }
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -146,6 +165,19 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
+          
+          {localError && (
+            <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <p className="text-sm font-medium">{localError}</p>
+            </div>
+          )}
+          {localSuccess && (
+            <div className="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-700 px-4 py-3 rounded-lg flex items-start gap-3">
+              <CheckCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+              <p className="text-sm font-medium">{localSuccess}</p>
+            </div>
+          )}
           <form id="automationForm" onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
@@ -335,26 +367,29 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
           <button
             type="button"
             onClick={handleTest}
-            className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg font-medium hover:bg-slate-50 transition-colors"
+            disabled={isTesting || isSubmitting}
+            className="flex items-center gap-2 px-4 py-2 text-slate-600 bg-white border border-slate-300 rounded-lg font-medium hover:bg-slate-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <Send className="w-4 h-4" />
-            Enviar Teste
+            {isTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            {isTesting ? 'Enviando...' : 'Enviar Teste'}
           </button>
           <div className="flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors"
+              disabled={isSubmitting || isTesting}
+              className="px-4 py-2 text-slate-600 font-medium hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-50"
             >
               Cancelar
             </button>
             <button
               type="submit"
               form="automationForm"
-              className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors"
+              disabled={isSubmitting || isTesting}
+              className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-blue-700 transition-colors disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <Save className="w-4 h-4" />
-              Salvar
+              {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+              {isSubmitting ? 'Salvando...' : 'Salvar'}
             </button>
           </div>
         </div>

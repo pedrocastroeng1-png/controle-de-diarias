@@ -6,7 +6,7 @@ import { CentralCommunicationViewer } from '../CentralCommunicationViewer';
 import React, { useState, useEffect } from 'react';
 import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { ClipboardCheck, LogOut, Wrench, LayoutDashboard, HardHat, Briefcase, Users, FileText, Stethoscope, Megaphone, Camera, Bell } from 'lucide-react';
+import { ClipboardCheck, LogOut, Wrench, LayoutDashboard, HardHat, Briefcase, Users, FileText, Stethoscope, Megaphone, Camera, Bell, ChevronDown, ChevronRight, Package } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { version } from '../../config/appVersion';
 import { format } from 'date-fns';
@@ -18,6 +18,7 @@ export function AdminLayout() {
   const [unreadComms, setUnreadComms] = useState<any[]>([]);
   const [unreadCentralComms, setUnreadCentralComms] = useState<any[]>([]);
   const [loadingComms, setLoadingComms] = useState(true);
+  const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
 
   useEffect(() => {
     if (loading) return;
@@ -63,25 +64,87 @@ export function AdminLayout() {
     return <CommunicationViewer communications={unreadComms} onComplete={() => setUnreadComms([])} />;
   }
 
-  const allMenuItems = [
-    { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-    { name: 'Obras', path: '/admin/obras', icon: HardHat },
-    { name: 'Funções', path: '/admin/funcoes', icon: Briefcase },
-    { name: 'Funcionários', path: '/admin/funcionarios', icon: Users },
-    { name: 'Ferramentas', path: '/admin/ferramentas', icon: Wrench },
-    { name: 'Presença', path: '/admin/presenca', icon: ClipboardCheck },
-    { name: 'Relatórios', path: '/admin/relatorios', icon: FileText },
-    { name: 'Automações', path: '/admin/automacoes', icon: Bell },
-    { name: 'Atestados', path: '/admin/atestados', icon: Stethoscope },
-    { name: 'Comunicações', path: '/admin/comunicacoes', icon: Megaphone },
-    { name: 'Central de Comunicações', path: '/admin/central-comunicacoes', icon: Bell },
-
-    { name: 'Auditoria de Presenças', path: '/admin/auditoria', icon: Camera },
+  
+  const adminMenuGroups = [
+    {
+      name: 'Dashboard',
+      path: '/admin/dashboard',
+      icon: LayoutDashboard
+    },
+    {
+      name: 'CADASTROS',
+      icon: Briefcase,
+      items: [
+        { name: 'Obras', path: '/admin/obras' },
+        { name: 'Funções', path: '/admin/funcoes' },
+        { name: 'Funcionários', path: '/admin/funcionarios' }
+      ]
+    },
+    {
+      name: 'DIÁRIAS',
+      icon: ClipboardCheck,
+      items: [
+        { name: 'Presença', path: '/admin/presenca' },
+        { name: 'Atestados', path: '/admin/atestados' },
+        { name: 'Auditoria de Presenças', path: '/admin/auditoria' }
+      ]
+    },
+    {
+      name: 'FERRAMENTAS',
+      path: '/admin/ferramentas',
+      icon: Wrench
+    },
+    {
+      name: 'CONTROLE DE MATERIAIS',
+      path: '/admin/controle-materiais',
+      icon: Package
+    },
+    {
+      name: 'RESULTADOS',
+      icon: FileText,
+      items: [
+        { name: 'Relatórios', path: '/admin/relatorios' },
+        { name: 'Folha de Diárias', path: '/admin/relatorios?tab=folha' }
+      ]
+    },
+    {
+      name: 'COMUNICAÇÕES',
+      icon: Megaphone,
+      items: [
+        { name: 'Central de Comunicações', path: '/admin/central-comunicacoes' },
+        { name: 'Automações', path: '/admin/automacoes' }
+      ]
+    }
   ];
 
-  const menuItems = usuario.perfil === 'CONSULTA' 
-    ? allMenuItems.filter(item => item.path === '/admin/relatorios' || item.path === '/admin/auditoria')
-    : allMenuItems;
+  const consultaMenuGroups = [
+    {
+      name: 'RESULTADOS',
+      icon: FileText,
+      items: [
+        { name: 'Relatórios', path: '/admin/relatorios' },
+        { name: 'Folha de Diárias', path: '/admin/relatorios?tab=folha' }
+      ]
+    },
+    {
+      name: 'DIÁRIAS',
+      icon: ClipboardCheck,
+      items: [
+        { name: 'Auditoria de Presenças', path: '/admin/auditoria' }
+      ]
+    }
+  ];
+
+  const menuGroups = usuario.perfil === 'CONSULTA' ? consultaMenuGroups : adminMenuGroups;
+
+  const toggleGroup = (groupName: string) => {
+    if (expandedGroup === groupName) {
+      setExpandedGroup(null);
+    } else {
+      setExpandedGroup(groupName);
+    }
+  };
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
@@ -91,24 +154,80 @@ export function AdminLayout() {
           <img src="/logo.png" alt="Controle de Diárias" className="h-24 w-24 object-contain mb-3" />
           <h1 className="text-lg font-bold text-gray-900 text-center leading-tight">Controle de Diárias</h1>
         </div>
-        <nav className="flex-1 px-4 py-6 space-y-2">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = location.pathname.startsWith(item.path);
+        <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+          {menuGroups.map((group) => {
+            const Icon = group.icon;
+            if (group.path) {
+              const isActive = location.pathname.startsWith(group.path);
+              return (
+                <Link
+                  key={group.path}
+                  to={group.path}
+                  className={cn(
+                    "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    isActive 
+                      ? "bg-blue-50 text-blue-700" 
+                      : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  <Icon className={cn("mr-3 h-5 w-5", isActive ? "text-blue-700" : "text-gray-400")} />
+                  {group.name}
+                </Link>
+              );
+            }
+
+            const isExpanded = expandedGroup === group.name;
+            const hasActiveChild = group.items?.some(item => 
+              item.path.includes('?') 
+                ? location.pathname + location.search === item.path
+                : location.pathname.startsWith(item.path.split('?')[0])
+            );
+
             return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={cn(
-                  "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  isActive 
-                    ? "bg-blue-50 text-blue-700" 
-                    : "text-gray-700 hover:bg-gray-100"
+              <div key={group.name} className="space-y-1">
+                <button
+                  onClick={() => toggleGroup(group.name)}
+                  className={cn(
+                    "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    hasActiveChild && !isExpanded ? "bg-blue-50/50 text-blue-700" : "text-gray-700 hover:bg-gray-100"
+                  )}
+                >
+                  <div className="flex items-center">
+                    <Icon className={cn("mr-3 h-5 w-5", hasActiveChild && !isExpanded ? "text-blue-700" : "text-gray-400")} />
+                    {group.name}
+                  </div>
+                  {isExpanded ? (
+                    <ChevronDown className="h-4 w-4 text-gray-400" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+                
+                {isExpanded && group.items && (
+                  <div className="pl-11 pr-3 space-y-1 py-1">
+                    {group.items.map(item => {
+                      const isItemActive = item.path.includes('?') 
+                        ? location.pathname + location.search === item.path
+                        : location.pathname === item.path;
+                        
+                      return (
+                        <Link
+                          key={item.path}
+                          to={item.path}
+                          className={cn(
+                            "block px-3 py-2 rounded-md text-sm transition-colors",
+                            isItemActive 
+                              ? "bg-blue-50 text-blue-700 font-medium" 
+                              : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
+                          )}
+                        >
+                          {item.name}
+                        </Link>
+                      );
+                    })}
+                  </div>
                 )}
-              >
-                <Icon className={cn("mr-3 h-5 w-5", isActive ? "text-blue-700" : "text-gray-400")} />
-                {item.name}
-              </Link>
+              </div>
             );
           })}
         </nav>
@@ -282,7 +401,7 @@ export function OperadorLayout() {
             )}
           >
             <ClipboardCheck className="h-6 w-6 mb-1" />
-            Presença
+            <span className="truncate w-full text-center">Presença</span>
           </Link>
           <div className="w-[1px] bg-gray-100 my-2"></div>
           <Link
@@ -293,7 +412,18 @@ export function OperadorLayout() {
             )}
           >
             <Wrench className="h-6 w-6 mb-1" />
-            Ferramentas
+            <span className="truncate w-full text-center">Ferramentas</span>
+          </Link>
+          <div className="w-[1px] bg-gray-100 my-2"></div>
+          <Link
+            to="/operador/controle-materiais"
+            className={cn(
+              "flex-1 flex flex-col items-center justify-center text-xs font-medium transition-colors",
+              location.pathname === '/operador/controle-materiais' ? "text-blue-600" : "text-gray-500 hover:text-gray-900"
+            )}
+          >
+            <Package className="h-6 w-6 mb-1" />
+            <span className="truncate w-full text-center">Materiais</span>
           </Link>
         </div>
       </nav>
