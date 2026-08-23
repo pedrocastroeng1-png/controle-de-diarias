@@ -218,7 +218,7 @@ export interface MaterialCategory {
 
 export interface Material {
   id: string;
-  category_id: string;
+  categoria_id: string;
   nome: string;
   descricao?: string;
   unidade: string;

@@ -460,7 +460,7 @@ export default function ComprasMateriaisTab() {
         ) : (
           <div className="space-y-4">
             {itensForm.map((item, index) => {
-              const catMateriais = materiais.filter(m => m.category_id === item.categoria_id);
+              const catMateriais = materiais.filter(m => m.categoria_id === item.categoria_id);
               const selectedMaterial = materiais.find(m => m.id === item.material_id);
               const totalItem = (item.quantidade || 0) * (item.valor_unitario || 0);
 
