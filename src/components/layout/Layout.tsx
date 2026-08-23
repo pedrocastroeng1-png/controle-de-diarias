@@ -8,6 +8,8 @@ import { Navigate, Outlet, Link, useLocation, useNavigate } from 'react-router-d
 import { useAuth } from '../../contexts/AuthContext';
 import { ClipboardCheck, LogOut, Wrench, LayoutDashboard, HardHat, Briefcase, Users, FileText, Stethoscope, Megaphone, Camera, Bell, ChevronDown, ChevronRight, Package } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { MonitorDown, CheckCircle2 } from 'lucide-react';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { version } from '../../config/appVersion';
 import { format } from 'date-fns';
 
@@ -19,6 +21,8 @@ export function AdminLayout() {
   const [unreadCentralComms, setUnreadCentralComms] = useState<any[]>([]);
   const [loadingComms, setLoadingComms] = useState(true);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
+  const { isInstallable, isInstalled, promptInstall } = usePWAInstall();
+  const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
 
   useEffect(() => {
     if (loading) return;
@@ -263,8 +267,28 @@ export function AdminLayout() {
               <div className="text-xs text-gray-500 font-normal">Administrador</div>
             </div>
           </div>
+
+          {isDesktop && (isInstallable || isInstalled) && (
+            <div className="mt-2 mb-2 w-full">
+              {isInstalled ? (
+                <div className="flex items-center justify-center px-3 py-2 text-xs font-medium text-emerald-600 gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                  PCEG Instalado
+                </div>
+              ) : (
+                <button
+                  onClick={promptInstall}
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-bold text-[#C6922E] bg-[#C6922E]/10 hover:bg-[#C6922E]/20 transition-colors uppercase tracking-wider"
+                >
+                  <MonitorDown className="w-4 h-4" />
+                  Instalar no PC
+                </button>
+              )}
+            </div>
+          )}
           <button
             onClick={logout}
+
             className="mt-2 w-full flex items-center px-3 py-2 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
           >
             <LogOut className="mr-3 h-5 w-5" />
@@ -304,6 +328,8 @@ export function OperadorLayout() {
   const [loadingComms, setLoadingComms] = useState(true);
   const [presencaHojeConcluida, setPresencaHojeConcluida] = useState(false);
   const [checkingPresenca, setCheckingPresenca] = useState(true);
+  const { isInstallable, isInstalled, promptInstall } = usePWAInstall();
+  const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
 
   useEffect(() => {
     if (loading) return;
@@ -379,10 +405,28 @@ export function OperadorLayout() {
               <img src="/icons/icone2.png" alt="Logo" className="h-8 w-8 object-contain" />
               <span className="font-bold text-gray-900 truncate">PCEG</span>
             </div>
+
+            {isDesktop && (isInstallable || isInstalled) && (
+              <div className="hidden md:flex ml-4 mr-4">
+                {isInstalled ? (
+                  <span className="flex items-center text-xs font-medium text-emerald-600 gap-1">
+                    <CheckCircle2 className="w-4 h-4" /> PCEG Instalado
+                  </span>
+                ) : (
+                  <button
+                    onClick={promptInstall}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#C6922E] bg-[#C6922E]/10 hover:bg-[#C6922E]/20 transition-colors uppercase tracking-wider"
+                  >
+                    <MonitorDown className="w-4 h-4" /> Instalar no PC
+                  </button>
+                )}
+              </div>
+            )}
             <button
               onClick={logout}
               className="text-gray-500 hover:text-red-600 p-2"
             >
+
               <LogOut className="h-6 w-6" />
             </button>
           </div>
@@ -402,10 +446,28 @@ export function OperadorLayout() {
             <img src="/icons/icone2.png" alt="Logo" className="h-8 w-8 object-contain" />
             <span className="font-bold text-gray-900 truncate">Olá, {usuario.usuario}</span>
           </div>
+
+            {isDesktop && (isInstallable || isInstalled) && (
+              <div className="hidden md:flex ml-4 mr-4">
+                {isInstalled ? (
+                  <span className="flex items-center text-xs font-medium text-emerald-600 gap-1">
+                    <CheckCircle2 className="w-4 h-4" /> PCEG Instalado
+                  </span>
+                ) : (
+                  <button
+                    onClick={promptInstall}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-[#C6922E] bg-[#C6922E]/10 hover:bg-[#C6922E]/20 transition-colors uppercase tracking-wider"
+                  >
+                    <MonitorDown className="w-4 h-4" /> Instalar no PC
+                  </button>
+                )}
+              </div>
+            )}
           <button
             onClick={logout}
             className="text-gray-500 hover:text-red-600 p-2"
           >
+
             <LogOut className="h-6 w-6" />
           </button>
         </div>

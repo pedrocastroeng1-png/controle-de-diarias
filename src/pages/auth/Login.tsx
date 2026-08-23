@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { version } from '../../config/appVersion';
-import { Loader2, User, Lock, ArrowRight, Building2, Users, Package, LineChart } from 'lucide-react';
+import { Loader2, User, Lock, ArrowRight, Building2, Users, Package, LineChart, MonitorDown, CheckCircle2 } from 'lucide-react';
+import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { WhatsNewScreen } from '../../components/WhatsNewScreen';
 
 export default function Login() {
@@ -14,6 +15,8 @@ export default function Login() {
 
   const { login, usuario: authUsuario, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const { isInstallable, isInstalled, promptInstall } = usePWAInstall();
+  const isDesktop = typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches;
 
   useEffect(() => {
     const viewedVersion = localStorage.getItem('@diarias:whatsNewViewedVersion');
@@ -248,7 +251,28 @@ export default function Login() {
             </form>
           </div>
 
+          
+          {isDesktop && (isInstallable || isInstalled) && (
+            <div className="mt-4 pt-4 border-t border-gray-100 flex justify-center">
+              {isInstalled ? (
+                <div className="flex items-center text-emerald-600 gap-1.5">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider">PCEG Instalado</span>
+                </div>
+              ) : isInstallable ? (
+                <button
+                  type="button"
+                  onClick={promptInstall}
+                  className="flex items-center justify-center gap-2 text-[11px] font-bold text-[#C6922E] hover:text-[#B58529] uppercase tracking-wider transition-colors py-2 px-4 rounded-lg hover:bg-[#C6922E]/5"
+                >
+                  <MonitorDown className="w-4 h-4" />
+                  Instalar PCEG no computador
+                </button>
+              ) : null}
+            </div>
+          )}
           <div className="mt-4 sm:mt-6 md:mt-8 text-center md:text-left shrink-0">
+
             <p className="text-[10px] sm:text-[11px] text-gray-400 font-medium">
               v{version} &copy; {new Date().getFullYear()} PCEG
             </p>

@@ -1,4 +1,6 @@
-import React from 'react';
+const fs = require('fs');
+
+const code = `import React from 'react';
 import { version } from '../config/appVersion';
 import { Loader2, MonitorDown, CheckCircle2 } from 'lucide-react';
 import { usePWAInstall } from '../hooks/usePWAInstall';
@@ -103,3 +105,7 @@ export function UpdateScreen({ latestVersion, onUpdateNow, onUpdateLater, isUpda
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/components/UpdateScreen.tsx', code);
+console.log("Patched UpdateScreen.tsx");
