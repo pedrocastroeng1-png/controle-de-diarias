@@ -1,92 +1,61 @@
 import React, { useState } from 'react';
 import { api } from '../lib/api';
 import { useAuth } from '../contexts/AuthContext';
-import { ShieldAlert, RefreshCw } from 'lucide-react';
+import { ShieldAlert, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react';
 
 export function PushDiagnostic() {
   const { usuario } = useAuth();
   const [running, setRunning] = useState(false);
-  const [results, setResults] = useState<{
-    permission: string;
-    swRegistered: string;
-    swScript: string;
-    swScope: string;
-    swState: string;
-    swCount: number;
-    envApiKey: string;
-    envAuthDomain: string;
-    envProjectId: string;
-    envStorage: string;
-    envSenderId: string;
-    envAppId: string;
-    vapid: string;
-    firebaseInit: string;
-    firebaseError: string;
-    messagingInit: string;
-    messagingError: string;
-    getTokenExecuted: string;
-    getTokenError: string;
-    fcmTokenGenerated: string;
-    registerExecuted: string;
-    supabaseResult: string;
-    supabaseErrorCode: string;
-    supabaseErrorMsg: string;
-    supabaseErrorDetails: string;
-    supabaseErrorHint: string;
-  } | null>(null);
+  const [results, setResults] = useState<any>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const runDiagnostic = async () => {
     setRunning(true);
-    const res = {
-      permission: 'unknown',
-      swRegistered: 'NOT REGISTERED',
-      swScript: '-',
-      swScope: '-',
-      swState: '-',
+    setExpanded(true);
+    let res: any = {
+      permission: 'PENDING',
+      swRegistered: 'PENDING',
       swCount: 0,
-      envApiKey: 'MISSING',
-      envAuthDomain: 'MISSING',
-      envProjectId: 'MISSING',
-      envStorage: 'MISSING',
-      envSenderId: 'MISSING',
-      envAppId: 'MISSING',
-      vapid: 'MISSING',
+      swScript: '',
+      swScope: '',
+      swState: '',
+      envApiKey: 'PENDING',
+      envAuthDomain: 'PENDING',
+      envProjectId: 'PENDING',
+      envStorage: 'PENDING',
+      envSenderId: 'PENDING',
+      envAppId: 'PENDING',
+      vapid: 'PENDING',
       firebaseInit: 'PENDING',
       firebaseError: '',
       messagingInit: 'PENDING',
-      messagingError: '',
-      getTokenExecuted: 'NOT EXECUTED',
+      getTokenExecuted: 'PENDING',
+      fcmTokenGenerated: 'PENDING',
       getTokenError: '',
-      fcmTokenGenerated: 'NOT GENERATED',
-      registerExecuted: 'NOT EXECUTED',
+      registerExecuted: 'PENDING',
       supabaseResult: 'PENDING',
       supabaseErrorCode: '',
       supabaseErrorMsg: '',
       supabaseErrorDetails: '',
-      supabaseErrorHint: ''
+      supabaseErrorHint: '',
     };
 
     try {
-      // 1. Permission
       res.permission = Notification.permission;
-
-      // 2. Service Worker
+      
       if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         res.swCount = regs.length;
         if (regs.length > 0) {
-          const reg = regs[0];
           res.swRegistered = 'REGISTERED';
-          const sw = reg.active || reg.waiting || reg.installing;
-          if (sw) {
-            res.swScript = sw.scriptURL;
-            res.swState = sw.state;
-          }
-          res.swScope = reg.scope;
+          res.swScript = regs[0].active?.scriptURL || 'N/A';
+          res.swScope = regs[0].scope || 'N/A';
+          res.swState = regs[0].active?.state || 'N/A';
+        } else {
+          res.swRegistered = 'NOT REGISTERED';
         }
       }
 
-      // 3. Env Vars
       res.envApiKey = import.meta.env.VITE_FIREBASE_API_KEY ? 'PRESENT' : 'MISSING';
       res.envAuthDomain = import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ? 'PRESENT' : 'MISSING';
       res.envProjectId = import.meta.env.VITE_FIREBASE_PROJECT_ID ? 'PRESENT' : 'MISSING';
@@ -95,7 +64,6 @@ export function PushDiagnostic() {
       res.envAppId = import.meta.env.VITE_FIREBASE_APP_ID ? 'PRESENT' : 'MISSING';
       res.vapid = import.meta.env.VITE_FIREBASE_VAPID_KEY ? 'CONFIGURED' : 'MISSING';
 
-      // 4. Firebase Init
       let messaging: any = null;
       try {
         const { initFirebase } = await import('../lib/firebase');
@@ -110,7 +78,6 @@ export function PushDiagnostic() {
           res.messagingInit = 'ERRO - Missing config';
         }
 
-        // 5. Get Token
         if (messaging && res.swRegistered === 'REGISTERED') {
           res.getTokenExecuted = 'EXECUTING';
           const registration = await navigator.serviceWorker.ready;
@@ -123,8 +90,6 @@ export function PushDiagnostic() {
              
              if (token) {
                 res.fcmTokenGenerated = 'GENERATED';
-                
-                // 6. Register Push Device
                 if (usuario?.id) {
                    res.registerExecuted = 'EXECUTED';
                    try {
@@ -148,12 +113,10 @@ export function PushDiagnostic() {
              res.getTokenError = tokenErr?.message || String(tokenErr);
           }
         }
-        
       } catch (fbErr: any) {
          res.firebaseInit = 'ERRO';
          res.firebaseError = fbErr?.message || String(fbErr);
       }
-      
     } catch (e: any) {
       console.error(e);
     }
@@ -163,71 +126,76 @@ export function PushDiagnostic() {
   };
 
   return (
-    <div className="bg-slate-900 rounded-xl p-6 text-white my-8 border border-slate-700 font-mono text-sm shadow-xl">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <ShieldAlert className="w-6 h-6 text-amber-400" />
-          <h2 className="text-xl font-bold text-slate-100">Diagnóstico do Push (ADMIN)</h2>
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden transition-all duration-200">
+      <div className="flex flex-col sm:flex-row items-center justify-between p-4 sm:p-5 gap-4">
+        <div className="flex items-center gap-3 self-start sm:self-auto w-full sm:w-auto">
+          <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
+            <ShieldAlert className="w-5 h-5 text-slate-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-[14px] font-bold text-[#0B1B33] uppercase tracking-wide truncate">Diagnóstico do Push</h2>
+            <p className="text-[12px] text-gray-500 font-medium truncate">Verifique o status das notificações (ADMIN).</p>
+          </div>
         </div>
-        <button 
-          onClick={runDiagnostic}
-          disabled={running}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-semibold transition disabled:opacity-50"
-        >
-          <RefreshCw className={`w-4 h-4 ${running ? 'animate-spin' : ''}`} />
-          {running ? 'Rodando...' : 'Executar Diagnóstico'}
-        </button>
+        
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end shrink-0">
+          {results && (
+             <button
+               onClick={() => setExpanded(!expanded)}
+               className="p-2 text-gray-400 hover:text-[#0B1B33] hover:bg-gray-100 rounded-lg transition-colors"
+               title={expanded ? "Recolher detalhes" : "Ver detalhes"}
+             >
+               {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+             </button>
+          )}
+          <button 
+            onClick={runDiagnostic}
+            disabled={running}
+            className="flex-1 sm:flex-none flex justify-center items-center gap-2 bg-[#0B1B33] hover:bg-[#15294A] text-white px-4 py-2 sm:py-2.5 rounded-lg text-[13px] font-bold uppercase tracking-wider transition-colors disabled:opacity-70 whitespace-nowrap"
+          >
+            <RefreshCw className={`w-4 h-4 ${running ? 'animate-spin' : ''}`} />
+            {running ? 'Rodando...' : 'Executar Diagnóstico'}
+          </button>
+        </div>
       </div>
 
-      {results ? (
-        <div className="space-y-4">
-          <Section title="Permissão & SW">
-            <Row label="Notification Permission" value={results.permission} highlight={results.permission !== 'granted'} />
-            <Row label="Service Worker" value={results.swRegistered} highlight={results.swRegistered !== 'REGISTERED'} />
-            {results.swRegistered === 'REGISTERED' && (
-              <>
-                <Row label="SW Count" value={results.swCount.toString()} />
-                <Row label="SW Script URL" value={results.swScript} />
-                <Row label="SW Scope" value={results.swScope} />
-                <Row label="SW State" value={results.swState} />
-              </>
-            )}
-          </Section>
-
-          <Section title="Firebase">
-            <Row label="VITE_FIREBASE_API_KEY" value={results.envApiKey} highlight={results.envApiKey !== 'PRESENT'} />
-            <Row label="VITE_FIREBASE_AUTH_DOMAIN" value={results.envAuthDomain} highlight={results.envAuthDomain !== 'PRESENT'} />
-            <Row label="VITE_FIREBASE_PROJECT_ID" value={results.envProjectId} highlight={results.envProjectId !== 'PRESENT'} />
-            <Row label="VITE_FIREBASE_STORAGE_BUCKET" value={results.envStorage} highlight={results.envStorage !== 'PRESENT'} />
-            <Row label="VITE_FIREBASE_MESSAGING_SENDER_ID" value={results.envSenderId} highlight={results.envSenderId !== 'PRESENT'} />
-            <Row label="VITE_FIREBASE_APP_ID" value={results.envAppId} highlight={results.envAppId !== 'PRESENT'} />
-            <Row label="VITE_FIREBASE_VAPID_KEY" value={results.vapid} highlight={results.vapid !== 'CONFIGURED'} />
-            <Row label="Firebase Init" value={results.firebaseInit} highlight={results.firebaseInit !== 'OK'} />
-            {results.firebaseError && <Row label="Firebase Error" value={results.firebaseError} isError />}
-            <Row label="getMessaging()" value={results.messagingInit} highlight={results.messagingInit !== 'OK'} />
-          </Section>
-
-          <Section title="Token & Registro">
-            <Row label="getToken()" value={results.getTokenExecuted} />
-            <Row label="FCM Token" value={results.fcmTokenGenerated} highlight={results.fcmTokenGenerated !== 'GENERATED'} />
-            {results.getTokenError && <Row label="Token Error" value={results.getTokenError} isError />}
+      {results && expanded && (
+        <div className="p-4 sm:p-5 border-t border-gray-100 bg-slate-50 font-mono text-[11px] sm:text-[12px] text-slate-700">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Section title="Permissão & SW">
+              <Row label="Permissão" value={results.permission} highlight={results.permission !== 'granted'} />
+              <Row label="Service Worker" value={results.swRegistered} highlight={results.swRegistered !== 'REGISTERED'} />
+              {results.swRegistered === 'REGISTERED' && (
+                <>
+                  <Row label="Script URL" value={results.swScript} />
+                  <Row label="State" value={results.swState} />
+                </>
+              )}
+            </Section>
             
-            <Row label="registerPushDevice()" value={results.registerExecuted} />
-            <Row label="Supabase Registration" value={results.supabaseResult} highlight={results.supabaseResult !== 'SUCCESS' && results.supabaseResult !== 'PENDING'} />
+            <Section title="Firebase">
+              <Row label="Firebase Init" value={results.firebaseInit} highlight={results.firebaseInit !== 'OK'} />
+              {results.firebaseError && <Row label="Firebase Error" value={results.firebaseError} isError />}
+              <Row label="getMessaging()" value={results.messagingInit} highlight={results.messagingInit !== 'OK'} />
+              <Row label="VAPID_KEY" value={results.vapid} highlight={results.vapid !== 'CONFIGURED'} />
+            </Section>
             
-            {results.supabaseResult === 'FAILED' && (
-              <div className="mt-2 p-3 bg-red-950 border border-red-800 rounded text-red-200 text-xs break-all space-y-1">
-                <p><span className="font-bold opacity-75">Code:</span> {results.supabaseErrorCode}</p>
-                <p><span className="font-bold opacity-75">Message:</span> {results.supabaseErrorMsg}</p>
-                {results.supabaseErrorDetails && <p><span className="font-bold opacity-75">Details:</span> {results.supabaseErrorDetails}</p>}
-                {results.supabaseErrorHint && <p><span className="font-bold opacity-75">Hint:</span> {results.supabaseErrorHint}</p>}
-              </div>
-            )}
-          </Section>
-        </div>
-      ) : (
-        <div className="text-slate-400 text-center py-8">
-          Clique no botão acima para iniciar o diagnóstico na máquina local.
+            <Section title="Token & Registro">
+              <Row label="getToken()" value={results.getTokenExecuted} />
+              <Row label="FCM Token" value={results.fcmTokenGenerated} highlight={results.fcmTokenGenerated !== 'GENERATED'} />
+              {results.getTokenError && <Row label="Token Error" value={results.getTokenError} isError />}
+              <Row label="registerPushDevice()" value={results.registerExecuted} />
+              <Row label="Supabase" value={results.supabaseResult} highlight={results.supabaseResult !== 'SUCCESS' && results.supabaseResult !== 'PENDING'} />
+            </Section>
+          </div>
+          
+          {results.supabaseResult === 'FAILED' && (
+             <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-[11px] break-words space-y-1">
+               <p><span className="font-bold">Code:</span> {results.supabaseErrorCode}</p>
+               <p><span className="font-bold">Message:</span> {results.supabaseErrorMsg}</p>
+               {results.supabaseErrorDetails && <p><span className="font-bold">Details:</span> {results.supabaseErrorDetails}</p>}
+             </div>
+          )}
         </div>
       )}
     </div>
@@ -236,9 +204,9 @@ export function PushDiagnostic() {
 
 function Section({ title, children }: { title: string, children: React.ReactNode }) {
   return (
-    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700/50">
-      <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3">{title}</h3>
-      <div className="space-y-2">
+    <div className="bg-white rounded-lg p-3 border border-slate-200 shadow-sm overflow-hidden">
+      <h3 className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2 border-b border-slate-100 pb-2">{title}</h3>
+      <div className="space-y-1.5 min-w-0">
         {children}
       </div>
     </div>
@@ -246,15 +214,15 @@ function Section({ title, children }: { title: string, children: React.ReactNode
 }
 
 function Row({ label, value, highlight, isError }: { label: string, value: string, highlight?: boolean, isError?: boolean }) {
-  let valColor = 'text-slate-300';
-  if (highlight) valColor = 'text-amber-400 font-bold';
-  if (isError) valColor = 'text-red-400 font-bold';
-  if (value === 'OK' || value === 'SUCCESS' || value === 'GENERATED' || value === 'REGISTERED') valColor = 'text-emerald-400 font-bold';
-
+  let valColor = 'text-slate-600';
+  if (highlight) valColor = 'text-amber-600 font-bold';
+  if (isError) valColor = 'text-red-600 font-bold';
+  if (value === 'OK' || value === 'SUCCESS' || value === 'GENERATED' || value === 'REGISTERED') valColor = 'text-emerald-600 font-bold';
+  
   return (
-    <div className="flex justify-between items-center border-b border-slate-700/30 pb-2 last:border-0 last:pb-0">
-      <span className="text-slate-400">{label}</span>
-      <span className={`text-right break-all ml-4 ${valColor}`}>{value}</span>
+    <div className="flex justify-between items-start sm:items-center gap-2">
+      <span className="text-slate-500 flex-shrink-0 whitespace-nowrap">{label}</span>
+      <span className={`text-right break-words min-w-0 ${valColor}`}>{value}</span>
     </div>
   );
 }

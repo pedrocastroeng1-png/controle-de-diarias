@@ -167,16 +167,16 @@ export function AdminLayout() {
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
-      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex">
-        <div className="flex flex-col items-center justify-center py-6 px-4 border-b border-gray-200">
-          <img src="/icons/logo.png" alt="PCEG" className="w-48 h-auto object-contain" />
+      <aside className="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex flex-shrink-0 z-10">
+        <div className="h-[80px] flex items-center justify-center px-6 border-b border-gray-100 bg-white">
+          <img src="/icons/logo.png" alt="" className="w-full max-w-[160px] h-auto object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
         </div>
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {menuGroups.map((group, index) => {
             const Icon = group.icon;
             const isFirstInSection = group.section && (index === 0 || menuGroups[index - 1].section !== group.section);
             const sectionHeader = isFirstInSection ? (
-              <div key={`section-${group.section}`} className="mt-6 mb-2 px-3 text-xs font-semibold text-[var(--color-pceg-slate)] tracking-widest uppercase">
+              <div key={`section-${group.section}`} className="mt-6 mb-2 px-3 text-[10px] font-bold text-gray-400 tracking-[0.15em] uppercase">
                 {group.section}
               </div>
             ) : null;
@@ -189,13 +189,13 @@ export function AdminLayout() {
                   key={group.path}
                   to={group.path}
                   className={cn(
-                    "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
+                    "flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200",
                     isActive 
-                      ? "bg-[#FDF9F1] text-[var(--color-pceg-gold)]" 
-                      : "text-gray-700 hover:bg-gray-100"
+                      ? "bg-[#0B1B33] text-white shadow-md" 
+                      : "text-gray-600 hover:bg-gray-50 hover:text-[#0B1B33]"
                   )}
                 >
-                  <Icon className={cn("mr-3 h-5 w-5", isActive ? "text-[var(--color-pceg-gold)]" : "text-gray-400")} />
+                  <Icon className={cn("mr-3 h-5 w-5 transition-colors", isActive ? "text-[#C6922E]" : "text-gray-400 group-hover:text-[#0B1B33]")} />
                   {group.name}
                 </Link>
               </React.Fragment>
@@ -216,12 +216,12 @@ export function AdminLayout() {
                 <button
                   onClick={() => toggleGroup(group.name)}
                   className={cn(
-                    "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                    hasActiveChild && !isExpanded ? "bg-[#FDF9F1]/50 text-[var(--color-pceg-gold)]" : "text-gray-700 hover:bg-gray-100"
+                    "w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group",
+                    hasActiveChild && !isExpanded ? "bg-[#0B1B33]/5 text-[#0B1B33] font-bold" : "text-gray-600 hover:bg-gray-50 hover:text-[#0B1B33]"
                   )}
                 >
                   <div className="flex items-center">
-                    <Icon className={cn("mr-3 h-5 w-5", hasActiveChild && !isExpanded ? "text-[var(--color-pceg-gold)]" : "text-gray-400")} />
+                    <Icon className={cn("mr-3 h-5 w-5 transition-colors", hasActiveChild && !isExpanded ? "text-[#C6922E]" : "text-gray-400 group-hover:text-[#0B1B33]")} />
                     {group.name}
                   </div>
                   {isExpanded ? (
@@ -260,11 +260,11 @@ export function AdminLayout() {
             );
           })}
         </nav>
-        <div className="p-4 border-t border-gray-200">
-          <div className="flex items-center px-3 py-2 text-sm font-medium text-gray-700">
-            <div className="flex-1 truncate">
-              {usuario.usuario}
-              <div className="text-xs text-gray-500 font-normal">Administrador</div>
+        <div className="p-4 border-t border-gray-100 bg-slate-50 mt-auto">
+          <div className="flex items-center px-3 py-2 text-sm font-bold text-[#0B1B33]">
+            <div className="flex-1 min-w-0">
+              <div className="truncate">{usuario.usuario}</div>
+              <div className="text-[11px] text-gray-500 font-medium uppercase tracking-wider mt-0.5">Administrador</div>
             </div>
           </div>
 
@@ -304,7 +304,7 @@ export function AdminLayout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-3 md:hidden">
-           <img src="/icons/icone2.png" alt="PCEG" className="h-10 w-10 object-contain" />
+           <img src="/icons/icone2.png" alt="" className="h-10 w-10 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
            <h1 className="text-xl font-bold text-gray-900 flex-1">PCEG</h1>
            <button onClick={logout} className="text-gray-500 hover:text-red-600">
              <LogOut className="h-6 w-6" />
@@ -402,7 +402,7 @@ export function OperadorLayout() {
         <header className="bg-white border-b border-gray-200">
           <div className="max-w-md md:max-w-5xl w-full mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <img src="/icons/icone2.png" alt="Logo" className="h-8 w-8 object-contain" />
+              <img src="/icons/icone2.png" alt="" className="h-8 w-8 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
               <span className="font-bold text-gray-900 truncate">PCEG</span>
             </div>
 
@@ -443,7 +443,7 @@ export function OperadorLayout() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-md md:max-w-5xl w-full mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => navigate('/operador/painel')}>
-            <img src="/icons/icone2.png" alt="Logo" className="h-8 w-8 object-contain" />
+            <img src="/icons/icone2.png" alt="" className="h-8 w-8 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
             <span className="font-bold text-gray-900 truncate">Olá, {usuario.usuario}</span>
           </div>
 
