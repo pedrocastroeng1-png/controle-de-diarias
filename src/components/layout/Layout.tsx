@@ -168,8 +168,8 @@ export function AdminLayout() {
     <div className="min-h-screen bg-gray-50 flex">
       {/* Sidebar */}
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex flex-shrink-0 z-10">
-        <div className="h-[80px] flex items-center justify-center px-6 border-b border-gray-100 bg-white">
-          <img src="/icons/logo.png" alt="" className="w-full max-w-[160px] h-auto object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+        <div className="h-[100px] flex items-center justify-center px-4 py-4 border-b border-gray-200 bg-white">
+          <img src="/icons/icone2.png" alt="PCEG Logo" className="w-full max-w-[180px] max-h-full object-contain" />
         </div>
         <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
           {menuGroups.map((group, index) => {
@@ -304,7 +304,7 @@ export function AdminLayout() {
       {/* Main Content */}
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-3 md:hidden">
-           <img src="/icons/icone2.png" alt="" className="h-10 w-10 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+           <img src="/icons/icone2.png" alt="PCEG Logo" className="h-10 w-auto object-contain" />
            <h1 className="text-xl font-bold text-gray-900 flex-1">PCEG</h1>
            <button onClick={logout} className="text-gray-500 hover:text-red-600">
              <LogOut className="h-6 w-6" />

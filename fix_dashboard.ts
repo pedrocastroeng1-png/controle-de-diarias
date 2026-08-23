@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import fs from 'fs';
+
+let content = `import React, { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { HardHat, Users, CheckCircle, XCircle, Calendar, ArrowRight, BarChart3, ShieldAlert } from 'lucide-react';
 import { format, subDays, parseISO } from 'date-fns';
@@ -30,18 +32,13 @@ export default function Dashboard() {
         const dataStr = format(hoje, 'yyyy-MM-dd');
         const sevenDaysAgoStr = format(subDays(hoje, 6), 'yyyy-MM-dd');
         
-        const [statsResult, obrasResult, presencasResult, relatorioResult] = await Promise.allSettled([
+        const [stats, obrasData, presencasHoje, relatorio7d] = await Promise.all([
           api.getDashboardStats(dataStr),
           api.getObras(),
           api.getPresencas(dataStr),
           api.getRelatorio(sevenDaysAgoStr, dataStr)
         ]);
-
-        const stats = statsResult.status === 'fulfilled' ? statsResult.value : { totalObras: 0, totalFuncionarios: 0, presentesHoje: 0, faltasHoje: 0, valorTotalHoje: 0 };
-        const obrasData = obrasResult.status === 'fulfilled' ? obrasResult.value : [];
-        const presencasHoje = presencasResult.status === 'fulfilled' ? presencasResult.value : [];
-        const relatorio7d = relatorioResult.status === 'fulfilled' ? relatorioResult.value : [];
-
+        
         setTotalObras(stats.totalObras);
         setTotalFuncionarios(stats.totalFuncionarios);
         setPresentesHoje(stats.presentesHoje);
@@ -145,7 +142,7 @@ export default function Dashboard() {
                </div>
                <div className="w-full bg-white/10 h-2.5 rounded-full overflow-hidden">
                  <div className="bg-[#C9972B] h-full rounded-full transition-all duration-1000 ease-out" 
-                      style={{ width: `${taxaPresenca}%` }} />
+                      style={{ width: \`\${taxaPresenca}%\` }} />
                </div>
             </div>
           </div>
@@ -154,7 +151,7 @@ export default function Dashboard() {
         {/* Indicadores Grid */}
         <div className="lg:col-span-7 xl:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-6 min-w-0">
            {indicadores.map((card) => (
-             <div key={card.name} className={`bg-white rounded-[20px] p-6 border border-gray-100 shadow-[0_2px_10px_rgb(0,0,0,0.02)] flex flex-col justify-center min-w-0`}>
+             <div key={card.name} className={\`bg-white rounded-[20px] p-6 border border-gray-100 shadow-[0_2px_10px_rgb(0,0,0,0.02)] flex flex-col justify-center min-w-0\`}>
                 <div className="flex items-center justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <p className="text-[12px] font-bold text-gray-400 uppercase tracking-widest truncate">
@@ -164,8 +161,8 @@ export default function Dashboard() {
                       {isLoading ? '...' : card.value}
                     </p>
                   </div>
-                  <div className={`p-4 rounded-[16px] shrink-0 ${card.bg}`}>
-                    <card.icon className={`h-7 w-7 ${card.color}`} strokeWidth={2.5} />
+                  <div className={\`p-4 rounded-[16px] shrink-0 \${card.bg}\`}>
+                    <card.icon className={\`h-7 w-7 \${card.color}\`} strokeWidth={2.5} />
                   </div>
                 </div>
              </div>
@@ -205,7 +202,7 @@ export default function Dashboard() {
                      </div>
                      <div className="shrink-0 flex items-center gap-4">
                        <div className="w-24 bg-gray-100 h-2 rounded-full overflow-hidden hidden sm:block">
-                         <div className="h-full rounded-full bg-[#081B36]" style={{ width: `${obra.percentual}%` }} />
+                         <div className="h-full rounded-full bg-[#081B36]" style={{ width: \`\${obra.percentual}%\` }} />
                        </div>
                        <span className="text-[15px] font-bold text-[#081B36] w-12 text-right">
                          {obra.percentual}%
@@ -266,3 +263,5 @@ export default function Dashboard() {
     </div>
   );
 }
+`;
+fs.writeFileSync('src/pages/admin/Dashboard.tsx', content);

@@ -20,7 +20,7 @@ export default defineConfig(() => {
         },
         manifest: {
           short_name: "PCEG",
-          name: "PCEG — Gestão de Obras",
+          name: "PCEG — Pedro Castro Engenharia e Gestão",
           description: "Pedro Castro Engenharia e Gestão. Gestão inteligente. Obras eficientes.",
           categories: ["business", "productivity"],
           icons: [

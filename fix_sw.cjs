@@ -1,6 +1,7 @@
 const fs = require('fs');
-let sw = fs.readFileSync('src/sw.ts', 'utf-8');
-// Remove top level skipWaiting and clientsClaim
-sw = sw.replace(/\/\/ 3\. skipWaiting and clients\.claim\nself\.skipWaiting\(\);\nclientsClaim\(\);/, '');
-fs.writeFileSync('src/sw.ts', sw);
-console.log('Fixed sw.ts');
+let swContent = fs.readFileSync('src/sw.ts', 'utf8');
+
+swContent = swContent.replace(/icon: '\/icons\/icone2.png'/g, "icon: '/icons/celular.png'");
+swContent = swContent.replace(/badge: '\/icons\/icone2.png'/g, "badge: '/icons/celular.png'");
+
+fs.writeFileSync('src/sw.ts', swContent);

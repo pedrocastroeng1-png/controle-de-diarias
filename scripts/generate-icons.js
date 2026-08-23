@@ -5,7 +5,7 @@ import path from 'path';
 const PUBLIC_DIR = path.resolve('public');
 const ICONS_DIR = path.join(PUBLIC_DIR, 'icons');
 const APP_ICON_PATH = path.join(PUBLIC_DIR, 'icons/celular.png');
-const FAVICON_PATH = path.join(PUBLIC_DIR, 'icons/icone2.png');
+const FAVICON_PATH = path.join(PUBLIC_DIR, 'icons/celular.png');
 
 if (!fs.existsSync(ICONS_DIR)) {
   fs.mkdirSync(ICONS_DIR, { recursive: true });
@@ -25,7 +25,7 @@ const sizes = [72, 96, 128, 144, 152, 180, 192, 384, 512];
 const faviconSizes = [16, 32, 48];
 
 async function generate() {
-  console.log("Generating icons from celular.png and icone.png...");
+  console.log("Generating icons from celular.png...");
   
   const appImage = sharp(APP_ICON_PATH);
   const faviconImage = sharp(FAVICON_PATH);
