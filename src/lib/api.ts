@@ -1110,11 +1110,14 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('compras_materiais')
-      .select('*, obra:obras(nome), registrador:usuarios!registrado_por(usuario)')
+      .select('*, obra:obras(nome), registrador:usuarios!registrado_por(usuario), itens:compras_materiais_itens(valor_total)')
       .order('data_compra', { ascending: false })
       .order('created_at', { ascending: false });
     if (error) throw error;
-    return data || [];
+    return (data || []).map((compra: any) => ({
+      ...compra,
+      total_calculado: compra.itens ? compra.itens.reduce((acc: number, item: any) => acc + (Number(item.valor_total) || 0), 0) : 0
+    }));
   },
 
   getCompraDetalhes: async (compraId: string): Promise<any> => {
@@ -1132,16 +1135,19 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
       .eq('compra_id', compraId);
     if (itensError) throw itensError;
 
-    return { ...compra, itens: itens || [] };
+    const total_calculado = (itens || []).reduce((acc: number, item: any) => acc + (Number(item.valor_total) || 0), 0);
+    return { ...compra, itens: itens || [], total_calculado };
   },
 
   createCompraMaterial: async (compraData: any, itensData: any[]): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
     
+    const { total, total_calculado, ...compraPayload } = compraData;
+
     // Insert compra
     const { data: compra, error: compraError } = await supabase
       .from('compras_materiais')
-      .insert(compraData)
+      .insert(compraPayload)
       .select()
       .single();
       
@@ -1149,18 +1155,19 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
     
     // Insert items
     if (itensData && itensData.length > 0) {
-      const itensToInsert = itensData.map(item => ({
-        ...item,
-        compra_id: compra.id
-      }));
+      const itensToInsert = itensData.map(item => {
+        const { total_item, valor_total, ...itemPayload } = item;
+        return {
+          ...itemPayload,
+          compra_id: compra.id
+        };
+      });
       
       const { error: itensError } = await supabase
         .from('compras_materiais_itens')
         .insert(itensToInsert);
         
       if (itensError) {
-        // We shouldn't leave orphaned records, but lacking transaction control
-        // we might want to attempt to delete the compra if items fail
         await supabase.from('compras_materiais').delete().eq('id', compra.id);
         throw itensError;
       }

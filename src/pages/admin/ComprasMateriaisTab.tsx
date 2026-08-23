@@ -153,7 +153,7 @@ export default function ComprasMateriaisTab() {
         material_id: item.material_id,
         quantidade: item.quantidade,
         valor_unitario: item.valor_unitario,
-        total_item: totalItem
+        
       });
     }
 
@@ -162,7 +162,7 @@ export default function ComprasMateriaisTab() {
       
       const payloadCompra = {
         ...compraForm,
-        total: totalCompra,
+        
         registrado_por: usuario?.id
       };
       
@@ -248,7 +248,7 @@ export default function ComprasMateriaisTab() {
                         {compra.fornecedor || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(compra.total)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(compra.total_calculado)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                         <button
@@ -340,7 +340,7 @@ export default function ComprasMateriaisTab() {
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor_unitario)}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total_item)}
+                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor_total)}
                       </td>
                     </tr>
                   ))}
@@ -351,7 +351,7 @@ export default function ComprasMateriaisTab() {
                       Total da Compra:
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap text-right text-base font-bold text-blue-600">
-                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedCompra.total)}
+                      {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(selectedCompra.total_calculado)}
                     </td>
                   </tr>
                 </tfoot>

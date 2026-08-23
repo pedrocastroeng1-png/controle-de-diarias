@@ -234,7 +234,7 @@ export interface CompraMaterial {
   fornecedor?: string;
   numero_recibo?: string;
   observacao?: string;
-  total: number;
+  total_calculado?: number;
   data_compra: string;
   registrado_por: string;
   created_at?: string;
@@ -250,7 +250,7 @@ export interface CompraMaterialItem {
   material_id: string;
   quantidade: number;
   valor_unitario: number;
-  total_item: number;
+  valor_total?: number;
   created_at?: string;
   
   material?: Material;
