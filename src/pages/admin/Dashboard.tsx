@@ -59,7 +59,7 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Visão Geral</h2>
+          <h2 className="text-3xl font-bold text-gray-900 tracking-tight">Central de Operações</h2>
           <p className="mt-1 text-sm text-gray-500 flex items-center gap-2">
             <Calendar className="w-4 h-4" />
             Hoje é {hojeFormatado}
@@ -78,7 +78,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         
         {/* Highlight Card */}
-        <div className="md:col-span-12 lg:col-span-4 bg-gradient-to-br from-gray-900 to-gray-800 rounded-3xl p-8 text-white shadow-xl flex flex-col justify-between relative overflow-hidden group">
+        <div className="md:col-span-12 lg:col-span-4 bg-[var(--color-pceg-navy)] rounded-3xl p-8 text-white shadow-xl flex flex-col justify-between relative overflow-hidden group">
           <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
           <div className="relative z-10">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/10 text-xs font-medium text-gray-300 backdrop-blur-md border border-white/10 mb-6">
@@ -92,7 +92,7 @@ export default function Dashboard() {
           </div>
           <div className="relative z-10 mt-8">
              <div className="w-full bg-white/10 h-1.5 rounded-full overflow-hidden">
-               <div className="bg-emerald-400 h-full rounded-full w-3/4" style={{ width: totalFuncionarios ? `${(presentesHoje / totalFuncionarios) * 100}%` : '0%' }} />
+               <div className="bg-[var(--color-pceg-gold)] h-full rounded-full w-3/4" style={{ width: totalFuncionarios ? `${(presentesHoje / totalFuncionarios) * 100}%` : '0%' }} />
              </div>
              <div className="mt-3 text-sm text-gray-400 flex justify-between">
                <span>Taxa de presença</span>

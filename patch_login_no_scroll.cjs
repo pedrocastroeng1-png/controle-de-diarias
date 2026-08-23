@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+
+const content = `import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { version } from '../../config/appVersion';
@@ -100,14 +102,14 @@ export default function Login() {
         </div>
         
         {/* Top/Middle Content Wrapper to distribute space on mobile */}
-        <div className="relative z-10 flex flex-col flex-1 justify-center md:justify-start">
+        <div className="relative z-10 flex flex-col h-full justify-center md:justify-start">
           
           {/* Top Content: Icon */}
           <div className="relative z-10 animate-in fade-in slide-in-from-left-8 duration-1000 ease-out 
                           -ml-2 -mt-2 mb-2 md:-ml-6 md:-mt-6 md:mb-6 flex justify-center md:justify-start">
             <img src="/icons/icone2.png" alt="PCEG Icon" 
                  className="h-auto object-contain drop-shadow-2xl 
-                            w-[130px] sm:w-[150px] md:w-[210px] lg:w-[240px] xl:w-[280px]" />
+                            w-[100px] sm:w-[120px] md:w-[210px] lg:w-[240px] xl:w-[280px]" />
           </div>
 
           {/* Typography */}
@@ -258,3 +260,7 @@ export default function Login() {
     </div>
   );
 }
+`;
+
+fs.writeFileSync('src/pages/auth/Login.tsx', content, 'utf8');
+console.log("No-scroll layout applied.");

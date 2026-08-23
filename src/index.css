@@ -1,5 +1,13 @@
 @import "tailwindcss";
--e 
+
+@theme {
+  --color-pceg-navy: #0B1B33;
+  --color-pceg-gold: #C6922E;
+  --color-pceg-gray: #F5F7FA;
+  --color-pceg-slate: #64748B;
+}
+
 body, html {
   overflow-x: hidden;
+  background-color: var(--color-pceg-gray);
 }

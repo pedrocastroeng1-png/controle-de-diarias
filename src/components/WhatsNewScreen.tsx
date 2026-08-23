@@ -15,12 +15,12 @@ export function WhatsNewScreen({ onContinue }: WhatsNewScreenProps) {
       <div className="sm:mx-auto sm:w-full sm:max-w-[480px] w-full relative z-10 animate-in fade-in zoom-in-95 duration-700 ease-out fill-mode-both">
         <div className="bg-white p-[32px] sm:p-[48px] shadow-[0_24px_80px_-12px_rgba(0,0,0,0.06)] rounded-[28px] border-none flex flex-col items-center text-center">
           
-          <div className="flex items-center justify-center mb-6">
-            <img src="/logo.png" alt="Controle de Diárias" className="h-[80px] w-[80px] object-contain drop-shadow-sm" />
+          <div className="flex items-center justify-center mb-8">
+            <img src="/icons/logo.png" alt="PCEG - Pedro Castro Engenharia e Gestão" className="w-[240px] h-auto object-contain drop-shadow-sm" />
           </div>
           
           <h2 className="text-[28px] sm:text-[32px] leading-tight font-extrabold text-[#0F172A] tracking-tight mb-2">
-            🚀 Controle de Diárias
+            🚀 Novidades
           </h2>
           
           <div className="mb-6">
@@ -63,7 +63,7 @@ export function WhatsNewScreen({ onContinue }: WhatsNewScreenProps) {
           <div className="w-full">
             <button
               onClick={onContinue}
-              className="w-full flex justify-center items-center h-[58px] border border-transparent rounded-[16px] shadow-[0_4px_12px_rgba(37,99,235,0.25)] text-[16px] font-bold text-white bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] hover:-translate-y-[2px] hover:shadow-[0_8px_20px_rgba(37,99,235,0.35)] focus:outline-none focus:ring-[3px] focus:ring-offset-2 focus:ring-[#2563EB]/50 transition-all duration-250 cursor-pointer"
+              className="w-full flex justify-center items-center h-[58px] border border-transparent rounded-[16px] shadow-[0_4px_12px_rgba(37,99,235,0.25)] text-[16px] font-bold text-white bg-gradient-to-b from-[var(--color-pceg-navy)] to-[#081324] hover:-translate-y-[2px] hover:shadow-[0_8px_20px_rgba(37,99,235,0.35)] focus:outline-none focus:ring-[3px] focus:ring-offset-2 focus:ring-[var(--color-pceg-navy)]/50 transition-all duration-250 cursor-pointer"
             >
               Continuar
             </button>

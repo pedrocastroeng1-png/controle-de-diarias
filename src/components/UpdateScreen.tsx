@@ -19,8 +19,8 @@ export function UpdateScreen({ latestVersion, onUpdateNow, onUpdateLater, isUpda
       <div className="sm:mx-auto sm:w-full sm:max-w-[480px] w-full relative z-10 animate-in fade-in zoom-in-95 duration-700 ease-out fill-mode-both">
         <div className="bg-white p-[32px] sm:p-[48px] shadow-[0_24px_80px_-12px_rgba(0,0,0,0.06)] rounded-[28px] border-none flex flex-col items-center text-center">
           
-          <div className="flex items-center justify-center mb-8">
-            <img src="/logo.png" alt="Controle de Diárias" className="h-[96px] w-[96px] object-contain drop-shadow-sm" />
+          <div className="flex items-center justify-center mb-10">
+            <img src="/icons/logo.png" alt="PCEG" className="w-[280px] h-auto object-contain drop-shadow-sm" />
           </div>
           
           <h2 className="text-[32px] sm:text-[36px] leading-tight font-extrabold text-[#0F172A] tracking-tight mb-4">
@@ -28,7 +28,7 @@ export function UpdateScreen({ latestVersion, onUpdateNow, onUpdateLater, isUpda
           </h2>
           
           <p className="text-[15px] sm:text-[16px] text-[#64748B] font-medium leading-relaxed mb-8">
-            Uma nova versão do Controle de Diárias foi publicada.<br/><br/>
+            Uma nova versão do PCEG foi publicada.<br/><br/>
             Atualize agora para continuar utilizando o aplicativo com melhorias, correções e novos recursos.
           </p>
           {latestVersion !== version && (
@@ -51,7 +51,7 @@ export function UpdateScreen({ latestVersion, onUpdateNow, onUpdateLater, isUpda
             <button
               onClick={onUpdateNow}
               disabled={isUpdating}
-              className="w-full flex justify-center items-center h-[58px] border border-transparent rounded-[16px] shadow-[0_4px_12px_rgba(37,99,235,0.25)] text-[16px] font-bold text-white bg-gradient-to-b from-[#2563EB] to-[#1D4ED8] hover:-translate-y-[2px] hover:shadow-[0_8px_20px_rgba(37,99,235,0.35)] focus:outline-none focus:ring-[3px] focus:ring-offset-2 focus:ring-[#2563EB]/50 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-250 cursor-pointer"
+              className="w-full flex justify-center items-center h-[58px] border border-transparent rounded-[16px] shadow-[0_4px_12px_rgba(37,99,235,0.25)] text-[16px] font-bold text-white bg-gradient-to-b from-[var(--color-pceg-navy)] to-[#081324] hover:-translate-y-[2px] hover:shadow-[0_8px_20px_rgba(37,99,235,0.35)] focus:outline-none focus:ring-[3px] focus:ring-offset-2 focus:ring-[var(--color-pceg-navy)]/50 disabled:opacity-70 disabled:cursor-not-allowed transition-all duration-250 cursor-pointer"
             >
               {isUpdating ? (
                 <>

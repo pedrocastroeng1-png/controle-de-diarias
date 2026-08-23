@@ -19,9 +19,9 @@ export default defineConfig(() => {
           maximumFileSizeToCacheInBytes: 5000000
         },
         manifest: {
-          short_name: "Diárias",
-          name: "Controle de Diárias",
-          description: "Sistema de controle de diárias, presença e ferramentas para obras.",
+          short_name: "PCEG",
+          name: "PCEG — Gestão de Obras",
+          description: "Pedro Castro Engenharia e Gestão. Gestão inteligente. Obras eficientes.",
           categories: ["business", "productivity"],
           icons: [
             {
@@ -73,7 +73,7 @@ export default defineConfig(() => {
           ],
           start_url: "/",
           background_color: "#FFFFFF",
-          theme_color: "#2563EB",
+          theme_color: "#0B1B33",
           display: "standalone",
           orientation: "portrait"
         }
