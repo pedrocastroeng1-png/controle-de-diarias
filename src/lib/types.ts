@@ -255,3 +255,25 @@ export interface CompraMaterialItem {
   
   material?: Material;
 }
+
+
+export interface MaterialQuantityDetail {
+  id: string;
+  data_compra: string;
+  fornecedor?: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+}
+
+export interface MaterialQuantityRow {
+  material_id: string;
+  material_nome: string;
+  unidade: string;
+  categoria_id: string;
+  categoria_nome: string;
+  obra_id?: string;
+  obra_nome?: string;
+  quantidade_total: number;
+  registros: MaterialQuantityDetail[];
+}

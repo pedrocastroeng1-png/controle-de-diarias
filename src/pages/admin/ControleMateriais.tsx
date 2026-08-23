@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Package } from 'lucide-react';
 import ComprasMateriaisTab from './ComprasMateriaisTab';
+import QuantidadeMateriaisTab from './QuantidadeMateriaisTab';
 
 export default function ControleMateriais() {
   const { usuario } = useAuth();
@@ -49,7 +50,7 @@ export default function ControleMateriais() {
         <div className="p-6">
           <div>
             {activeTab === 'compras' && <div className="text-left"><ComprasMateriaisTab /></div>}
-            {activeTab === 'quantidade' && isAdmin && <div className="text-center py-12 text-gray-500"><p>Controle de Quantidade (Em desenvolvimento)</p></div>}
+            {activeTab === 'quantidade' && isAdmin && <div className="text-left"><QuantidadeMateriaisTab /></div>}
             {activeTab === 'relatorios' && isAdmin && <div className="text-center py-12 text-gray-500"><p>Relatórios de Materiais (Em desenvolvimento)</p></div>}
           </div>
         </div>

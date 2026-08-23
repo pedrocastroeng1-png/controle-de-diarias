@@ -1139,6 +1139,86 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
     return { ...compra, itens: itens || [], total_calculado };
   },
 
+  
+  getMaterialQuantities: async (filters?: { obra_id?: string; categoria_id?: string; material_id?: string; data_inicial?: string; data_final?: string }): Promise<any[]> => {
+    if (!supabase) throw new Error('Supabase não configurado');
+    let query = supabase
+      .from('compras_materiais_itens')
+      .select(`
+        id,
+        quantidade,
+        valor_unitario,
+        valor_total,
+        compra:compras_materiais!inner(id, data_compra, fornecedor, obra_id, obra:obras(nome)),
+        material:materiais!inner(id, nome, unidade, categoria_id, category:material_categories(nome))
+      `);
+
+    if (filters?.obra_id) {
+      query = query.eq('compra.obra_id', filters.obra_id);
+    }
+    if (filters?.categoria_id) {
+      query = query.eq('material.categoria_id', filters.categoria_id);
+    }
+    if (filters?.material_id) {
+      query = query.eq('material_id', filters.material_id);
+    }
+    if (filters?.data_inicial) {
+      query = query.gte('compra.data_compra', filters.data_inicial);
+    }
+    if (filters?.data_final) {
+      query = query.lte('compra.data_compra', filters.data_final);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    
+    // Agregação no frontend
+    const map = new Map<string, any>();
+    
+    for (const rawItem of (data || [])) {
+      const item: any = rawItem;
+      const mat = Array.isArray(item.material) ? item.material[0] : item.material;
+      const comp = Array.isArray(item.compra) ? item.compra[0] : item.compra;
+      const cat = mat?.category ? (Array.isArray(mat.category) ? mat.category[0] : mat.category) : null;
+      const ob = comp?.obra ? (Array.isArray(comp.obra) ? comp.obra[0] : comp.obra) : null;
+      
+      const matId = mat?.id;
+      const obraId = comp?.obra_id;
+      // If we are showing "Todas as Obras", we might want to aggregate by Material AND Obra, 
+      // or just by Material? 
+      // The requirement says: "Se OBRA = Todas as Obras, mostrar: OBRA | MATERIAL | UNIDADE | QUANTIDADE"
+      // So the grouping key must be obra_id + material_id
+      const key = `${obraId}_${matId}`;
+      
+      if (!map.has(key)) {
+        map.set(key, {
+          material_id: matId,
+          material_nome: mat?.nome,
+          unidade: mat?.unidade,
+          categoria_id: mat?.categoria_id,
+          categoria_nome: cat?.nome,
+          obra_id: obraId,
+          obra_nome: ob?.nome || 'N/A',
+          quantidade_total: 0,
+          registros: []
+        });
+      }
+      
+      const row = map.get(key);
+      row.quantidade_total += Number(item.quantidade) || 0;
+      row.registros.push({
+        id: item.id,
+        data_compra: comp?.data_compra,
+        fornecedor: comp?.fornecedor,
+        quantidade: item.quantidade,
+        valor_unitario: item.valor_unitario,
+        valor_total: item.valor_total
+      });
+    }
+    
+    return Array.from(map.values()).sort((a, b) => a.material_nome.localeCompare(b.material_nome));
+  },
+
   createCompraMaterial: async (compraData: any, itensData: any[]): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
     

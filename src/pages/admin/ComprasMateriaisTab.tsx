@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Loader2, FileText, ChevronLeft, Save, X, Eye, Trash2, ArrowLeft } from 'lucide-react';
+import { Plus, Search, Loader2, FileText, ChevronLeft, Save, X, Eye, Trash2, ArrowLeft, Sparkles } from 'lucide-react';
+import SmartPurchaseForm from '../../components/SmartPurchaseForm';
 import { api } from '../../lib/api';
 import { format } from 'date-fns';
 import { useAuth } from '../../contexts/AuthContext';
@@ -153,7 +154,7 @@ export default function ComprasMateriaisTab() {
         material_id: item.material_id,
         quantidade: item.quantidade,
         valor_unitario: item.valor_unitario,
-        
+        funcionario_id: item.funcionario_id || null
       });
     }
 
