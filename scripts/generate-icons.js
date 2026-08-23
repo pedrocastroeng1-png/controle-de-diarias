@@ -5,7 +5,7 @@ import path from 'path';
 const PUBLIC_DIR = path.resolve('public');
 const ICONS_DIR = path.join(PUBLIC_DIR, 'icons');
 const APP_ICON_PATH = path.join(PUBLIC_DIR, 'icons/celular.png');
-const FAVICON_PATH = path.join(PUBLIC_DIR, 'icons/icone.png');
+const FAVICON_PATH = path.join(PUBLIC_DIR, 'icons/icone2.png');
 
 if (!fs.existsSync(ICONS_DIR)) {
   fs.mkdirSync(ICONS_DIR, { recursive: true });

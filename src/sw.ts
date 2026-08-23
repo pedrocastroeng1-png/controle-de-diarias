@@ -10,7 +10,7 @@ declare const __BUILD_VERSION__: string;
 const BUILD_ID = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : Date.now().toString();
 
 // 1. Every deployment MUST generate a completely new cache version.
-const CACHE_NAME = `controle-diarias-v${BUILD_ID}`;
+const CACHE_NAME = `pceg-v${BUILD_ID}`;
 const HTML_CACHE = `html-cache-${BUILD_ID}`;
 const ASSETS_CACHE = `assets-cache-${BUILD_ID}`;
 
@@ -108,8 +108,8 @@ self.addEventListener('push', (event: any) => {
   event.waitUntil(
     self.registration.showNotification(title, {
       body: body,
-      icon: '/icons/icone.png',
-      badge: '/icons/icone.png',
+      icon: '/icons/icone2.png',
+      badge: '/icons/icone2.png',
       data: dataPayload
     })
   );

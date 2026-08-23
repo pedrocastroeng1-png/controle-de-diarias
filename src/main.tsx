@@ -17,7 +17,7 @@ if ('serviceWorker' in navigator) {
 async function verifyAssets() {
   if (sessionStorage.getItem('asset_checked')) return;
   try {
-    const res = await fetch('/icons/icone.png', { method: 'HEAD', cache: 'no-cache' });
+    const res = await fetch('/icons/icone2.png', { method: 'HEAD', cache: 'no-cache' });
     if (res.status === 404) {
       console.error('Core asset 404. Purging caches...');
       if ('caches' in window) {
