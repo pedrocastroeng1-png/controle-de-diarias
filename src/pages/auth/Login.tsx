@@ -48,25 +48,28 @@ export default function Login() {
     setErro('');
     setLoading(true);
 
-    if (usuario.trim().toLowerCase() === 'castrophs1@gmail.com') {
+    let supabaseAuthFailed = false;
+
+    if (usuario.includes('@')) {
       try {
         const { data, error } = await supabase.auth.signInWithPassword({
           email: usuario.trim(),
           password: senha
         });
         
-        if (!error && data?.session?.user?.app_metadata?.platform_role === 'owner') {
-          navigate('/owner/dashboard');
-          return;
-        } else {
-          setErro('Credenciais de proprietário inválidas.');
-          setLoading(false);
-          return;
+        if (!error && data?.session) {
+          if (data.session.user?.app_metadata?.platform_role === 'owner') {
+            navigate('/owner/dashboard');
+            return;
+          } else {
+            await supabase.auth.signOut();
+            supabaseAuthFailed = true;
+          }
+        } else if (error) {
+          supabaseAuthFailed = true;
         }
       } catch (e) {
-        setErro('Erro ao autenticar proprietário.');
-        setLoading(false);
-        return;
+        supabaseAuthFailed = true;
       }
     }
 
@@ -85,7 +88,11 @@ export default function Login() {
         }
       }
     } else {
-      setErro('Usuário ou senha inválidos.');
+      if (supabaseAuthFailed) {
+        setErro('Credenciais de proprietário inválidas.');
+      } else {
+        setErro('Usuário ou senha inválidos.');
+      }
       setLoading(false);
     }
   };
