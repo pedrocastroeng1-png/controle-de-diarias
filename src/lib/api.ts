@@ -1,11 +1,21 @@
-import { supabase } from './supabase';
-import bcrypt from 'bcryptjs';
+import { supabase } from "./supabase";
+import bcrypt from "bcryptjs";
 
-import { AutomationRule, AutomationEventCatalog, AutomationRun, Usuario, Obra, Funcao, Funcionario, Presenca, AtestadoMedico } from './types';
+import {
+  AutomationRule,
+  AutomationEventCatalog,
+  AutomationRun,
+  Usuario,
+  Obra,
+  Funcao,
+  Funcionario,
+  Presenca,
+  AtestadoMedico,
+} from "./types";
 
 const getEmpresaId = () => {
   try {
-    const userStr = localStorage.getItem('@diarias:usuario');
+    const userStr = localStorage.getItem("@diarias:usuario");
     if (userStr) {
       return JSON.parse(userStr).empresa_id;
     }
@@ -16,111 +26,135 @@ const getEmpresaId = () => {
 const withEmpresa = (query: any, isAuth = false) => {
   const empId = getEmpresaId();
   if (empId && !isAuth) {
-    return query.eq('empresa_id', empId);
+    return query.eq("empresa_id", empId);
   }
   return query;
 };
-
 
 const addEmpresaId = (payload: any) => {
   const empId = getEmpresaId();
   if (!empId) return payload;
   if (Array.isArray(payload)) {
-    return payload.map(p => ({ ...p, empresa_id: empId }));
+    return payload.map((p) => ({ ...p, empresa_id: empId }));
   }
   return { ...payload, empresa_id: empId };
 };
 
-export const api = {
+const getCurrentUserProfile = () => {
+  try {
+    const userStr = localStorage.getItem("@diarias:usuario");
+    if (userStr) {
+      return JSON.parse(userStr).perfil;
+    }
+  } catch (e) {}
+  return null;
+};
 
+export const api = {
   // Communications
   getCommunications: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase
-      .from('communications')
-      .select('*, creator:usuarios!created_by(id, usuario), target_operator:usuarios!target_operator_id(id, usuario)')
-    ).order('created_at', { ascending: false });
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase
+        .from("communications")
+        .select(
+          "*, creator:usuarios!created_by(id, usuario), target_operator:usuarios!target_operator_id(id, usuario)",
+        ),
+    ).order("created_at", { ascending: false });
     if (error) throw error;
     return data || [];
   },
 
   getUnreadCommunications: async (operatorId: string): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+    if (!supabase) throw new Error("Supabase não configurado");
     const now = new Date();
-    const today = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
-    
+    const today = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+      .toISOString()
+      .split("T")[0];
+
     // Get all active communications
-    const { data: comms, error: commsError } = await withEmpresa(supabase
-      .from('communications')
-      .select('*, creator:usuarios!created_by(id, usuario), attachments:communication_attachments(*)')
-    ).eq('is_active', true);
-      
+    const { data: comms, error: commsError } = await withEmpresa(
+      supabase
+        .from("communications")
+        .select(
+          "*, creator:usuarios!created_by(id, usuario), attachments:communication_attachments(*)",
+        ),
+    ).eq("is_active", true);
+
     if (commsError) throw commsError;
 
     // Get all recipient records for this operator
-    const commIds = (comms || []).map(c => c.id);
+    const commIds = (comms || []).map((c) => c.id);
     let reads: any[] = [];
     if (commIds.length > 0) {
       const { data, error: readsError } = await supabase
-        .from('communication_recipients')
-        .select('communication_id, read_at')
-        .eq('operator_id', operatorId)
-        .in('communication_id', commIds);
+        .from("communication_recipients")
+        .select("communication_id, read_at")
+        .eq("operator_id", operatorId)
+        .in("communication_id", commIds);
       if (readsError) throw readsError;
       reads = data || [];
     }
 
-    const recipientRecords = new Map(reads.map(r => [r.communication_id, r]));
-    
-    const validComms = (comms || []).filter(c => {
+    const recipientRecords = new Map(reads.map((r) => [r.communication_id, r]));
+
+    const validComms = (comms || []).filter((c) => {
       // Check expiration
       if (c.expiration_date && c.expiration_date < today) return false;
-      
+
       const rec = recipientRecords.get(c.id);
-      
+
       // Check audience
-      if (c.target_audience === 'OPERATOR') {
+      if (c.target_audience === "OPERATOR") {
         // Must be explicitly targeted via target_operator_id or recipient table
         if (c.target_operator_id !== operatorId && !rec) return false;
       }
-      
+
       // Check if read
       if (rec && rec.read_at) return false; // Already read
-      
+
       return true;
     });
-    
+
     return validComms.sort((a, b) => a.created_at.localeCompare(b.created_at));
   },
-  
-  getCommunicationRecipients: async (communicationId: string): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('communication_recipients'))
-      .select('*, operator:usuarios!operator_id(id, usuario)')
-      .eq('communication_id', communicationId)
-      .order('read_at', { ascending: false });
+
+  getCommunicationRecipients: async (
+    communicationId: string,
+  ): Promise<any[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("communication_recipients"),
+    )
+      .select("*, operator:usuarios!operator_id(id, usuario)")
+      .eq("communication_id", communicationId)
+      .order("read_at", { ascending: false });
     if (error) throw error;
     return data || [];
   },
 
-  
-  markCommunicationRead: async (communicationId: string, operatorId: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await supabase
-      .from('communication_recipients')
-      .upsert(addEmpresaId([{
-        communication_id: communicationId,
-        operator_id: operatorId,
-        read_at: new Date().toISOString()
-      }]), { onConflict: 'communication_id, operator_id' });
+  markCommunicationRead: async (
+    communicationId: string,
+    operatorId: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await supabase.from("communication_recipients").upsert(
+      addEmpresaId([
+        {
+          communication_id: communicationId,
+          operator_id: operatorId,
+          read_at: new Date().toISOString(),
+        },
+      ]),
+      { onConflict: "communication_id, operator_id" },
+    );
     if (error) throw error;
   },
 
-  
   createCommunicationAttachment: async (payload: any): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+    if (!supabase) throw new Error("Supabase não configurado");
     const { data, error } = await supabase
-      .from('communication_attachments')
+      .from("communication_attachments")
       .insert(addEmpresaId([payload]))
       .select()
       .single();
@@ -128,15 +162,19 @@ export const api = {
     return data;
   },
 
-  
-  createCommunicationRecipient: async (communication_id: string, operator_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    await supabase.from('communication_recipients').insert(addEmpresaId([{ communication_id, operator_id }]));
+  createCommunicationRecipient: async (
+    communication_id: string,
+    operator_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    await supabase
+      .from("communication_recipients")
+      .insert(addEmpresaId([{ communication_id, operator_id }]));
   },
   createCommunication: async (payload: any): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+    if (!supabase) throw new Error("Supabase não configurado");
     const { data, error } = await supabase
-      .from('communications')
+      .from("communications")
       .insert(addEmpresaId([payload]))
       .select()
       .single();
@@ -145,9 +183,10 @@ export const api = {
   },
 
   updateCommunication: async (id: string, payload: any): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('communications')).update(payload)
-      .eq('id', id)
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(supabase.from("communications"))
+      .update(payload)
+      .eq("id", id)
       .select()
       .single();
     if (error) throw error;
@@ -155,72 +194,90 @@ export const api = {
   },
 
   deleteCommunication: async (id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await withEmpresa(supabase.from('communications').delete())
-      .eq('id', id);
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await withEmpresa(
+      supabase.from("communications").delete(),
+    ).eq("id", id);
     if (error) throw error;
   },
 
-  markCommunicationAsRead: async (communicationId: string, operatorId: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+  markCommunicationAsRead: async (
+    communicationId: string,
+    operatorId: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
     const { error } = await supabase
-      .from('communication_recipients')
-      .insert(addEmpresaId([{ communication_id: communicationId, operator_id: operatorId }]));
+      .from("communication_recipients")
+      .insert(
+        addEmpresaId([
+          { communication_id: communicationId, operator_id: operatorId },
+        ]),
+      );
     if (error) throw error;
   },
 
   getOperators: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('usuarios'))
-      .select('id, usuario, perfil')
-      .in('perfil', ['OPERADOR', 'ADMIN', 'CONSULTA'])
-      .eq('ativo', true);
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(supabase.from("usuarios"))
+      .select("id, usuario, perfil")
+      .in("perfil", ["OPERADOR", "ADMIN", "CONSULTA"])
+      .eq("ativo", true);
     if (error) throw error;
     return data || [];
   },
 
   // Usuarios
 
-checkUserActive: async (id: string): Promise<{ data: any | null, error: any | null }> => {
-    if (!supabase) return { data: null, error: new Error('Supabase não configurado') };
+  checkUserActive: async (
+    id: string,
+  ): Promise<{ data: any | null; error: any | null }> => {
+    if (!supabase)
+      return { data: null, error: new Error("Supabase não configurado") };
     const { data, error } = await supabase
-      .from('usuarios')
-      .select('id, usuario, perfil, ativo, empresa_id, login, email')
-      .eq('id', id)
+      .from("usuarios")
+      .select("id, usuario, perfil, ativo, empresa_id, login, email")
+      .eq("id", id)
       .single();
     return { data, error };
   },
 
   getEmpresa: async (id: string) => {
     if (!supabase) return null;
-    const { data } = await supabase.from('empresas').select('*').eq('id', id).single();
+    const { data } = await supabase
+      .from("empresas")
+      .select("*")
+      .eq("id", id)
+      .single();
     return data;
   },
 
   login: async (usuario: string, senha: string): Promise<any | null> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+    if (!supabase) throw new Error("Supabase não configurado");
     const { data, error } = await supabase
-      .from('usuarios')
-      .select('id, usuario, perfil, senha, empresa_id, login, email')
+      .from("usuarios")
+      .select("id, usuario, perfil, senha, empresa_id, login, email")
       .or(`usuario.eq."${usuario}",login.eq."${usuario}",email.eq."${usuario}"`)
-      .eq('ativo', true)
+      .eq("ativo", true)
       .single();
 
     if (error || !data) {
-      throw new Error('Usuário ou senha inválidos.');
+      throw new Error("Usuário ou senha inválidos.");
     }
 
     const { senha: passwordHash, ...userData } = data;
-    
+
     let isValid = false;
-    if (passwordHash && (passwordHash.startsWith('$2a$') || passwordHash.startsWith('$2b$'))) {
+    if (
+      passwordHash &&
+      (passwordHash.startsWith("$2a$") || passwordHash.startsWith("$2b$"))
+    ) {
       isValid = await bcrypt.compare(senha, passwordHash);
     } else {
       isValid = senha === passwordHash;
     }
 
     if (!isValid) {
-      throw new Error('Usuário ou senha inválidos.');
+      throw new Error("Usuário ou senha inválidos.");
     }
 
     return userData;
@@ -228,110 +285,167 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
 
   // Obras
   getObras: async (): Promise<Obra[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('obras').select('*')).eq('ativo', true).order('nome');
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("obras").select("*"),
+    )
+      .eq("ativo", true)
+      .order("nome");
     if (error) throw error;
     return data;
   },
-  createObra: async (obra: Omit<Obra, 'id'>): Promise<Obra> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('obras').insert(addEmpresaId([obra])).select().single();
+  createObra: async (obra: Omit<Obra, "id">): Promise<Obra> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await supabase
+      .from("obras")
+      .insert(addEmpresaId([obra]))
+      .select()
+      .single();
     if (error) throw error;
     return data;
   },
   updateObra: async (id: string, obra: Partial<Obra>): Promise<Obra> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('obras').update(obra)).eq('id', id).select().single();
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("obras").update(obra),
+    )
+      .eq("id", id)
+      .select()
+      .single();
     if (error) throw error;
     return data;
   },
   deleteObra: async (id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await withEmpresa(supabase.from('obras').update({ ativo: false })).eq('id', id);
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await withEmpresa(
+      supabase.from("obras").update({ ativo: false }),
+    ).eq("id", id);
     if (error) throw error;
   },
 
   // Funcoes
   getFuncoes: async (): Promise<Funcao[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('funcoes').select('*')).eq('ativo', true).order('nome');
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("funcoes").select("*"),
+    )
+      .eq("ativo", true)
+      .order("nome");
     if (error) throw error;
     return data;
   },
-  createFuncao: async (funcao: Omit<Funcao, 'id'>): Promise<Funcao> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('funcoes').insert(addEmpresaId([funcao])).select().single();
+  createFuncao: async (funcao: Omit<Funcao, "id">): Promise<Funcao> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await supabase
+      .from("funcoes")
+      .insert(addEmpresaId([funcao]))
+      .select()
+      .single();
     if (error) throw error;
     return data;
   },
-  updateFuncao: async (id: string, funcao: Partial<Funcao>): Promise<Funcao> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('funcoes').update(funcao)).eq('id', id).select().single();
+  updateFuncao: async (
+    id: string,
+    funcao: Partial<Funcao>,
+  ): Promise<Funcao> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("funcoes").update(funcao),
+    )
+      .eq("id", id)
+      .select()
+      .single();
     if (error) throw error;
     return data;
   },
   deleteFuncao: async (id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await withEmpresa(supabase.from('funcoes').update({ ativo: false })).eq('id', id);
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await withEmpresa(
+      supabase.from("funcoes").update({ ativo: false }),
+    ).eq("id", id);
     if (error) throw error;
   },
 
   // Funcionarios
-  getFuncionarios: async (status: 'ativos' | 'inativos' | 'todos' = 'ativos', apenasDiaristas = false): Promise<Funcionario[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    let query = withEmpresa(supabase
-      .from('funcionarios')
-      .select(`*, funcao:funcoes(*), obra:obras(*)`)
-    ).order('nome');
+  getFuncionarios: async (
+    status: "ativos" | "inativos" | "todos" = "ativos",
+    apenasDiaristas = false,
+  ): Promise<Funcionario[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    let query = withEmpresa(
+      supabase
+        .from("funcionarios")
+        .select(`*, funcao:funcoes(*), obra:obras(*)`),
+    ).order("nome");
 
-    if (status === 'ativos') {
-      query = query.eq('ativo', true);
-    } else if (status === 'inativos') {
-      query = query.eq('ativo', false);
+    if (status === "ativos") {
+      query = query.eq("ativo", true);
+    } else if (status === "inativos") {
+      query = query.eq("ativo", false);
     }
     if (apenasDiaristas) {
-      query = query.or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null');
+      query = query.or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null");
     }
 
-    
     let { data, error } = await query;
     if (data) {
-       // Since vw_relatorio_presencas might not have tipo_colaborador or inner join properly mapped
-       // Let's filter out CLT using getFuncionarios
-       const { data: cltData } = await withEmpresa(supabase.from('funcionarios').select('nome')).eq('tipo_colaborador', 'CLT');
-       const cltNames = cltData?.map(f => f.nome) || [];
-       data = data.filter(r => !cltNames.includes(r.funcionario));
+      // Since vw_relatorio_presencas might not have tipo_colaborador or inner join properly mapped
+      // Let's filter out CLT using getFuncionarios
+      const { data: cltData } = await withEmpresa(
+        supabase.from("funcionarios").select("nome"),
+      ).eq("tipo_colaborador", "CLT");
+      const cltNames = cltData?.map((f) => f.nome) || [];
+      data = data.filter((r) => !cltNames.includes(r.funcionario));
     }
     if (error) throw error;
     return data as any;
   },
-  createFuncionario: async (funcionario: Omit<Funcionario, 'id' | 'funcao' | 'obra'>): Promise<Funcionario> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('funcionarios').insert(addEmpresaId([funcionario])).select().single();
+  createFuncionario: async (
+    funcionario: Omit<Funcionario, "id" | "funcao" | "obra">,
+  ): Promise<Funcionario> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await supabase
+      .from("funcionarios")
+      .insert(addEmpresaId([funcionario]))
+      .select()
+      .single();
     if (error) throw error;
     return data as any;
   },
-  updateFuncionario: async (id: string, funcionario: Partial<Funcionario>): Promise<Funcionario> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('funcionarios').update(funcionario)).eq('id', id).select().single();
+  updateFuncionario: async (
+    id: string,
+    funcionario: Partial<Funcionario>,
+  ): Promise<Funcionario> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("funcionarios").update(funcionario),
+    )
+      .eq("id", id)
+      .select()
+      .single();
     if (error) throw error;
     return data as any;
   },
   deleteFuncionario: async (id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await withEmpresa(supabase.from('funcionarios').update({ ativo: false })).eq('id', id);
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await withEmpresa(
+      supabase.from("funcionarios").update({ ativo: false }),
+    ).eq("id", id);
     if (error) throw error;
   },
-  getFuncionariosPorObra: async (obra_id: string, apenasDiaristas = false): Promise<Funcionario[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    let query = withEmpresa(supabase.from('funcionarios'))
+  getFuncionariosPorObra: async (
+    obra_id: string,
+    apenasDiaristas = false,
+  ): Promise<Funcionario[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    let query = withEmpresa(supabase.from("funcionarios"))
       .select(`*, funcao:funcoes(*), obra:obras(*)`)
-      .eq('obra_id', obra_id)
-      .eq('ativo', true);
+      .eq("obra_id", obra_id)
+      .eq("ativo", true);
     if (apenasDiaristas) {
-      query = query.or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null');
+      query = query.or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null");
     }
-    query = query.order('nome');
+    query = query.order("nome");
     const { data, error } = await query;
     if (error) throw error;
     return data as any;
@@ -339,82 +453,114 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
 
   // Presencas
   getPresencas: async (data: string, obra_id?: string): Promise<Presenca[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    let query = withEmpresa(supabase
-      .from('presencas')
-      .select(`*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`)
+    if (!supabase) throw new Error("Supabase não configurado");
+    let query = withEmpresa(
+      supabase
+        .from("presencas")
+        .select(
+          `*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`,
+        ),
     )
-      .or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' })
-      .eq('data', data);
-      
+      .or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null", {
+        referencedTable: "funcionarios",
+      })
+      .eq("data", data);
+
     if (obra_id) {
-      query = query.eq('obra_id', obra_id);
+      query = query.eq("obra_id", obra_id);
     }
-    
+
     const { data: presencas, error } = await query;
     if (error) throw error;
     return presencas as any;
   },
-  
-  toggleMeiaDiaria: async (presenca_id: string, is_meia: boolean, usuario_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+
+  toggleMeiaDiaria: async (
+    presenca_id: string,
+    is_meia: boolean,
+    usuario_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
     try {
       if (is_meia) {
-        const { error } = await supabase.rpc('definir_meia_diaria', {
+        const { error } = await supabase.rpc("definir_meia_diaria", {
           p_presenca_id: presenca_id,
-          p_usuario_id: usuario_id
+          p_usuario_id: usuario_id,
         });
         if (error) throw error;
       } else {
-        const { error } = await supabase.rpc('reverter_meia_diaria', {
+        const { error } = await supabase.rpc("reverter_meia_diaria", {
           p_presenca_id: presenca_id,
-          p_usuario_id: usuario_id
+          p_usuario_id: usuario_id,
         });
         if (error) throw error;
       }
     } catch (e: any) {
-        throw e;
+      throw e;
     }
   },
 
-  deletePresencaFuncionario: async (funcionario_id: string, data: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await withEmpresa(supabase.from('presencas').delete()).eq('funcionario_id', funcionario_id).eq('data', data);
+  deletePresencaFuncionario: async (
+    funcionario_id: string,
+    data: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await withEmpresa(supabase.from("presencas").delete())
+      .eq("funcionario_id", funcionario_id)
+      .eq("data", data);
     if (error) throw error;
   },
 
   salvarPresencas: async (presencas: Array<any>): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+    if (!supabase) throw new Error("Supabase não configurado");
     if (!presencas || presencas.length === 0) return;
-    
-    const { data, error } = await supabase
-      .from('presencas')
-      .upsert(addEmpresaId(presencas), { onConflict: 'funcionario_id,data' })
-      .select();
-      
-    if (error) throw error;
-    
-    if (!data || data.length === 0) {
-      throw new Error('A operação falhou silenciosamente: nenhum registro foi salvo. Verifique as permissões de acesso ou restrições do banco de dados.');
+
+    const userProfile = getCurrentUserProfile();
+
+    if (userProfile === "CONSULTA") {
+      throw new Error(
+        "Acesso negado: Usuários com perfil CONSULTA não podem registrar presenças.",
+      );
     }
+
+    if (userProfile === "OPERADOR") {
+      for (const p of presencas) {
+        if (p.presente && !p.photo_path) {
+          throw new Error(
+            "Operadores devem obrigatoriamente anexar foto para registrar presença.",
+          );
+        }
+      }
+    }
+
+    const { data, error } = await supabase
+      .from("presencas")
+      .upsert(addEmpresaId(presencas), { onConflict: "funcionario_id,data" })
+      .select();
+
+    if (error) throw error;
   },
 
-  getRelatorio: async (dataInicial?: string, dataFinal?: string, obraId?: string): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+  getRelatorio: async (
+    dataInicial?: string,
+    dataFinal?: string,
+    obraId?: string,
+  ): Promise<any[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
     let query = supabase
-      .from('vw_relatorio_presencas')
-      .select('*')
-      .order('data', { ascending: false });
+      .from("vw_relatorio_presencas")
+      .select("*")
+      .order("data", { ascending: false });
 
     if (dataInicial) {
-      query = query.gte('data', dataInicial);
+      query = query.gte("data", dataInicial);
     }
     if (dataFinal) {
-      query = query.lte('data', dataFinal);
+      query = query.lte("data", dataFinal);
     }
     if (obraId) {
       // Obras are filtered by name since the view has 'obra' column
-      query = query.eq('obra', obraId);
+      query = query.eq("obra", obraId);
     }
 
     const { data, error } = await query;
@@ -425,66 +571,95 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   },
 
   // Storage
-  
-  uploadPhoto: async (bucket: string, file: File | Blob, prefix: string): Promise<string> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const ext = file instanceof File ? file.name.split('.').pop() : 'jpg';
+
+  uploadPhoto: async (
+    bucket: string,
+    file: File | Blob,
+    prefix: string,
+  ): Promise<string> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const ext = file instanceof File ? file.name.split(".").pop() : "jpg";
     const fileName = `${prefix}_${Date.now()}.${ext}`;
     const { data, error } = await supabase.storage
       .from(bucket)
-      .upload(fileName, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
-    
+      .upload(fileName, file, {
+        upsert: false,
+        contentType: file.type || "application/octet-stream",
+      });
+
     if (error) {
-       console.error("Storage upload error:", error);
-       throw error;
+      console.error("Storage upload error:", error);
+      throw error;
     }
     return data.path;
   },
 
-  uploadEmployeePhoto: async (file: File, employeeId: string): Promise<string> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const fileExt = file.name.split('.').pop();
+  uploadEmployeePhoto: async (
+    file: File,
+    employeeId: string,
+  ): Promise<string> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const fileExt = file.name.split(".").pop();
     const fileName = `${employeeId}_${Date.now()}.${fileExt}`;
     const { data, error } = await supabase.storage
-      .from('employee-photos')
-      .upload(fileName, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
+      .from("employee-photos")
+      .upload(fileName, file, {
+        upsert: false,
+        contentType: file.type || "application/octet-stream",
+      });
 
     if (error) {
-       console.error("Storage upload error:", error);
-       throw error;
+      console.error("Storage upload error:", error);
+      throw error;
     }
     return data.path;
   },
 
-  uploadFerramentaPhoto: async (file: File, ferramentaId: string): Promise<string> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const fileExt = file.name.split('.').pop();
+  uploadFerramentaPhoto: async (
+    file: File,
+    ferramentaId: string,
+  ): Promise<string> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const fileExt = file.name.split(".").pop();
     const fileName = `${ferramentaId}_${Date.now()}.${fileExt}`;
     const { data, error } = await supabase.storage
-      .from('fotos_ferramentas')
-      .upload(fileName, file, { upsert: false, contentType: file.type || 'application/octet-stream' });
+      .from("fotos_ferramentas")
+      .upload(fileName, file, {
+        upsert: false,
+        contentType: file.type || "application/octet-stream",
+      });
 
     if (error) {
-       console.error("Storage upload error:", error);
-       throw error;
+      console.error("Storage upload error:", error);
+      throw error;
     }
     return data.path;
   },
 
-  uploadAttendancePhoto: async (file: Blob, employeeId: string): Promise<string> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+  uploadAttendancePhoto: async (
+    file: Blob,
+    employeeId: string,
+  ): Promise<string> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const fileName = `${employeeId}_${timestamp}.jpg`;
     const { data, error } = await supabase.storage
-      .from('attendance-photos')
-      .upload(fileName, file, { contentType: 'image/jpeg' });
+      .from("attendance-photos")
+      .upload(fileName, file, { contentType: "image/jpeg" });
 
     if (error) throw error;
     return data.path;
   },
 
-  getPhotoUrl: async (bucket: 'employee-photos' | 'attendance-photos' | 'medical-certificates' | 'fotos_ferramentas', path: string): Promise<string> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+  getPhotoUrl: async (
+    bucket:
+      | "employee-photos"
+      | "attendance-photos"
+      | "medical-certificates"
+      | "fotos_ferramentas",
+    path: string,
+  ): Promise<string> => {
+    if (!supabase) throw new Error("Supabase não configurado");
     const { data, error } = await supabase.storage
       .from(bucket)
       .createSignedUrl(path, 60 * 60); // 1 hour
@@ -494,66 +669,94 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   },
 
   // Auditoria
-  getAuditoriaPresencas: async (funcionario_id: string): Promise<Presenca[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    
+  getAuditoriaPresencas: async (
+    funcionario_id: string,
+  ): Promise<Presenca[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+
     // Get presences from last 15 days with photo
     const quinzeDiasAtras = new Date();
     quinzeDiasAtras.setDate(quinzeDiasAtras.getDate() - 15);
-    const dataLimite = quinzeDiasAtras.toISOString().split('T')[0];
+    const dataLimite = quinzeDiasAtras.toISOString().split("T")[0];
 
-    const { data, error } = await withEmpresa(supabase.from('presencas'))
-      .select(`*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`)
-      .eq('funcionario_id', funcionario_id)
-      .not('photo_path', 'is', null)
-      .gte('data', dataLimite)
-      .order('data', { ascending: false });
+    const { data, error } = await withEmpresa(supabase.from("presencas"))
+      .select(
+        `*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`,
+      )
+      .eq("funcionario_id", funcionario_id)
+      .not("photo_path", "is", null)
+      .gte("data", dataLimite)
+      .order("data", { ascending: false });
 
     if (error) throw error;
     return data as any;
   },
 
-
   getDashboardStats: async (hoje: string) => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { count: obrasCount } = await withEmpresa(supabase.from('obras').select('*', { count: 'exact', head: true })).eq('ativo', true);
-    const { count: funcionariosCount } = await withEmpresa(supabase.from('funcionarios').select('*', { count: 'exact', head: true })).eq('ativo', true).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null');
-    
-        const { data: presencasHojeData, error } = await withEmpresa(supabase.from('presencas').select('presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))')).eq('data', hoje).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' });
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { count: obrasCount } = await withEmpresa(
+      supabase.from("obras").select("*", { count: "exact", head: true }),
+    ).eq("ativo", true);
+    const { count: funcionariosCount } = await withEmpresa(
+      supabase.from("funcionarios").select("*", { count: "exact", head: true }),
+    )
+      .eq("ativo", true)
+      .or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null");
+
+    const { data: presencasHojeData, error } = await withEmpresa(
+      supabase
+        .from("presencas")
+        .select(
+          "presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))",
+        ),
+    )
+      .eq("data", hoje)
+      .or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null", {
+        referencedTable: "funcionarios",
+      });
     if (error) throw error;
     let presentesHoje = 0;
     let faltasHoje = 0;
     let valorTotalHoje = 0;
-    presencasHojeData?.forEach(p => {
+    presencasHojeData?.forEach((p) => {
       if (p.presente) {
         presentesHoje++;
         let valor = Number((p.funcionario as any)?.funcao?.valor_diaria || 0);
-        if (p.tipo_diaria === 'MEIA_DIARIA') valor = valor / 2;
+        if (p.tipo_diaria === "MEIA_DIARIA") valor = valor / 2;
         valorTotalHoje += valor;
       } else {
         faltasHoje++;
       }
     });
 
-
-        // Communication stats (Secondary - do not block dashboard)
+    // Communication stats (Secondary - do not block dashboard)
     let totalComms = 0;
     let readComms = 0;
     let totalExpectedReads = 0;
     let numOperators = 0;
     let unreadComms = 0;
     try {
-      const { data: communications } = await withEmpresa(supabase.from('communications').select('id, target_audience, target_operator_id'));
-      const { data: recipients } = await withEmpresa(supabase.from('communication_recipients').select('communication_id, operator_id, read_at'));
-      const { data: operators } = await withEmpresa(supabase.from('usuarios')).select('id').eq('perfil', 'OPERADOR');
-      
+      const { data: communications } = await withEmpresa(
+        supabase
+          .from("communications")
+          .select("id, target_audience, target_operator_id"),
+      );
+      const { data: recipients } = await withEmpresa(
+        supabase
+          .from("communication_recipients")
+          .select("communication_id, operator_id, read_at"),
+      );
+      const { data: operators } = await withEmpresa(supabase.from("usuarios"))
+        .select("id")
+        .eq("perfil", "OPERADOR");
+
       totalComms = communications?.length || 0;
-      readComms = recipients?.filter(r => r.read_at)?.length || 0;
+      readComms = recipients?.filter((r) => r.read_at)?.length || 0;
       numOperators = operators?.length || 0;
-      
+
       if (communications) {
-        communications.forEach(c => {
-          if (c.target_audience === 'ALL') {
+        communications.forEach((c) => {
+          if (c.target_audience === "ALL") {
             totalExpectedReads += numOperators;
           } else {
             totalExpectedReads += 1;
@@ -573,284 +776,469 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
       valorTotalHoje,
       totalComms,
       readComms,
-      unreadComms
+      unreadComms,
     };
   },
 
   // Atestados
   getAtestados: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('medical_certificates'))
-      .select('*, funcionario:funcionarios(*)');
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("medical_certificates"),
+    ).select("*, funcionario:funcionarios(*)");
     if (error) throw error;
     return data;
   },
-  
+
   createAtestado: async (atestado: any): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+    if (!supabase) throw new Error("Supabase não configurado");
     const { data, error } = await supabase
-      .from('medical_certificates')
+      .from("medical_certificates")
       .insert(addEmpresaId([atestado]))
       .select()
       .single();
     if (error) throw error;
     return data;
   },
-  
+
   updateAtestado: async (id: string, atestado: any): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('medical_certificates').update(atestado))
-      .eq('id', id)
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("medical_certificates").update(atestado),
+    )
+      .eq("id", id)
       .select()
       .single();
     if (error) throw error;
     return data;
   },
-  
+
   deleteAtestado: async (id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await withEmpresa(supabase.from('medical_certificates').delete()).eq('id', id);
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await withEmpresa(
+      supabase.from("medical_certificates").delete(),
+    ).eq("id", id);
     if (error) throw error;
   },
-  
+
   getActiveAtestadosForDate: async (dateStr: string): Promise<any[]> => {
     // dateStr format: YYYY-MM-DD
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('medical_certificates'))
-      .select('*, funcionario:funcionarios(*)')
-      .lte('start_date', dateStr)
-      .gte('end_date', dateStr);
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("medical_certificates"),
+    )
+      .select("*, funcionario:funcionarios(*)")
+      .lte("start_date", dateStr)
+      .gte("end_date", dateStr);
     if (error) throw error;
     return data || [];
   },
 
-
   // Ferramentas
   getFerramentas: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('ferramentas'))
-      .select('*')
-      .order('nome', { ascending: true });
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(supabase.from("ferramentas"))
+      .select("*")
+      .order("nome", { ascending: true });
     if (error) throw error;
     return data || [];
   },
   getFerramenta: async (id: string): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('ferramentas'))
-      .select('*')
-      .eq('id', id)
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(supabase.from("ferramentas"))
+      .select("*")
+      .eq("id", id)
       .single();
     if (error) throw error;
     return data;
   },
-  createFerramenta: async (ferramenta: any, usuario_id: string): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
+  createFerramenta: async (
+    ferramenta: any,
+    usuario_id: string,
+  ): Promise<any> => {
+    if (!supabase) throw new Error("Supabase não configurado");
     const { data, error } = await supabase
-      .from('ferramentas')
+      .from("ferramentas")
       .insert(addEmpresaId([{ ...ferramenta, created_by: usuario_id }]))
       .select()
       .single();
     if (error) throw error;
-    
-    await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id: data.id,
-      evento: 'CADASTRO',
-      usuario_id,
-      descricao: 'Ferramenta cadastrada no sistema'
-    }]));
-    
+
+    await supabase.from("historico_ferramentas").insert(
+      addEmpresaId([
+        {
+          ferramenta_id: data.id,
+          evento: "CADASTRO",
+          usuario_id,
+          descricao: "Ferramenta cadastrada no sistema",
+        },
+      ]),
+    );
+
     return data;
   },
-  updateFerramenta: async (id: string, ferramenta: any, usuario_id: string): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('ferramentas').update(ferramenta))
-      .eq('id', id)
+  updateFerramenta: async (
+    id: string,
+    ferramenta: any,
+    usuario_id: string,
+  ): Promise<any> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("ferramentas").update(ferramenta),
+    )
+      .eq("id", id)
       .select()
       .single();
     if (error) throw error;
-    
-    await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id: id,
-      evento: 'EDICAO',
-      usuario_id,
-      descricao: 'Ferramenta editada'
-    }]));
-    
+
+    await supabase.from("historico_ferramentas").insert(
+      addEmpresaId([
+        {
+          ferramenta_id: id,
+          evento: "EDICAO",
+          usuario_id,
+          descricao: "Ferramenta editada",
+        },
+      ]),
+    );
+
     return data;
   },
-  inativarFerramenta: async (id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'INATIVA' })).eq('id', id);
+  inativarFerramenta: async (
+    id: string,
+    observacao: string | undefined,
+    usuario_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error: updError } = await withEmpresa(
+      supabase.from("ferramentas").update({ status: "INATIVA" }),
+    ).eq("id", id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id: id,
-      evento: 'INATIVACAO',
-      usuario_id,
-      descricao: `Marcada como inativa` + (observacao ? ` - ${observacao}` : '')
-    }]));
+    const { error: histError } = await supabase
+      .from("historico_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id: id,
+            evento: "INATIVACAO",
+            usuario_id,
+            descricao:
+              `Marcada como inativa` + (observacao ? ` - ${observacao}` : ""),
+          },
+        ]),
+      );
     if (histError) throw histError;
   },
-  reativarFerramenta: async (id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'ATIVA' })).eq('id', id);
+  reativarFerramenta: async (
+    id: string,
+    observacao: string | undefined,
+    usuario_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error: updError } = await withEmpresa(
+      supabase.from("ferramentas").update({ status: "ATIVA" }),
+    ).eq("id", id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id: id,
-      evento: 'REATIVACAO',
-      usuario_id,
-      descricao: `Reativada` + (observacao ? ` - ${observacao}` : '')
-    }]));
+    const { error: histError } = await supabase
+      .from("historico_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id: id,
+            evento: "REATIVACAO",
+            usuario_id,
+            descricao: `Reativada` + (observacao ? ` - ${observacao}` : ""),
+          },
+        ]),
+      );
     if (histError) throw histError;
   },
   getEmprestimosFerramentas: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('emprestimos_ferramentas'))
-      .select('*, ferramenta:ferramentas(*), funcionario:funcionarios(*, funcao:funcoes(*)), obra:obras(*)')
-      .order('data_emprestimo', { ascending: false });
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("emprestimos_ferramentas"),
+    )
+      .select(
+        "*, ferramenta:ferramentas(*), funcionario:funcionarios(*, funcao:funcoes(*)), obra:obras(*)",
+      )
+      .order("data_emprestimo", { ascending: false });
     if (error) throw error;
     return data || [];
   },
-  
+
   getTodosEmprestimos: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('emprestimos_ferramentas'))
-      .select('*, ferramenta:ferramentas(nome, codigo_interno), funcionario:funcionarios(nome), obra:obras(nome)')
-      .order('data_emprestimo', { ascending: false });
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("emprestimos_ferramentas"),
+    )
+      .select(
+        "*, ferramenta:ferramentas(nome, codigo_interno), funcionario:funcionarios(nome), obra:obras(nome)",
+      )
+      .order("data_emprestimo", { ascending: false });
     if (error) throw error;
     return data || [];
   },
   getEmprestimosAtivos: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('emprestimos_ferramentas'))
-      .select('*, ferramenta:ferramentas(*), funcionario:funcionarios(*), obra:obras(*)')
-      .is('data_devolucao', null)
-      .order('data_emprestimo', { ascending: false });
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("emprestimos_ferramentas"),
+    )
+      .select(
+        "*, ferramenta:ferramentas(*), funcionario:funcionarios(*), obra:obras(*)",
+      )
+      .is("data_devolucao", null)
+      .order("data_emprestimo", { ascending: false });
     if (error) throw error;
     return data || [];
   },
   getHistoricoFerramentas: async (ferramentaId?: string): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    let query = withEmpresa(supabase.from('historico_ferramentas'))
-      .select('*, ferramenta:ferramentas(*), usuario:usuarios(*)');
+    if (!supabase) throw new Error("Supabase não configurado");
+    let query = withEmpresa(supabase.from("historico_ferramentas")).select(
+      "*, ferramenta:ferramentas(*), usuario:usuarios(*)",
+    );
     if (ferramentaId) {
-      query = query.eq('ferramenta_id', ferramentaId);
+      query = query.eq("ferramenta_id", ferramentaId);
     }
-    const { data, error } = await query.order('created_at', { ascending: false });
+    const { data, error } = await query.order("created_at", {
+      ascending: false,
+    });
     if (error) throw error;
     return data || [];
   },
-  
+
   // RPC Calls for Ferramentas
-  emprestarFerramenta: async (ferramenta_id: string, funcionario_id: string, obra_id: string, usuario_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data: emprestimo, error: empError } = await supabase.from('emprestimos_ferramentas').insert(addEmpresaId([{
-      ferramenta_id,
-      funcionario_id,
-      obra_id,
-      operador_emprestimo_id: usuario_id,
-      data_emprestimo: new Date().toISOString()
-    }])).select().single();
+  emprestarFerramenta: async (
+    ferramenta_id: string,
+    funcionario_id: string,
+    obra_id: string,
+    usuario_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data: emprestimo, error: empError } = await supabase
+      .from("emprestimos_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id,
+            funcionario_id,
+            obra_id,
+            operador_emprestimo_id: usuario_id,
+            data_emprestimo: new Date().toISOString(),
+          },
+        ]),
+      )
+      .select()
+      .single();
     if (empError) throw empError;
 
-    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'EMPRESTADA' })).eq('id', ferramenta_id);
+    const { error: updError } = await withEmpresa(
+      supabase.from("ferramentas").update({ status: "EMPRESTADA" }),
+    ).eq("id", ferramenta_id);
     if (updError) throw updError;
 
-    const { data: funcData } = await withEmpresa(supabase.from('funcionarios').select('nome')).eq('id', funcionario_id).single();
-    const { data: obraData } = await withEmpresa(supabase.from('obras').select('nome')).eq('id', obra_id).single();
-    const { data: ferData } = await withEmpresa(supabase.from('ferramentas').select('nome, codigo_interno')).eq('id', ferramenta_id).single();
-    
+    const { data: funcData } = await withEmpresa(
+      supabase.from("funcionarios").select("nome"),
+    )
+      .eq("id", funcionario_id)
+      .single();
+    const { data: obraData } = await withEmpresa(
+      supabase.from("obras").select("nome"),
+    )
+      .eq("id", obra_id)
+      .single();
+    const { data: ferData } = await withEmpresa(
+      supabase.from("ferramentas").select("nome, codigo_interno"),
+    )
+      .eq("id", ferramenta_id)
+      .single();
+
     const funcNome = funcData?.nome || funcionario_id;
     const obraNome = obraData?.nome || obra_id;
-    const ferNome = ferData ? `${ferData.nome} ${ferData.codigo_interno}` : 'Ferramenta';
+    const ferNome = ferData
+      ? `${ferData.nome} ${ferData.codigo_interno}`
+      : "Ferramenta";
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id,
-      evento: 'EMPRESTIMO',
-      usuario_id,
-      descricao: `${ferNome} Emprestada para ${funcNome} Obra ${obraNome}`
-    }]));
+    const { error: histError } = await supabase
+      .from("historico_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id,
+            evento: "EMPRESTIMO",
+            usuario_id,
+            descricao: `${ferNome} Emprestada para ${funcNome} Obra ${obraNome}`,
+          },
+        ]),
+      );
     if (histError) throw histError;
   },
 
-  devolverFerramenta: async (emprestimo_id: string, condicao: string, observacao: string | undefined, usuario_id: string, ferramenta_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    
-    const { data: emprestimo } = await withEmpresa(supabase.from('emprestimos_ferramentas'))
-      .select('funcionario_id, obra_id, funcionario:funcionarios(nome), obra:obras(nome)')
-      .eq('id', emprestimo_id)
-      .single();
-      
-    const funcNome = (emprestimo?.funcionario as any)?.nome || emprestimo?.funcionario_id || 'funcionário';
-    const obraNome = (emprestimo?.obra as any)?.nome || emprestimo?.obra_id || 'obra';
+  devolverFerramenta: async (
+    emprestimo_id: string,
+    condicao: string,
+    observacao: string | undefined,
+    usuario_id: string,
+    ferramenta_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
 
-    const { error: empError } = await withEmpresa(supabase.from('emprestimos_ferramentas').update({
-      data_devolucao: new Date().toISOString(),
-      operador_devolucao_id: usuario_id,
-      condicao_devolucao: condicao,
-      observacao_devolucao: observacao || null
-    })).eq('id', emprestimo_id);
+    const { data: emprestimo } = await withEmpresa(
+      supabase.from("emprestimos_ferramentas"),
+    )
+      .select(
+        "funcionario_id, obra_id, funcionario:funcionarios(nome), obra:obras(nome)",
+      )
+      .eq("id", emprestimo_id)
+      .single();
+
+    const funcNome =
+      (emprestimo?.funcionario as any)?.nome ||
+      emprestimo?.funcionario_id ||
+      "funcionário";
+    const obraNome =
+      (emprestimo?.obra as any)?.nome || emprestimo?.obra_id || "obra";
+
+    const { error: empError } = await withEmpresa(
+      supabase.from("emprestimos_ferramentas").update({
+        data_devolucao: new Date().toISOString(),
+        operador_devolucao_id: usuario_id,
+        condicao_devolucao: condicao,
+        observacao_devolucao: observacao || null,
+      }),
+    ).eq("id", emprestimo_id);
     if (empError) throw empError;
 
-    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'ATIVA' })).eq('id', ferramenta_id);
+    const { error: updError } = await withEmpresa(
+      supabase.from("ferramentas").update({ status: "ATIVA" }),
+    ).eq("id", ferramenta_id);
     if (updError) throw updError;
 
-    const { data: ferData } = await withEmpresa(supabase.from('ferramentas').select('nome, codigo_interno')).eq('id', ferramenta_id).single();
-    const ferNome = ferData ? `${ferData.nome} ${ferData.codigo_interno}` : 'Ferramenta';
+    const { data: ferData } = await withEmpresa(
+      supabase.from("ferramentas").select("nome, codigo_interno"),
+    )
+      .eq("id", ferramenta_id)
+      .single();
+    const ferNome = ferData
+      ? `${ferData.nome} ${ferData.codigo_interno}`
+      : "Ferramenta";
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id,
-      evento: 'DEVOLUCAO',
-      usuario_id,
-      descricao: `${ferNome} Devolvida por ${funcNome} da obra ${obraNome} em condição: ${condicao}` + (observacao ? ` - ${observacao}` : '')
-    }]));
+    const { error: histError } = await supabase
+      .from("historico_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id,
+            evento: "DEVOLUCAO",
+            usuario_id,
+            descricao:
+              `${ferNome} Devolvida por ${funcNome} da obra ${obraNome} em condição: ${condicao}` +
+              (observacao ? ` - ${observacao}` : ""),
+          },
+        ]),
+      );
     if (histError) throw histError;
   },
 
-  marcarReparoFerramenta: async (ferramenta_id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'EM_REPARO', ultima_manutencao: new Date().toISOString() })).eq('id', ferramenta_id);
+  marcarReparoFerramenta: async (
+    ferramenta_id: string,
+    observacao: string | undefined,
+    usuario_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error: updError } = await withEmpresa(
+      supabase
+        .from("ferramentas")
+        .update({
+          status: "EM_REPARO",
+          ultima_manutencao: new Date().toISOString(),
+        }),
+    ).eq("id", ferramenta_id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id,
-      evento: 'REPARO',
-      usuario_id,
-      descricao: `Enviada para reparo` + (observacao ? ` - ${observacao}` : '')
-    }]));
+    const { error: histError } = await supabase
+      .from("historico_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id,
+            evento: "REPARO",
+            usuario_id,
+            descricao:
+              `Enviada para reparo` + (observacao ? ` - ${observacao}` : ""),
+          },
+        ]),
+      );
     if (histError) throw histError;
   },
 
-  finalizarReparoFerramenta: async (ferramenta_id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'ATIVA', ultima_manutencao: new Date().toISOString() })).eq('id', ferramenta_id);
+  finalizarReparoFerramenta: async (
+    ferramenta_id: string,
+    observacao: string | undefined,
+    usuario_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error: updError } = await withEmpresa(
+      supabase
+        .from("ferramentas")
+        .update({
+          status: "ATIVA",
+          ultima_manutencao: new Date().toISOString(),
+        }),
+    ).eq("id", ferramenta_id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id,
-      evento: 'REPARO',
-      usuario_id,
-      descricao: `Retorno de reparo` + (observacao ? ` - ${observacao}` : '')
-    }]));
+    const { error: histError } = await supabase
+      .from("historico_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id,
+            evento: "REPARO",
+            usuario_id,
+            descricao:
+              `Retorno de reparo` + (observacao ? ` - ${observacao}` : ""),
+          },
+        ]),
+      );
     if (histError) throw histError;
   },
 
-  
-  marcarQuebradaFerramenta: async (ferramenta_id: string, observacao: string, usuario_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'QUEBRADA' })).eq('id', ferramenta_id);
+  marcarQuebradaFerramenta: async (
+    ferramenta_id: string,
+    observacao: string,
+    usuario_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error: updError } = await withEmpresa(
+      supabase.from("ferramentas").update({ status: "QUEBRADA" }),
+    ).eq("id", ferramenta_id);
     if (updError) throw updError;
 
-    const { data: fData } = await withEmpresa(supabase.from('ferramentas').select('nome, codigo_interno')).eq('id', ferramenta_id).single();
-    const fNome = fData ? `${fData.nome} ${fData.codigo_interno}` : 'Ferramenta';
+    const { data: fData } = await withEmpresa(
+      supabase.from("ferramentas").select("nome, codigo_interno"),
+    )
+      .eq("id", ferramenta_id)
+      .single();
+    const fNome = fData
+      ? `${fData.nome} ${fData.codigo_interno}`
+      : "Ferramenta";
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id,
-      evento: 'QUEBRA',
-      usuario_id,
-      descricao: `${fNome} marcada como QUEBRADA` + (observacao ? ` - ${observacao}` : '')
-    }]));
+    const { error: histError } = await supabase
+      .from("historico_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id,
+            evento: "QUEBRA",
+            usuario_id,
+            descricao:
+              `${fNome} marcada como QUEBRADA` +
+              (observacao ? ` - ${observacao}` : ""),
+          },
+        ]),
+      );
     if (histError) throw histError;
   },
 
@@ -860,14 +1248,16 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   },
 
   getCentralComunicacoes: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('communications'))
-      .select(`
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(supabase.from("communications"))
+      .select(
+        `
         *,
         remetente:usuarios!created_by(id, usuario),
         destinatarios:communication_recipients(id, read_at, confirmed, usuario:usuarios!operator_id(id, usuario))
-      `)
-      .order('created_at', { ascending: false });
+      `,
+      )
+      .order("created_at", { ascending: false });
 
     if (error) {
       console.log("communications table missing or error", error);
@@ -880,80 +1270,107 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
       data_envio: item.created_at,
       created_at: item.created_at,
       remetente: item.remetente,
-      destinatarios: item.destinatarios ? item.destinatarios.map((d: any) => ({
-        id: d.id,
-        lida: d.read_at !== null,
-        data_leitura: d.read_at,
-        usuario: d.usuario
-      })) : []
+      destinatarios: item.destinatarios
+        ? item.destinatarios.map((d: any) => ({
+            id: d.id,
+            lida: d.read_at !== null,
+            data_leitura: d.read_at,
+            usuario: d.usuario,
+          }))
+        : [],
     }));
   },
 
-  sendCentralCommunication: async ({ titulo, mensagem, destinatarios, sugestao_id, usuario_id }: { titulo: string, mensagem: string, destinatarios: string[], sugestao_id?: string, usuario_id?: string }): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    
+  sendCentralCommunication: async ({
+    titulo,
+    mensagem,
+    destinatarios,
+    sugestao_id,
+    usuario_id,
+  }: {
+    titulo: string;
+    mensagem: string;
+    destinatarios: string[];
+    sugestao_id?: string;
+    usuario_id?: string;
+  }): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+
     // In a real scenario we'd do a transaction, here we insert and map
     const { data: comm, error } = await supabase
-      .from('communications')
-      .insert(addEmpresaId([{ 
-        title: titulo, 
-        message: mensagem,
-        type: 'INFO',
-        priority: 'NORMAL',
-        target_audience: 'OPERATOR',
-        created_by: usuario_id || null
-      }]))
-      .select('id')
+      .from("communications")
+      .insert(
+        addEmpresaId([
+          {
+            title: titulo,
+            message: mensagem,
+            type: "INFO",
+            priority: "NORMAL",
+            target_audience: "OPERATOR",
+            created_by: usuario_id || null,
+          },
+        ]),
+      )
+      .select("id")
       .single();
-      
+
     if (error) throw error;
-    
+
     if (destinatarios && destinatarios.length > 0) {
-       const dests = destinatarios.map(d => ({
-          communication_id: comm.id,
-          operator_id: d
-       }));
-       await supabase.from('communication_recipients').insert(addEmpresaId(dests));
+      const dests = destinatarios.map((d) => ({
+        communication_id: comm.id,
+        operator_id: d,
+      }));
+      await supabase
+        .from("communication_recipients")
+        .insert(addEmpresaId(dests));
     }
-    
+
     if (usuario_id) {
-       const { error: rpcError } = await supabase.rpc('request_communication_push', {
-         p_communication_id: comm.id,
-         p_usuario_id: usuario_id
-       });
-       if (rpcError) {
-         console.error("RPC Push error:", rpcError);
-         throw new Error('Comunicação salva, mas falha ao despachar notificação Push.');
-       }
+      const { error: rpcError } = await supabase.rpc(
+        "request_communication_push",
+        {
+          p_communication_id: comm.id,
+          p_usuario_id: usuario_id,
+        },
+      );
+      if (rpcError) {
+        console.error("RPC Push error:", rpcError);
+        throw new Error(
+          "Comunicação salva, mas falha ao despachar notificação Push.",
+        );
+      }
     }
-    
+
     if (sugestao_id) {
-       // Table does not exist in production yet
+      // Table does not exist in production yet
     }
   },
-  
 
-  getUnreadCentralCommunications: async (usuario_id: string): Promise<any[]> => {
+  getUnreadCentralCommunications: async (
+    usuario_id: string,
+  ): Promise<any[]> => {
     if (!supabase) return [];
     try {
-      const { data, error } = await withEmpresa(supabase
-        .from('communication_recipients')
-        .select('*, comunicacao:communications(*)')
+      const { data, error } = await withEmpresa(
+        supabase
+          .from("communication_recipients")
+          .select("*, comunicacao:communications(*)"),
       )
-        .eq('operator_id', usuario_id)
-        .is('read_at', null);
+        .eq("operator_id", usuario_id)
+        .is("read_at", null);
       if (error) return [];
       return data.map((item: any) => ({
         id: item.id,
         lida: item.read_at !== null,
         data_leitura: item.read_at,
         comunicacao: {
-           id: item.comunicacao.id,
-           titulo: item.comunicacao.title,
-           mensagem: item.comunicacao.message,
-           data_envio: item.comunicacao.created_at,
-           created_at: item.comunicacao.created_at
-        }
+          id: item.comunicacao.id,
+          titulo: item.comunicacao.title,
+          mensagem: item.comunicacao.message,
+          data_envio: item.comunicacao.created_at,
+          created_at: item.comunicacao.created_at,
+        },
       }));
     } catch (e) {
       return [];
@@ -963,139 +1380,202 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   markCentralCommunicationAsRead: async (id: string): Promise<void> => {
     if (!supabase) return;
     try {
-      await withEmpresa(supabase.from('communication_recipients').update({ read_at: new Date().toISOString() })).eq('id', id);
+      await withEmpresa(
+        supabase
+          .from("communication_recipients")
+          .update({ read_at: new Date().toISOString() }),
+      ).eq("id", id);
     } catch (e) {}
   },
-  registerPushDevice: async (usuario_id: string, token: string, plataforma: string, dispositivo_id?: string): Promise<void> => {
+  registerPushDevice: async (
+    usuario_id: string,
+    token: string,
+    plataforma: string,
+    dispositivo_id?: string,
+  ): Promise<void> => {
     if (!supabase) return;
     try {
-      const { error } = await supabase.rpc('registrar_push_device', {
+      const { error } = await supabase.rpc("registrar_push_device", {
         p_usuario_id: usuario_id,
         p_token: token,
         p_plataforma: plataforma.toUpperCase(),
-        p_dispositivo_id: dispositivo_id ?? null
+        p_dispositivo_id: dispositivo_id ?? null,
       });
 
       if (error) {
-        console.error('Push device registration failed', {
+        console.error("Push device registration failed", {
           code: error.code,
           message: error.message,
           details: error.details,
-          hint: error.hint
+          hint: error.hint,
         });
         throw error;
       }
     } catch (e) {
-      console.error('Error registering push device (catch block):', e);
+      console.error("Error registering push device (catch block):", e);
       throw e;
     }
   },
-  
+
   deactivatePushDevice: async (token: string): Promise<void> => {
     if (!supabase) return;
     try {
-      await withEmpresa(supabase.from('push_devices').update({ ativo: false })).eq('token', token);
+      await withEmpresa(
+        supabase.from("push_devices").update({ ativo: false }),
+      ).eq("token", token);
     } catch (e) {
-      console.error('Error deactivating push device:', e);
+      console.error("Error deactivating push device:", e);
     }
   },
-marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'PERDIDA' })).eq('id', ferramenta_id);
+  marcarPerdidaFerramenta: async (
+    ferramenta_id: string,
+    observacao: string | undefined,
+    usuario_id: string,
+  ): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error: updError } = await withEmpresa(
+      supabase.from("ferramentas").update({ status: "PERDIDA" }),
+    ).eq("id", ferramenta_id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
-      ferramenta_id,
-      evento: 'PERDA',
-      usuario_id,
-      descricao: `Marcada como perdida` + (observacao ? ` - ${observacao}` : '')
-    }]));
+    const { error: histError } = await supabase
+      .from("historico_ferramentas")
+      .insert(
+        addEmpresaId([
+          {
+            ferramenta_id,
+            evento: "PERDA",
+            usuario_id,
+            descricao:
+              `Marcada como perdida` + (observacao ? ` - ${observacao}` : ""),
+          },
+        ]),
+      );
     if (histError) throw histError;
   },
   // Automations
   getAutomationRules: async (): Promise<AutomationRule[]> => {
-        if (!supabase) return [];
-    const { data, error } = await withEmpresa(supabase.from('automation_rules').select('*')).order('created_at', { ascending: false });
+    if (!supabase) return [];
+    const { data, error } = await withEmpresa(
+      supabase.from("automation_rules").select("*"),
+    ).order("created_at", { ascending: false });
     if (error) throw error;
     return data || [];
   },
 
   getAutomationEventCatalog: async (): Promise<AutomationEventCatalog[]> => {
-        if (!supabase) return [];
-    const { data, error } = await supabase.from('automation_event_catalog').select('*').eq('is_active', true).order('module', { ascending: true });
+    if (!supabase) return [];
+    const { data, error } = await supabase
+      .from("automation_event_catalog")
+      .select("*")
+      .eq("is_active", true)
+      .order("module", { ascending: true });
     if (error) throw error;
     return data || [];
   },
 
   getAutomationRuns: async (): Promise<AutomationRun[]> => {
-        if (!supabase) return [];
-    const { data, error } = await withEmpresa(supabase.from('automation_runs').select('*, rule:rule_id(*)')).order('created_at', { ascending: false }).limit(100);
+    if (!supabase) return [];
+    const { data, error } = await withEmpresa(
+      supabase.from("automation_runs").select("*, rule:rule_id(*)"),
+    )
+      .order("created_at", { ascending: false })
+      .limit(100);
     if (error) throw error;
     return data || [];
   },
 
-  createAutomationRule: async (rule: Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>): Promise<AutomationRule> => {
-        if (!supabase) throw new Error('Supabase not connected');
-    const { data, error } = await supabase.from('automation_rules').insert(addEmpresaId(rule)).select().single();
+  createAutomationRule: async (
+    rule: Omit<AutomationRule, "id" | "created_at" | "updated_at">,
+  ): Promise<AutomationRule> => {
+    if (!supabase) throw new Error("Supabase not connected");
+    const { data, error } = await supabase
+      .from("automation_rules")
+      .insert(addEmpresaId(rule))
+      .select()
+      .single();
     if (error) throw error;
     return data;
   },
 
-  updateAutomationRule: async (id: string, rule: Partial<AutomationRule>): Promise<AutomationRule> => {
-        if (!supabase) throw new Error('Supabase not connected');
-    const { data, error } = await withEmpresa(supabase.from('automation_rules').update(rule)).eq('id', id).select().single();
+  updateAutomationRule: async (
+    id: string,
+    rule: Partial<AutomationRule>,
+  ): Promise<AutomationRule> => {
+    if (!supabase) throw new Error("Supabase not connected");
+    const { data, error } = await withEmpresa(
+      supabase.from("automation_rules").update(rule),
+    )
+      .eq("id", id)
+      .select()
+      .single();
     if (error) throw error;
     return data;
   },
 
   deleteAutomationRule: async (id: string): Promise<void> => {
-        if (!supabase) throw new Error('Supabase not connected');
-    const { error } = await withEmpresa(supabase.from('automation_rules').delete()).eq('id', id);
+    if (!supabase) throw new Error("Supabase not connected");
+    const { error } = await withEmpresa(
+      supabase.from("automation_rules").delete(),
+    ).eq("id", id);
     if (error) throw error;
   },
 
-
-  
-
-  sendAutomationTest: async (params: { title: string; message: string; channels: string[]; userId: string }): Promise<void> => {
-    if (!supabase) throw new Error('Supabase not connected');
+  sendAutomationTest: async (params: {
+    title: string;
+    message: string;
+    channels: string[];
+    userId: string;
+  }): Promise<void> => {
+    if (!supabase) throw new Error("Supabase not connected");
     const { title, message, channels, userId } = params;
 
-    if (channels.includes('CENTRAL') || channels.includes('PUSH')) {
+    if (channels.includes("CENTRAL") || channels.includes("PUSH")) {
       const { data: comm, error: commError } = await supabase
-        .from('communications')
-        .insert(addEmpresaId([{
-          title: title || 'Teste de Automação',
-          message: message,
-          type: 'INFO',
-          priority: 'NORMAL',
-          target_audience: 'OPERATOR',
-          target_operator_id: userId,
-          created_by: userId,
-          is_active: true
-        }]))
+        .from("communications")
+        .insert(
+          addEmpresaId([
+            {
+              title: title || "Teste de Automação",
+              message: message,
+              type: "INFO",
+              priority: "NORMAL",
+              target_audience: "OPERATOR",
+              target_operator_id: userId,
+              created_by: userId,
+              is_active: true,
+            },
+          ]),
+        )
         .select()
         .single();
-        
+
       if (commError) throw commError;
 
       const { error: recError } = await supabase
-        .from('communication_recipients')
-        .insert(addEmpresaId([{
-          communication_id: comm.id,
-          operator_id: userId
-        }]));
-        
+        .from("communication_recipients")
+        .insert(
+          addEmpresaId([
+            {
+              communication_id: comm.id,
+              operator_id: userId,
+            },
+          ]),
+        );
+
       if (recError) throw recError;
 
-      if (channels.includes('PUSH')) {
-        const { error: pushError } = await supabase.rpc('request_communication_push', {
-          p_communication_id: comm.id,
-          p_usuario_id: userId
-        });
-        
+      if (channels.includes("PUSH")) {
+        const { error: pushError } = await supabase.rpc(
+          "request_communication_push",
+          {
+            p_communication_id: comm.id,
+            p_usuario_id: userId,
+          },
+        );
+
         if (pushError) {
-          const err = new Error('PUSH_FAILED');
+          const err = new Error("PUSH_FAILED");
           (err as any).originalError = pushError;
           throw err;
         }
@@ -1104,58 +1584,82 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
   },
   // Controle de Materiais
   getMaterialCategories: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('material_categories'))
-      .select('*')
-      .order('nome');
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("material_categories"),
+    )
+      .select("*")
+      .order("nome");
     if (error) throw error;
     return data || [];
   },
 
   getMateriais: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('materiais'))
-      .select('*, category:material_categories(*)')
-      .order('nome');
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(supabase.from("materiais"))
+      .select("*, category:material_categories(*)")
+      .order("nome");
     if (error) throw error;
     return data || [];
   },
 
   getComprasMateriais: async (): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await withEmpresa(supabase.from('compras_materiais'))
-      .select('*, obra:obras(nome), registrador:usuarios!registrado_por(usuario), itens:compras_materiais_itens(valor_total)')
-      .order('data_compra', { ascending: false })
-      .order('created_at', { ascending: false });
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(
+      supabase.from("compras_materiais"),
+    )
+      .select(
+        "*, obra:obras(nome), registrador:usuarios!registrado_por(usuario), itens:compras_materiais_itens(valor_total)",
+      )
+      .order("data_compra", { ascending: false })
+      .order("created_at", { ascending: false });
     if (error) throw error;
     return (data || []).map((compra: any) => ({
       ...compra,
-      total_calculado: compra.itens ? compra.itens.reduce((acc: number, item: any) => acc + (Number(item.valor_total) || 0), 0) : 0
+      total_calculado: compra.itens
+        ? compra.itens.reduce(
+            (acc: number, item: any) => acc + (Number(item.valor_total) || 0),
+            0,
+          )
+        : 0,
     }));
   },
 
   getCompraDetalhes: async (compraId: string): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    const { data: compra, error: compraError } = await withEmpresa(supabase.from('compras_materiais'))
-      .select('*, obra:obras(nome), registrador:usuarios!registrado_por(usuario)')
-      .eq('id', compraId)
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data: compra, error: compraError } = await withEmpresa(
+      supabase.from("compras_materiais"),
+    )
+      .select(
+        "*, obra:obras(nome), registrador:usuarios!registrado_por(usuario)",
+      )
+      .eq("id", compraId)
       .single();
     if (compraError) throw compraError;
 
-    const { data: itens, error: itensError } = await withEmpresa(supabase.from('compras_materiais_itens'))
-      .select('*, material:materiais(*, category:material_categories(*))')
-      .eq('compra_id', compraId);
+    const { data: itens, error: itensError } = await withEmpresa(
+      supabase.from("compras_materiais_itens"),
+    )
+      .select("*, material:materiais(*, category:material_categories(*))")
+      .eq("compra_id", compraId);
     if (itensError) throw itensError;
 
-    const total_calculado = (itens || []).reduce((acc: number, item: any) => acc + (Number(item.valor_total) || 0), 0);
+    const total_calculado = (itens || []).reduce(
+      (acc: number, item: any) => acc + (Number(item.valor_total) || 0),
+      0,
+    );
     return { ...compra, itens: itens || [], total_calculado };
   },
 
-  
-  getMaterialQuantities: async (filters?: { obra_id?: string; categoria_id?: string; material_id?: string; data_inicial?: string; data_final?: string }): Promise<any[]> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    let query = withEmpresa(supabase.from('compras_materiais_itens'))
-      .select(`
+  getMaterialQuantities: async (filters?: {
+    obra_id?: string;
+    categoria_id?: string;
+    material_id?: string;
+    data_inicial?: string;
+    data_final?: string;
+  }): Promise<any[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    let query = withEmpresa(supabase.from("compras_materiais_itens")).select(`
         id,
         quantidade,
         valor_unitario,
@@ -1165,42 +1669,52 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
       `);
 
     if (filters?.obra_id) {
-      query = query.eq('compra.obra_id', filters.obra_id);
+      query = query.eq("compra.obra_id", filters.obra_id);
     }
     if (filters?.categoria_id) {
-      query = query.eq('material.categoria_id', filters.categoria_id);
+      query = query.eq("material.categoria_id", filters.categoria_id);
     }
     if (filters?.material_id) {
-      query = query.eq('material_id', filters.material_id);
+      query = query.eq("material_id", filters.material_id);
     }
     if (filters?.data_inicial) {
-      query = query.gte('compra.data_compra', filters.data_inicial);
+      query = query.gte("compra.data_compra", filters.data_inicial);
     }
     if (filters?.data_final) {
-      query = query.lte('compra.data_compra', filters.data_final);
+      query = query.lte("compra.data_compra", filters.data_final);
     }
 
     const { data, error } = await query;
     if (error) throw error;
-    
+
     // Agregação no frontend
     const map = new Map<string, any>();
-    
-    for (const rawItem of (data || [])) {
+
+    for (const rawItem of data || []) {
       const item: any = rawItem;
-      const mat = Array.isArray(item.material) ? item.material[0] : item.material;
+      const mat = Array.isArray(item.material)
+        ? item.material[0]
+        : item.material;
       const comp = Array.isArray(item.compra) ? item.compra[0] : item.compra;
-      const cat = mat?.category ? (Array.isArray(mat.category) ? mat.category[0] : mat.category) : null;
-      const ob = comp?.obra ? (Array.isArray(comp.obra) ? comp.obra[0] : comp.obra) : null;
-      
+      const cat = mat?.category
+        ? Array.isArray(mat.category)
+          ? mat.category[0]
+          : mat.category
+        : null;
+      const ob = comp?.obra
+        ? Array.isArray(comp.obra)
+          ? comp.obra[0]
+          : comp.obra
+        : null;
+
       const matId = mat?.id;
       const obraId = comp?.obra_id;
-      // If we are showing "Todas as Obras", we might want to aggregate by Material AND Obra, 
-      // or just by Material? 
+      // If we are showing "Todas as Obras", we might want to aggregate by Material AND Obra,
+      // or just by Material?
       // The requirement says: "Se OBRA = Todas as Obras, mostrar: OBRA | MATERIAL | UNIDADE | QUANTIDADE"
       // So the grouping key must be obra_id + material_id
       const key = `${obraId}_${matId}`;
-      
+
       if (!map.has(key)) {
         map.set(key, {
           material_id: matId,
@@ -1209,12 +1723,12 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
           categoria_id: mat?.categoria_id,
           categoria_nome: cat?.nome,
           obra_id: obraId,
-          obra_nome: ob?.nome || 'N/A',
+          obra_nome: ob?.nome || "N/A",
           quantidade_total: 0,
-          registros: []
+          registros: [],
         });
       }
-      
+
       const row = map.get(key);
       row.quantidade_total += Number(item.quantidade) || 0;
       row.registros.push({
@@ -1223,47 +1737,55 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
         fornecedor: comp?.fornecedor,
         quantidade: item.quantidade,
         valor_unitario: item.valor_unitario,
-        valor_total: item.valor_total
+        valor_total: item.valor_total,
       });
     }
-    
-    return Array.from(map.values()).sort((a, b) => a.material_nome.localeCompare(b.material_nome));
+
+    return Array.from(map.values()).sort((a, b) =>
+      a.material_nome.localeCompare(b.material_nome),
+    );
   },
 
-  createCompraMaterial: async (compraData: any, itensData: any[]): Promise<any> => {
-    if (!supabase) throw new Error('Supabase não configurado');
-    
+  createCompraMaterial: async (
+    compraData: any,
+    itensData: any[],
+  ): Promise<any> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+
     const { total, total_calculado, ...compraPayload } = compraData;
 
     // Insert compra
     const { data: compra, error: compraError } = await supabase
-      .from('compras_materiais')
+      .from("compras_materiais")
       .insert(addEmpresaId(compraPayload))
       .select()
       .single();
-      
+
     if (compraError) throw compraError;
-    
+
     // Insert items
     if (itensData && itensData.length > 0) {
-      const itensToInsert = itensData.map(item => {
+      const itensToInsert = itensData.map((item) => {
         const { total_item, valor_total, ...itemPayload } = item;
         return {
           ...itemPayload,
-          compra_id: compra.id
+          compra_id: compra.id,
         };
       });
-      
+
       const { error: itensError } = await supabase
-        .from('compras_materiais_itens')
+        .from("compras_materiais_itens")
         .insert(addEmpresaId(itensToInsert));
-        
+
       if (itensError) {
-        await withEmpresa(supabase.from('compras_materiais').delete()).eq('id', compra.id);
+        await withEmpresa(supabase.from("compras_materiais").delete()).eq(
+          "id",
+          compra.id,
+        );
         throw itensError;
       }
     }
-    
+
     return compra;
   },
 };
