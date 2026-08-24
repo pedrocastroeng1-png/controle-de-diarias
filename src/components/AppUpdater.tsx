@@ -78,11 +78,9 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
     setIsUpdating(true);
     
     try {
-      // 1. Clear all caches (to be safe)
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map(k => caches.delete(k)));
-      }
+      // Note: We MUST NOT clear caches here because the waiting SW 
+      // has already populated its precache. The SW's activate event 
+      // will handle cleaning up old caches safely.
       
       // 2. If we have a pending SW update, apply it
       if (needRefresh) {

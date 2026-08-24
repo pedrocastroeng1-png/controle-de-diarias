@@ -17,21 +17,12 @@ if ('serviceWorker' in navigator) {
 async function verifyAssets() {
   if (sessionStorage.getItem('asset_checked')) return;
   try {
-    const res = await fetch('/icons/icone2.png', { method: 'HEAD', cache: 'no-cache' });
+    // Avoid cache-busting HEAD requests that might fail offline or be mishandled by SW.
+    // The Service Worker is reliable now that we don't manually delete its caches.
+    const res = await fetch('/icons/icone2.png', { method: 'HEAD' });
     if (res.status === 404) {
-      console.error('Core asset 404. Purging caches...');
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map(k => caches.delete(k)));
-      }
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        for (let reg of registrations) {
-          await reg.unregister();
-        }
-      }
-      sessionStorage.setItem('asset_checked', 'failed');
-      // window.location.reload removido para evitar reloads agressivos
+      console.warn('Core asset 404 detected, but we will let the SW recover naturally.');
+      // We no longer aggressively purge caches here to avoid destroying a newly installed SW's precache
     } else {
       sessionStorage.setItem('asset_checked', 'ok');
     }
