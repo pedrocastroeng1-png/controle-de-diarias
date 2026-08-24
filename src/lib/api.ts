@@ -3,15 +3,43 @@ import bcrypt from 'bcryptjs';
 
 import { AutomationRule, AutomationEventCatalog, AutomationRun, Usuario, Obra, Funcao, Funcionario, Presenca, AtestadoMedico } from './types';
 
+const getEmpresaId = () => {
+  try {
+    const userStr = localStorage.getItem('@diarias:usuario');
+    if (userStr) {
+      return JSON.parse(userStr).empresa_id;
+    }
+  } catch (e) {}
+  return null;
+};
+
+const withEmpresa = (query: any, isAuth = false) => {
+  const empId = getEmpresaId();
+  if (empId && !isAuth) {
+    return query.eq('empresa_id', empId);
+  }
+  return query;
+};
+
+
+const addEmpresaId = (payload: any) => {
+  const empId = getEmpresaId();
+  if (!empId) return payload;
+  if (Array.isArray(payload)) {
+    return payload.map(p => ({ ...p, empresa_id: empId }));
+  }
+  return { ...payload, empresa_id: empId };
+};
+
 export const api = {
 
   // Communications
   getCommunications: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
+    const { data, error } = await withEmpresa(supabase
       .from('communications')
       .select('*, creator:usuarios!created_by(id, usuario), target_operator:usuarios!target_operator_id(id, usuario)')
-      .order('created_at', { ascending: false });
+    ).order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
   },
@@ -22,10 +50,10 @@ export const api = {
     const today = new Date(now.getTime() - (now.getTimezoneOffset() * 60000)).toISOString().split('T')[0];
     
     // Get all active communications
-    const { data: comms, error: commsError } = await supabase
+    const { data: comms, error: commsError } = await withEmpresa(supabase
       .from('communications')
       .select('*, creator:usuarios!created_by(id, usuario), attachments:communication_attachments(*)')
-      .eq('is_active', true);
+    ).eq('is_active', true);
       
     if (commsError) throw commsError;
 
@@ -67,8 +95,7 @@ export const api = {
   
   getCommunicationRecipients: async (communicationId: string): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('communication_recipients')
+    const { data, error } = await withEmpresa(supabase.from('communication_recipients'))
       .select('*, operator:usuarios!operator_id(id, usuario)')
       .eq('communication_id', communicationId)
       .order('read_at', { ascending: false });
@@ -81,11 +108,11 @@ export const api = {
     if (!supabase) throw new Error('Supabase não configurado');
     const { error } = await supabase
       .from('communication_recipients')
-      .upsert({
+      .upsert(addEmpresaId([{
         communication_id: communicationId,
         operator_id: operatorId,
         read_at: new Date().toISOString()
-      }, { onConflict: 'communication_id, operator_id' });
+      }]), { onConflict: 'communication_id, operator_id' });
     if (error) throw error;
   },
 
@@ -94,7 +121,7 @@ export const api = {
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('communication_attachments')
-      .insert([payload])
+      .insert(addEmpresaId([payload]))
       .select()
       .single();
     if (error) throw error;
@@ -104,13 +131,13 @@ export const api = {
   
   createCommunicationRecipient: async (communication_id: string, operator_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    await supabase.from('communication_recipients').insert([{ communication_id, operator_id }]);
+    await supabase.from('communication_recipients').insert(addEmpresaId([{ communication_id, operator_id }]));
   },
   createCommunication: async (payload: any): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('communications')
-      .insert([payload])
+      .insert(addEmpresaId([payload]))
       .select()
       .single();
     if (error) throw error;
@@ -119,9 +146,7 @@ export const api = {
 
   updateCommunication: async (id: string, payload: any): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('communications')
-      .update(payload)
+    const { data, error } = await withEmpresa(supabase.from('communications')).update(payload)
       .eq('id', id)
       .select()
       .single();
@@ -131,9 +156,7 @@ export const api = {
 
   deleteCommunication: async (id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await supabase
-      .from('communications')
-      .delete()
+    const { error } = await withEmpresa(supabase.from('communications').delete())
       .eq('id', id);
     if (error) throw error;
   },
@@ -142,14 +165,13 @@ export const api = {
     if (!supabase) throw new Error('Supabase não configurado');
     const { error } = await supabase
       .from('communication_recipients')
-      .insert([{ communication_id: communicationId, operator_id: operatorId }]);
+      .insert(addEmpresaId([{ communication_id: communicationId, operator_id: operatorId }]));
     if (error) throw error;
   },
 
   getOperators: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('usuarios')
+    const { data, error } = await withEmpresa(supabase.from('usuarios'))
       .select('id, usuario, perfil')
       .in('perfil', ['OPERADOR', 'ADMIN', 'CONSULTA'])
       .eq('ativo', true);
@@ -163,18 +185,24 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (!supabase) return { data: null, error: new Error('Supabase não configurado') };
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, usuario, perfil, ativo')
+      .select('id, usuario, perfil, ativo, empresa_id, login, email')
       .eq('id', id)
       .single();
     return { data, error };
   },
 
-  login: async (usuario: string, senha: string): Promise<Usuario | null> => {
+  getEmpresa: async (id: string) => {
+    if (!supabase) return null;
+    const { data } = await supabase.from('empresas').select('*').eq('id', id).single();
+    return data;
+  },
+
+  login: async (usuario: string, senha: string): Promise<any | null> => {
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('usuarios')
-      .select('id, usuario, perfil, senha')
-      .eq('usuario', usuario)
+      .select('id, usuario, perfil, senha, empresa_id, login, email')
+      .or(`usuario.eq."${usuario}",login.eq."${usuario}",email.eq."${usuario}"`)
       .eq('ativo', true)
       .single();
 
@@ -201,60 +229,60 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   // Obras
   getObras: async (): Promise<Obra[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('obras').select('*').eq('ativo', true).order('nome');
+    const { data, error } = await withEmpresa(supabase.from('obras').select('*')).eq('ativo', true).order('nome');
     if (error) throw error;
     return data;
   },
   createObra: async (obra: Omit<Obra, 'id'>): Promise<Obra> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('obras').insert([obra]).select().single();
+    const { data, error } = await supabase.from('obras').insert(addEmpresaId([obra])).select().single();
     if (error) throw error;
     return data;
   },
   updateObra: async (id: string, obra: Partial<Obra>): Promise<Obra> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('obras').update(obra).eq('id', id).select().single();
+    const { data, error } = await withEmpresa(supabase.from('obras').update(obra)).eq('id', id).select().single();
     if (error) throw error;
     return data;
   },
   deleteObra: async (id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await supabase.from('obras').update({ ativo: false }).eq('id', id);
+    const { error } = await withEmpresa(supabase.from('obras').update({ ativo: false })).eq('id', id);
     if (error) throw error;
   },
 
   // Funcoes
   getFuncoes: async (): Promise<Funcao[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('funcoes').select('*').eq('ativo', true).order('nome');
+    const { data, error } = await withEmpresa(supabase.from('funcoes').select('*')).eq('ativo', true).order('nome');
     if (error) throw error;
     return data;
   },
   createFuncao: async (funcao: Omit<Funcao, 'id'>): Promise<Funcao> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('funcoes').insert([funcao]).select().single();
+    const { data, error } = await supabase.from('funcoes').insert(addEmpresaId([funcao])).select().single();
     if (error) throw error;
     return data;
   },
   updateFuncao: async (id: string, funcao: Partial<Funcao>): Promise<Funcao> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('funcoes').update(funcao).eq('id', id).select().single();
+    const { data, error } = await withEmpresa(supabase.from('funcoes').update(funcao)).eq('id', id).select().single();
     if (error) throw error;
     return data;
   },
   deleteFuncao: async (id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await supabase.from('funcoes').update({ ativo: false }).eq('id', id);
+    const { error } = await withEmpresa(supabase.from('funcoes').update({ ativo: false })).eq('id', id);
     if (error) throw error;
   },
 
   // Funcionarios
   getFuncionarios: async (status: 'ativos' | 'inativos' | 'todos' = 'ativos', apenasDiaristas = false): Promise<Funcionario[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    let query = supabase
+    let query = withEmpresa(supabase
       .from('funcionarios')
       .select(`*, funcao:funcoes(*), obra:obras(*)`)
-      .order('nome');
+    ).order('nome');
 
     if (status === 'ativos') {
       query = query.eq('ativo', true);
@@ -270,7 +298,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (data) {
        // Since vw_relatorio_presencas might not have tipo_colaborador or inner join properly mapped
        // Let's filter out CLT using getFuncionarios
-       const { data: cltData } = await supabase.from('funcionarios').select('nome').eq('tipo_colaborador', 'CLT');
+       const { data: cltData } = await withEmpresa(supabase.from('funcionarios').select('nome')).eq('tipo_colaborador', 'CLT');
        const cltNames = cltData?.map(f => f.nome) || [];
        data = data.filter(r => !cltNames.includes(r.funcionario));
     }
@@ -279,25 +307,24 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   },
   createFuncionario: async (funcionario: Omit<Funcionario, 'id' | 'funcao' | 'obra'>): Promise<Funcionario> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('funcionarios').insert([funcionario]).select().single();
+    const { data, error } = await supabase.from('funcionarios').insert(addEmpresaId([funcionario])).select().single();
     if (error) throw error;
     return data as any;
   },
   updateFuncionario: async (id: string, funcionario: Partial<Funcionario>): Promise<Funcionario> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase.from('funcionarios').update(funcionario).eq('id', id).select().single();
+    const { data, error } = await withEmpresa(supabase.from('funcionarios').update(funcionario)).eq('id', id).select().single();
     if (error) throw error;
     return data as any;
   },
   deleteFuncionario: async (id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await supabase.from('funcionarios').update({ ativo: false }).eq('id', id);
+    const { error } = await withEmpresa(supabase.from('funcionarios').update({ ativo: false })).eq('id', id);
     if (error) throw error;
   },
   getFuncionariosPorObra: async (obra_id: string, apenasDiaristas = false): Promise<Funcionario[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    let query = supabase
-      .from('funcionarios')
+    let query = withEmpresa(supabase.from('funcionarios'))
       .select(`*, funcao:funcoes(*), obra:obras(*)`)
       .eq('obra_id', obra_id)
       .eq('ativo', true);
@@ -313,9 +340,10 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   // Presencas
   getPresencas: async (data: string, obra_id?: string): Promise<Presenca[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    let query = supabase
+    let query = withEmpresa(supabase
       .from('presencas')
       .select(`*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`)
+    )
       .or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' })
       .eq('data', data);
       
@@ -351,7 +379,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
 
   deletePresencaFuncionario: async (funcionario_id: string, data: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await supabase.from('presencas').delete().eq('funcionario_id', funcionario_id).eq('data', data);
+    const { error } = await withEmpresa(supabase.from('presencas').delete()).eq('funcionario_id', funcionario_id).eq('data', data);
     if (error) throw error;
   },
 
@@ -361,7 +389,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     
     const { data, error } = await supabase
       .from('presencas')
-      .upsert(presencas, { onConflict: 'funcionario_id,data' })
+      .upsert(addEmpresaId(presencas), { onConflict: 'funcionario_id,data' })
       .select();
       
     if (error) throw error;
@@ -474,8 +502,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     quinzeDiasAtras.setDate(quinzeDiasAtras.getDate() - 15);
     const dataLimite = quinzeDiasAtras.toISOString().split('T')[0];
 
-    const { data, error } = await supabase
-      .from('presencas')
+    const { data, error } = await withEmpresa(supabase.from('presencas'))
       .select(`*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`)
       .eq('funcionario_id', funcionario_id)
       .not('photo_path', 'is', null)
@@ -489,10 +516,10 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
 
   getDashboardStats: async (hoje: string) => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { count: obrasCount } = await supabase.from('obras').select('*', { count: 'exact', head: true }).eq('ativo', true);
-    const { count: funcionariosCount } = await supabase.from('funcionarios').select('*', { count: 'exact', head: true }).eq('ativo', true).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null');
+    const { count: obrasCount } = await withEmpresa(supabase.from('obras').select('*', { count: 'exact', head: true })).eq('ativo', true);
+    const { count: funcionariosCount } = await withEmpresa(supabase.from('funcionarios').select('*', { count: 'exact', head: true })).eq('ativo', true).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null');
     
-        const { data: presencasHojeData, error } = await supabase.from('presencas').select('presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))').eq('data', hoje).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' });
+        const { data: presencasHojeData, error } = await withEmpresa(supabase.from('presencas').select('presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))')).eq('data', hoje).or('tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null', { referencedTable: 'funcionarios' });
     if (error) throw error;
     let presentesHoje = 0;
     let faltasHoje = 0;
@@ -514,10 +541,11 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     let readComms = 0;
     let totalExpectedReads = 0;
     let numOperators = 0;
+    let unreadComms = 0;
     try {
-      const { data: communications } = await supabase.from('communications').select('id, target_audience, target_operator_id');
-      const { data: recipients } = await supabase.from('communication_recipients').select('communication_id, operator_id, read_at');
-      const { data: operators } = await supabase.from('usuarios').select('id').eq('perfil', 'OPERADOR');
+      const { data: communications } = await withEmpresa(supabase.from('communications').select('id, target_audience, target_operator_id'));
+      const { data: recipients } = await withEmpresa(supabase.from('communication_recipients').select('communication_id, operator_id, read_at'));
+      const { data: operators } = await withEmpresa(supabase.from('usuarios')).select('id').eq('perfil', 'OPERADOR');
       
       totalComms = communications?.length || 0;
       readComms = recipients?.filter(r => r.read_at)?.length || 0;
@@ -535,6 +563,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     } catch (e) {
       console.warn("Could not load communication stats", e);
     }
+    unreadComms = totalExpectedReads - readComms;
 
     return {
       totalObras: obrasCount || 0,
@@ -551,8 +580,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   // Atestados
   getAtestados: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('medical_certificates')
+    const { data, error } = await withEmpresa(supabase.from('medical_certificates'))
       .select('*, funcionario:funcionarios(*)');
     if (error) throw error;
     return data;
@@ -562,7 +590,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('medical_certificates')
-      .insert([atestado])
+      .insert(addEmpresaId([atestado]))
       .select()
       .single();
     if (error) throw error;
@@ -571,9 +599,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   
   updateAtestado: async (id: string, atestado: any): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('medical_certificates')
-      .update(atestado)
+    const { data, error } = await withEmpresa(supabase.from('medical_certificates').update(atestado))
       .eq('id', id)
       .select()
       .single();
@@ -583,18 +609,14 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   
   deleteAtestado: async (id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error } = await supabase
-      .from('medical_certificates')
-      .delete()
-      .eq('id', id);
+    const { error } = await withEmpresa(supabase.from('medical_certificates').delete()).eq('id', id);
     if (error) throw error;
   },
   
   getActiveAtestadosForDate: async (dateStr: string): Promise<any[]> => {
     // dateStr format: YYYY-MM-DD
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('medical_certificates')
+    const { data, error } = await withEmpresa(supabase.from('medical_certificates'))
       .select('*, funcionario:funcionarios(*)')
       .lte('start_date', dateStr)
       .gte('end_date', dateStr);
@@ -606,8 +628,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   // Ferramentas
   getFerramentas: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('ferramentas')
+    const { data, error } = await withEmpresa(supabase.from('ferramentas'))
       .select('*')
       .order('nome', { ascending: true });
     if (error) throw error;
@@ -615,8 +636,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   },
   getFerramenta: async (id: string): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('ferramentas')
+    const { data, error } = await withEmpresa(supabase.from('ferramentas'))
       .select('*')
       .eq('id', id)
       .single();
@@ -627,69 +647,66 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     if (!supabase) throw new Error('Supabase não configurado');
     const { data, error } = await supabase
       .from('ferramentas')
-      .insert([{ ...ferramenta, created_by: usuario_id }])
+      .insert(addEmpresaId([{ ...ferramenta, created_by: usuario_id }]))
       .select()
       .single();
     if (error) throw error;
     
-    await supabase.from('historico_ferramentas').insert([{
+    await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id: data.id,
       evento: 'CADASTRO',
       usuario_id,
       descricao: 'Ferramenta cadastrada no sistema'
-    }]);
+    }]));
     
     return data;
   },
   updateFerramenta: async (id: string, ferramenta: any, usuario_id: string): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('ferramentas')
-      .update(ferramenta)
+    const { data, error } = await withEmpresa(supabase.from('ferramentas').update(ferramenta))
       .eq('id', id)
       .select()
       .single();
     if (error) throw error;
     
-    await supabase.from('historico_ferramentas').insert([{
+    await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id: id,
       evento: 'EDICAO',
       usuario_id,
       descricao: 'Ferramenta editada'
-    }]);
+    }]));
     
     return data;
   },
   inativarFerramenta: async (id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await supabase.from('ferramentas').update({ status: 'INATIVA' }).eq('id', id);
+    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'INATIVA' })).eq('id', id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert([{
+    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id: id,
       evento: 'INATIVACAO',
       usuario_id,
       descricao: `Marcada como inativa` + (observacao ? ` - ${observacao}` : '')
-    }]);
+    }]));
     if (histError) throw histError;
   },
   reativarFerramenta: async (id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await supabase.from('ferramentas').update({ status: 'ATIVA' }).eq('id', id);
+    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'ATIVA' })).eq('id', id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert([{
+    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id: id,
       evento: 'REATIVACAO',
       usuario_id,
       descricao: `Reativada` + (observacao ? ` - ${observacao}` : '')
-    }]);
+    }]));
     if (histError) throw histError;
   },
   getEmprestimosFerramentas: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('emprestimos_ferramentas')
+    const { data, error } = await withEmpresa(supabase.from('emprestimos_ferramentas'))
       .select('*, ferramenta:ferramentas(*), funcionario:funcionarios(*, funcao:funcoes(*)), obra:obras(*)')
       .order('data_emprestimo', { ascending: false });
     if (error) throw error;
@@ -698,8 +715,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   
   getTodosEmprestimos: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('emprestimos_ferramentas')
+    const { data, error } = await withEmpresa(supabase.from('emprestimos_ferramentas'))
       .select('*, ferramenta:ferramentas(nome, codigo_interno), funcionario:funcionarios(nome), obra:obras(nome)')
       .order('data_emprestimo', { ascending: false });
     if (error) throw error;
@@ -707,8 +723,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   },
   getEmprestimosAtivos: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('emprestimos_ferramentas')
+    const { data, error } = await withEmpresa(supabase.from('emprestimos_ferramentas'))
       .select('*, ferramenta:ferramentas(*), funcionario:funcionarios(*), obra:obras(*)')
       .is('data_devolucao', null)
       .order('data_emprestimo', { ascending: false });
@@ -717,8 +732,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   },
   getHistoricoFerramentas: async (ferramentaId?: string): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    let query = supabase
-      .from('historico_ferramentas')
+    let query = withEmpresa(supabase.from('historico_ferramentas'))
       .select('*, ferramenta:ferramentas(*), usuario:usuarios(*)');
     if (ferramentaId) {
       query = query.eq('ferramenta_id', ferramentaId);
@@ -731,40 +745,39 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   // RPC Calls for Ferramentas
   emprestarFerramenta: async (ferramenta_id: string, funcionario_id: string, obra_id: string, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data: emprestimo, error: empError } = await supabase.from('emprestimos_ferramentas').insert([{
+    const { data: emprestimo, error: empError } = await supabase.from('emprestimos_ferramentas').insert(addEmpresaId([{
       ferramenta_id,
       funcionario_id,
       obra_id,
       operador_emprestimo_id: usuario_id,
       data_emprestimo: new Date().toISOString()
-    }]).select().single();
+    }])).select().single();
     if (empError) throw empError;
 
-    const { error: updError } = await supabase.from('ferramentas').update({ status: 'EMPRESTADA' }).eq('id', ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'EMPRESTADA' })).eq('id', ferramenta_id);
     if (updError) throw updError;
 
-    const { data: funcData } = await supabase.from('funcionarios').select('nome').eq('id', funcionario_id).single();
-    const { data: obraData } = await supabase.from('obras').select('nome').eq('id', obra_id).single();
-    const { data: ferData } = await supabase.from('ferramentas').select('nome, codigo_interno').eq('id', ferramenta_id).single();
+    const { data: funcData } = await withEmpresa(supabase.from('funcionarios').select('nome')).eq('id', funcionario_id).single();
+    const { data: obraData } = await withEmpresa(supabase.from('obras').select('nome')).eq('id', obra_id).single();
+    const { data: ferData } = await withEmpresa(supabase.from('ferramentas').select('nome, codigo_interno')).eq('id', ferramenta_id).single();
     
     const funcNome = funcData?.nome || funcionario_id;
     const obraNome = obraData?.nome || obra_id;
     const ferNome = ferData ? `${ferData.nome} ${ferData.codigo_interno}` : 'Ferramenta';
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert([{
+    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id,
       evento: 'EMPRESTIMO',
       usuario_id,
       descricao: `${ferNome} Emprestada para ${funcNome} Obra ${obraNome}`
-    }]);
+    }]));
     if (histError) throw histError;
   },
 
   devolverFerramenta: async (emprestimo_id: string, condicao: string, observacao: string | undefined, usuario_id: string, ferramenta_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
     
-    const { data: emprestimo } = await supabase
-      .from('emprestimos_ferramentas')
+    const { data: emprestimo } = await withEmpresa(supabase.from('emprestimos_ferramentas'))
       .select('funcionario_id, obra_id, funcionario:funcionarios(nome), obra:obras(nome)')
       .eq('id', emprestimo_id)
       .single();
@@ -772,72 +785,72 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     const funcNome = (emprestimo?.funcionario as any)?.nome || emprestimo?.funcionario_id || 'funcionário';
     const obraNome = (emprestimo?.obra as any)?.nome || emprestimo?.obra_id || 'obra';
 
-    const { error: empError } = await supabase.from('emprestimos_ferramentas').update({
+    const { error: empError } = await withEmpresa(supabase.from('emprestimos_ferramentas').update({
       data_devolucao: new Date().toISOString(),
       operador_devolucao_id: usuario_id,
       condicao_devolucao: condicao,
       observacao_devolucao: observacao || null
-    }).eq('id', emprestimo_id);
+    })).eq('id', emprestimo_id);
     if (empError) throw empError;
 
-    const { error: updError } = await supabase.from('ferramentas').update({ status: 'ATIVA' }).eq('id', ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'ATIVA' })).eq('id', ferramenta_id);
     if (updError) throw updError;
 
-    const { data: ferData } = await supabase.from('ferramentas').select('nome, codigo_interno').eq('id', ferramenta_id).single();
+    const { data: ferData } = await withEmpresa(supabase.from('ferramentas').select('nome, codigo_interno')).eq('id', ferramenta_id).single();
     const ferNome = ferData ? `${ferData.nome} ${ferData.codigo_interno}` : 'Ferramenta';
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert([{
+    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id,
       evento: 'DEVOLUCAO',
       usuario_id,
       descricao: `${ferNome} Devolvida por ${funcNome} da obra ${obraNome} em condição: ${condicao}` + (observacao ? ` - ${observacao}` : '')
-    }]);
+    }]));
     if (histError) throw histError;
   },
 
   marcarReparoFerramenta: async (ferramenta_id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await supabase.from('ferramentas').update({ status: 'EM_REPARO', ultima_manutencao: new Date().toISOString() }).eq('id', ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'EM_REPARO', ultima_manutencao: new Date().toISOString() })).eq('id', ferramenta_id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert([{
+    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id,
       evento: 'REPARO',
       usuario_id,
       descricao: `Enviada para reparo` + (observacao ? ` - ${observacao}` : '')
-    }]);
+    }]));
     if (histError) throw histError;
   },
 
   finalizarReparoFerramenta: async (ferramenta_id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await supabase.from('ferramentas').update({ status: 'ATIVA', ultima_manutencao: new Date().toISOString() }).eq('id', ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'ATIVA', ultima_manutencao: new Date().toISOString() })).eq('id', ferramenta_id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert([{
+    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id,
       evento: 'REPARO',
       usuario_id,
       descricao: `Retorno de reparo` + (observacao ? ` - ${observacao}` : '')
-    }]);
+    }]));
     if (histError) throw histError;
   },
 
   
   marcarQuebradaFerramenta: async (ferramenta_id: string, observacao: string, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await supabase.from('ferramentas').update({ status: 'QUEBRADA' }).eq('id', ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'QUEBRADA' })).eq('id', ferramenta_id);
     if (updError) throw updError;
 
-    const { data: fData } = await supabase.from('ferramentas').select('nome, codigo_interno').eq('id', ferramenta_id).single();
+    const { data: fData } = await withEmpresa(supabase.from('ferramentas').select('nome, codigo_interno')).eq('id', ferramenta_id).single();
     const fNome = fData ? `${fData.nome} ${fData.codigo_interno}` : 'Ferramenta';
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert([{
+    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id,
       evento: 'QUEBRA',
       usuario_id,
       descricao: `${fNome} marcada como QUEBRADA` + (observacao ? ` - ${observacao}` : '')
-    }]);
+    }]));
     if (histError) throw histError;
   },
 
@@ -848,8 +861,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
 
   getCentralComunicacoes: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('communications')
+    const { data, error } = await withEmpresa(supabase.from('communications'))
       .select(`
         *,
         remetente:usuarios!created_by(id, usuario),
@@ -883,14 +895,14 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
     // In a real scenario we'd do a transaction, here we insert and map
     const { data: comm, error } = await supabase
       .from('communications')
-      .insert([{ 
+      .insert(addEmpresaId([{ 
         title: titulo, 
         message: mensagem,
         type: 'INFO',
         priority: 'NORMAL',
         target_audience: 'OPERATOR',
         created_by: usuario_id || null
-      }])
+      }]))
       .select('id')
       .single();
       
@@ -901,7 +913,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
           communication_id: comm.id,
           operator_id: d
        }));
-       await supabase.from('communication_recipients').insert(dests);
+       await supabase.from('communication_recipients').insert(addEmpresaId(dests));
     }
     
     if (usuario_id) {
@@ -924,9 +936,10 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   getUnreadCentralCommunications: async (usuario_id: string): Promise<any[]> => {
     if (!supabase) return [];
     try {
-      const { data, error } = await supabase
+      const { data, error } = await withEmpresa(supabase
         .from('communication_recipients')
         .select('*, comunicacao:communications(*)')
+      )
         .eq('operator_id', usuario_id)
         .is('read_at', null);
       if (error) return [];
@@ -950,7 +963,7 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   markCentralCommunicationAsRead: async (id: string): Promise<void> => {
     if (!supabase) return;
     try {
-      await supabase.from('communication_recipients').update({ read_at: new Date().toISOString() }).eq('id', id);
+      await withEmpresa(supabase.from('communication_recipients').update({ read_at: new Date().toISOString() })).eq('id', id);
     } catch (e) {}
   },
   registerPushDevice: async (usuario_id: string, token: string, plataforma: string, dispositivo_id?: string): Promise<void> => {
@@ -981,28 +994,28 @@ checkUserActive: async (id: string): Promise<{ data: any | null, error: any | nu
   deactivatePushDevice: async (token: string): Promise<void> => {
     if (!supabase) return;
     try {
-      await supabase.from('push_devices').update({ ativo: false }).eq('token', token);
+      await withEmpresa(supabase.from('push_devices').update({ ativo: false })).eq('token', token);
     } catch (e) {
       console.error('Error deactivating push device:', e);
     }
   },
 marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | undefined, usuario_id: string): Promise<void> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { error: updError } = await supabase.from('ferramentas').update({ status: 'PERDIDA' }).eq('id', ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from('ferramentas').update({ status: 'PERDIDA' })).eq('id', ferramenta_id);
     if (updError) throw updError;
 
-    const { error: histError } = await supabase.from('historico_ferramentas').insert([{
+    const { error: histError } = await supabase.from('historico_ferramentas').insert(addEmpresaId([{
       ferramenta_id,
       evento: 'PERDA',
       usuario_id,
       descricao: `Marcada como perdida` + (observacao ? ` - ${observacao}` : '')
-    }]);
+    }]));
     if (histError) throw histError;
   },
   // Automations
   getAutomationRules: async (): Promise<AutomationRule[]> => {
         if (!supabase) return [];
-    const { data, error } = await supabase.from('automation_rules').select('*').order('created_at', { ascending: false });
+    const { data, error } = await withEmpresa(supabase.from('automation_rules').select('*')).order('created_at', { ascending: false });
     if (error) throw error;
     return data || [];
   },
@@ -1016,28 +1029,28 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
 
   getAutomationRuns: async (): Promise<AutomationRun[]> => {
         if (!supabase) return [];
-    const { data, error } = await supabase.from('automation_runs').select('*, rule:rule_id(*)').order('created_at', { ascending: false }).limit(100);
+    const { data, error } = await withEmpresa(supabase.from('automation_runs').select('*, rule:rule_id(*)')).order('created_at', { ascending: false }).limit(100);
     if (error) throw error;
     return data || [];
   },
 
   createAutomationRule: async (rule: Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>): Promise<AutomationRule> => {
         if (!supabase) throw new Error('Supabase not connected');
-    const { data, error } = await supabase.from('automation_rules').insert(rule).select().single();
+    const { data, error } = await supabase.from('automation_rules').insert(addEmpresaId(rule)).select().single();
     if (error) throw error;
     return data;
   },
 
   updateAutomationRule: async (id: string, rule: Partial<AutomationRule>): Promise<AutomationRule> => {
         if (!supabase) throw new Error('Supabase not connected');
-    const { data, error } = await supabase.from('automation_rules').update(rule).eq('id', id).select().single();
+    const { data, error } = await withEmpresa(supabase.from('automation_rules').update(rule)).eq('id', id).select().single();
     if (error) throw error;
     return data;
   },
 
   deleteAutomationRule: async (id: string): Promise<void> => {
         if (!supabase) throw new Error('Supabase not connected');
-    const { error } = await supabase.from('automation_rules').delete().eq('id', id);
+    const { error } = await withEmpresa(supabase.from('automation_rules').delete()).eq('id', id);
     if (error) throw error;
   },
 
@@ -1051,7 +1064,7 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
     if (channels.includes('CENTRAL') || channels.includes('PUSH')) {
       const { data: comm, error: commError } = await supabase
         .from('communications')
-        .insert({
+        .insert(addEmpresaId([{
           title: title || 'Teste de Automação',
           message: message,
           type: 'INFO',
@@ -1060,7 +1073,7 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
           target_operator_id: userId,
           created_by: userId,
           is_active: true
-        })
+        }]))
         .select()
         .single();
         
@@ -1068,10 +1081,10 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
 
       const { error: recError } = await supabase
         .from('communication_recipients')
-        .insert({
+        .insert(addEmpresaId([{
           communication_id: comm.id,
           operator_id: userId
-        });
+        }]));
         
       if (recError) throw recError;
 
@@ -1092,8 +1105,7 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
   // Controle de Materiais
   getMaterialCategories: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('material_categories')
+    const { data, error } = await withEmpresa(supabase.from('material_categories'))
       .select('*')
       .order('nome');
     if (error) throw error;
@@ -1102,8 +1114,7 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
 
   getMateriais: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('materiais')
+    const { data, error } = await withEmpresa(supabase.from('materiais'))
       .select('*, category:material_categories(*)')
       .order('nome');
     if (error) throw error;
@@ -1112,8 +1123,7 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
 
   getComprasMateriais: async (): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data, error } = await supabase
-      .from('compras_materiais')
+    const { data, error } = await withEmpresa(supabase.from('compras_materiais'))
       .select('*, obra:obras(nome), registrador:usuarios!registrado_por(usuario), itens:compras_materiais_itens(valor_total)')
       .order('data_compra', { ascending: false })
       .order('created_at', { ascending: false });
@@ -1126,15 +1136,13 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
 
   getCompraDetalhes: async (compraId: string): Promise<any> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    const { data: compra, error: compraError } = await supabase
-      .from('compras_materiais')
+    const { data: compra, error: compraError } = await withEmpresa(supabase.from('compras_materiais'))
       .select('*, obra:obras(nome), registrador:usuarios!registrado_por(usuario)')
       .eq('id', compraId)
       .single();
     if (compraError) throw compraError;
 
-    const { data: itens, error: itensError } = await supabase
-      .from('compras_materiais_itens')
+    const { data: itens, error: itensError } = await withEmpresa(supabase.from('compras_materiais_itens'))
       .select('*, material:materiais(*, category:material_categories(*))')
       .eq('compra_id', compraId);
     if (itensError) throw itensError;
@@ -1146,8 +1154,7 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
   
   getMaterialQuantities: async (filters?: { obra_id?: string; categoria_id?: string; material_id?: string; data_inicial?: string; data_final?: string }): Promise<any[]> => {
     if (!supabase) throw new Error('Supabase não configurado');
-    let query = supabase
-      .from('compras_materiais_itens')
+    let query = withEmpresa(supabase.from('compras_materiais_itens'))
       .select(`
         id,
         quantidade,
@@ -1231,7 +1238,7 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
     // Insert compra
     const { data: compra, error: compraError } = await supabase
       .from('compras_materiais')
-      .insert(compraPayload)
+      .insert(addEmpresaId(compraPayload))
       .select()
       .single();
       
@@ -1249,10 +1256,10 @@ marcarPerdidaFerramenta: async (ferramenta_id: string, observacao: string | unde
       
       const { error: itensError } = await supabase
         .from('compras_materiais_itens')
-        .insert(itensToInsert);
+        .insert(addEmpresaId(itensToInsert));
         
       if (itensError) {
-        await supabase.from('compras_materiais').delete().eq('id', compra.id);
+        await withEmpresa(supabase.from('compras_materiais').delete()).eq('id', compra.id);
         throw itensError;
       }
     }

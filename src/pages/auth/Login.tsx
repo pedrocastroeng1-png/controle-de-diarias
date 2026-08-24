@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase } from '../../lib/supabase';
 import { version } from '../../config/appVersion';
 import { Loader2, User, Lock, ArrowRight, Building2, Users, Package, LineChart, MonitorDown, CheckCircle2 } from 'lucide-react';
 import { usePWAInstall } from '../../hooks/usePWAInstall';
@@ -46,6 +47,22 @@ export default function Login() {
     e.preventDefault();
     setErro('');
     setLoading(true);
+
+    try {
+      // Tenta login como Owner primeiro via Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: usuario,
+        password: senha
+      });
+      
+      if (!error && data?.session?.user?.app_metadata?.platform_role === 'owner') {
+        navigate('/owner');
+        return;
+      }
+    } catch (e) {
+      // Ignora erro do Supabase Auth e continua para login normal
+    }
+
 
     const success = await login(usuario, senha);
 
@@ -178,9 +195,7 @@ export default function Login() {
               
               <div className="space-y-3 sm:space-y-4">
                 <div>
-                  <label htmlFor="usuario" className="block text-[clamp(10px,1.5vh,12px)] font-bold text-gray-700 mb-1 uppercase tracking-wide">
-                    Usuário
-                  </label>
+                  <label htmlFor="usuario" className="block text-[clamp(10px,1.5vh,12px)] font-bold text-gray-700 mb-1 uppercase tracking-wide">E-mail ou Usuário</label>
                   <div className="relative group">
                     <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400 group-focus-within:text-[#0B1B33] transition-colors duration-300">
                       <User className="h-[16px] w-[16px] sm:h-[18px] sm:w-[18px]" />
@@ -193,7 +208,7 @@ export default function Login() {
                       value={usuario}
                       onChange={(e) => setUsuario(e.target.value)}
                       className="block w-full pl-10 pr-4 h-[clamp(42px,6vh,50px)] border border-gray-300 rounded-[8px] bg-white focus:bg-white focus:outline-none focus:ring-[2px] focus:ring-[#0B1B33]/10 focus:border-[#0B1B33] text-[clamp(13px,2vh,15px)] text-gray-900 font-medium transition-all shadow-sm"
-                      placeholder="Digite seu usuário"
+                      placeholder="Seu e-mail ou usuário"
                     />
                   </div>
                 </div>

@@ -13,7 +13,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 export default function Relatorios() {
   const location = useLocation();
-  const { usuario } = useAuth();
+  const { usuario, empresa } = useAuth();
   const [obras, setObras] = useState<Obra[]>([]);
   const [obraId, setObraId] = useState('');
   
@@ -300,7 +300,7 @@ export default function Relatorios() {
       doc.setFontSize(22);
       doc.setTextColor(30, 58, 95);
       doc.setFont("helvetica", "bold");
-      doc.text('PCEG - GESTÃO DE OBRAS', 14, 22);
+      doc.text(`${empresa?.nome || "PCEG"} - GESTÃO DE OBRAS`, 14, 22);
       
       doc.setFontSize(14);
       doc.setTextColor(100, 116, 139);
@@ -521,7 +521,7 @@ export default function Relatorios() {
         
         doc.setFontSize(8);
         doc.setTextColor(100, 116, 139);
-        doc.text('PCEG - GESTÃO DE OBRAS', 14, 10);
+        doc.text(`${empresa?.nome || "PCEG"} - GESTÃO DE OBRAS`, 14, 10);
         
         doc.text(`Documento interno`, 14, doc.internal.pageSize.height - 10);
         doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
@@ -647,7 +647,7 @@ export default function Relatorios() {
       doc.setPage(i);
       doc.setFontSize(8);
       doc.setTextColor(100, 116, 139);
-      doc.text('PCEG - GESTÃO DE OBRAS', 14, 10);
+      doc.text(`${empresa?.nome || "PCEG"} - GESTÃO DE OBRAS`, 14, 10);
       doc.text(`Documento interno`, 14, doc.internal.pageSize.height - 10);
       doc.text(`Página ${i} de ${pageCount}`, doc.internal.pageSize.width - 30, doc.internal.pageSize.height - 10);
     }
@@ -720,14 +720,14 @@ export default function Relatorios() {
       
       wsResumo.mergeCells('A1:F1');
       const cellA1 = wsResumo.getCell('A1');
-      cellA1.value = 'PCEG - GESTÃO DE OBRAS';
+      cellA1.value = `${empresa?.nome || "PCEG"} - GESTÃO DE OBRAS`;
       cellA1.font = { size: 18, bold: true, color: { argb: 'FFFFFFFF' } };
       cellA1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
       cellA1.alignment = { vertical: 'middle', horizontal: 'center' };
       
       wsResumo.mergeCells('A2:F2');
       const cellA2 = wsResumo.getCell('A2');
-      cellA2.value = 'PCEG - GESTÃO DE OBRAS';
+      cellA2.value = `${empresa?.nome || "PCEG"} - GESTÃO DE OBRAS`;
       cellA2.font = { size: 14, bold: true, color: { argb: 'FF1E3A8A' } };
       cellA2.alignment = { vertical: 'middle', horizontal: 'center' };
 

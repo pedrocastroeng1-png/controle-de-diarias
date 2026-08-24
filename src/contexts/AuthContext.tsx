@@ -9,7 +9,8 @@ import { Preferences } from '@capacitor/preferences';
 
 
 interface AuthContextType {
-  usuario: Usuario | null;
+  usuario: any | null;
+  empresa: any | null;
   login: (usuario: string, senha: string) => Promise<boolean>;
   logout: () => void;
   loading: boolean;
@@ -18,7 +19,8 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [usuario, setUsuario] = useState<Usuario | null>(null);
+  const [usuario, setUsuario] = useState<any | null>(null);
+  const [empresa, setEmpresa] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -86,6 +88,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           if (res.data && res.data.ativo) {
             setUsuario(res.data);
+            if (res.data.empresa_id) {
+               const emp = await (api as any).getEmpresa(res.data.empresa_id);
+               setEmpresa(emp);
+            }
             setupPushNotifications(res.data.id);
           } else if (res.data && !res.data.ativo) {
             // Disabled by admin
@@ -117,6 +123,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const u = await api.login(user, pass);
       if (u) {
         setUsuario(u);
+        if (u.empresa_id) {
+           const emp = await (api as any).getEmpresa(u.empresa_id);
+           setEmpresa(emp);
+        }
         setupPushNotifications(u.id);
         localStorage.setItem('@diarias:usuario', JSON.stringify(u));
         try { await Preferences.set({ key: '@diarias:usuario', value: JSON.stringify(u) }); } catch(e) {}
@@ -141,6 +151,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 1. Limpar estado local imediatamente (sem await) para feedback visual instantâneo
     setUsuario(null);
+    setEmpresa(null);
     localStorage.removeItem('@diarias:usuario');
     try { Preferences.remove({ key: '@diarias:usuario' }); } catch(e) {}
     localStorage.removeItem('supabase.auth.token');
@@ -155,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ usuario, login, logout, loading }}>
+    <AuthContext.Provider value={{ usuario, empresa, login, logout, loading }}>
       {children}
     </AuthContext.Provider>
   );

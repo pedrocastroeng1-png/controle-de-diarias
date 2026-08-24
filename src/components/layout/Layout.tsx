@@ -14,7 +14,7 @@ import { version } from '../../config/appVersion';
 import { format } from 'date-fns';
 
 export function AdminLayout() {
-  const { usuario, logout, loading } = useAuth();
+  const { usuario, empresa, logout, loading } = useAuth();
   const location = useLocation();
 
   const [unreadComms, setUnreadComms] = useState<any[]>([]);
@@ -295,7 +295,7 @@ export function AdminLayout() {
             Sair
           </button>
           <div className="mt-4 pt-4 border-t border-gray-200 text-xs text-gray-400 text-center">
-            PCEG<br/>
+            {empresa?.nome || "PCEG"}<br/>
             Versão {version}
           </div>
         </div>
@@ -305,7 +305,7 @@ export function AdminLayout() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-3 md:hidden">
            <img src="/icons/icone2.png" alt="PCEG Logo" className="h-10 w-auto object-contain" />
-           <h1 className="text-xl font-bold text-gray-900 flex-1">PCEG</h1>
+           <h1 className="text-lg font-bold text-gray-900 flex-1 truncate">{empresa?.nome || "PCEG"}</h1>
            <button onClick={logout} className="text-gray-500 hover:text-red-600">
              <LogOut className="h-6 w-6" />
            </button>
@@ -319,7 +319,7 @@ export function AdminLayout() {
 }
 
 export function OperadorLayout() {
-  const { usuario, logout, loading } = useAuth();
+  const { usuario, empresa, logout, loading } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   
@@ -403,7 +403,7 @@ export function OperadorLayout() {
           <div className="max-w-md md:max-w-5xl w-full mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img src="/icons/icone2.png" alt="" className="h-8 w-8 object-contain" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-              <span className="font-bold text-gray-900 truncate">PCEG</span>
+              <span className="font-bold text-gray-900 truncate">{empresa?.nome || "PCEG"}</span>
             </div>
 
             {isDesktop && (isInstallable || isInstalled) && (

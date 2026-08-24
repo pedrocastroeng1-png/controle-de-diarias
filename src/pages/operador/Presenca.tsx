@@ -8,7 +8,7 @@ import { User, Camera, CheckCircle } from 'lucide-react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
 
 export default function PresencaPage() {
-  const { usuario } = useAuth();
+  const { usuario, empresa } = useAuth();
   const navigate = useNavigate();
   const context = useOutletContext<any>();
   const isAdmin = usuario?.perfil === 'ADMIN';
@@ -429,7 +429,7 @@ export default function PresencaPage() {
       else if (hora < 18) saudacao = '🌤 Boa tarde!';
 
       let message = `${saudacao}\nSegue abaixo o controle de diárias referente ao dia de hoje.\n\n`;
-      message += `📋 *PCEG - GESTÃO DE OBRAS*\n📅 *${diaSemana}, ${dataFormatada}*\n══════════════════════════════\n\n`;
+      message += `📋 *${empresa?.nome || "PCEG"} - GESTÃO DE OBRAS*\n📅 *${diaSemana}, ${dataFormatada}*\n══════════════════════════════\n\n`;
 
       message += `👷 *FUNCIONÁRIOS PRESENTES (${presentes.length})*\n`;
       presentes.forEach(nome => {
@@ -456,7 +456,7 @@ export default function PresencaPage() {
       message += `🕒 Registrado às: ${horaFormatada}\n`;
       message += `👤 Operador: ${userName}\n\n`;
       
-      message += `📲 Gerado automaticamente pelo sistema\n*PCEG*`;
+      message += `📲 Gerado automaticamente pelo sistema\n*{empresa?.nome || "PCEG"}*`;
 
       const encodedMessage = encodeURIComponent(message);
       const whatsappUrl = `https://api.whatsapp.com/send?text=${encodedMessage}`;

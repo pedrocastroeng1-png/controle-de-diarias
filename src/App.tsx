@@ -31,6 +31,12 @@ import { AppUpdater } from './components/AppUpdater';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import Debug from './pages/debug/Debug';
 
+
+import { OwnerLayout } from './components/layout/OwnerLayout';
+import OwnerDashboard from './pages/owner/Dashboard';
+import OwnerPagamentos from './pages/owner/Pagamentos';
+import Placeholder from './pages/owner/Placeholder';
+
 function App() {
   return (
     <BrowserRouter>
@@ -69,6 +75,18 @@ function App() {
               <Route path="presenca" element={<PresencaPage />} />
             </Route>
             
+            
+            {/* Owner Routes */}
+            <Route path="/owner" element={<OwnerLayout />}>
+              <Route index element={<Navigate to="/owner/dashboard" replace />} />
+              <Route path="dashboard" element={<OwnerDashboard />} />
+              <Route path="empresas" element={<Placeholder title="Empresas" />} />
+              <Route path="assinaturas" element={<Placeholder title="Assinaturas" />} />
+              <Route path="pagamentos" element={<OwnerPagamentos />} />
+              <Route path="planos" element={<Placeholder title="Planos" />} />
+              <Route path="atualizacoes" element={<Placeholder title="Atualizações" />} />
+              <Route path="auditoria" element={<Placeholder title="Auditoria" />} />
+            </Route>
             <Route path="/debug" element={<Debug />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
           </Routes>
