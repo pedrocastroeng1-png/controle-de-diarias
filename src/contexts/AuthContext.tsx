@@ -9,6 +9,7 @@ import { Preferences } from '@capacitor/preferences';
 
 
 interface AuthContextType {
+  isOwner: boolean;
   usuario: any | null;
   empresa: any | null;
   login: (usuario: string, senha: string) => Promise<boolean>;
@@ -20,8 +21,22 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [usuario, setUsuario] = useState<any | null>(null);
+  const [isOwner, setIsOwner] = useState(false);
   const [empresa, setEmpresa] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+
+  
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setIsOwner(session?.user?.app_metadata?.platform_role === 'owner');
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setIsOwner(session?.user?.app_metadata?.platform_role === 'owner');
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   useEffect(() => {
     let unsubscribe: any = null;
@@ -160,13 +175,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     window.location.href = '/login';
     
     // 3. Fazer o signOut no backend em background (fire-and-forget), sem bloquear a UI
-    if (supabase) {
-      supabase.auth.signOut().catch(e => console.error('Erro no Supabase signOut:', e));
-    }
+
   };
 
   return (
-    <AuthContext.Provider value={{ usuario, empresa, login, logout, loading }}>
+    <AuthContext.Provider value={{ usuario, empresa, login, logout, loading, isOwner }}>
       {children}
     </AuthContext.Provider>
   );

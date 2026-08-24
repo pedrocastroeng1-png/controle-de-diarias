@@ -48,21 +48,27 @@ export default function Login() {
     setErro('');
     setLoading(true);
 
-    try {
-      // Tenta login como Owner primeiro via Supabase Auth
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: usuario,
-        password: senha
-      });
-      
-      if (!error && data?.session?.user?.app_metadata?.platform_role === 'owner') {
-        navigate('/owner');
+    if (usuario.trim().toLowerCase() === 'castrophs1@gmail.com') {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: usuario.trim(),
+          password: senha
+        });
+        
+        if (!error && data?.session?.user?.app_metadata?.platform_role === 'owner') {
+          navigate('/owner/dashboard');
+          return;
+        } else {
+          setErro('Credenciais de proprietário inválidas.');
+          setLoading(false);
+          return;
+        }
+      } catch (e) {
+        setErro('Erro ao autenticar proprietário.');
+        setLoading(false);
         return;
       }
-    } catch (e) {
-      // Ignora erro do Supabase Auth e continua para login normal
     }
-
 
     const success = await login(usuario, senha);
 
