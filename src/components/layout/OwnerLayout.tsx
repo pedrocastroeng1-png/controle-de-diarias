@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Outlet, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { LogOut, Home, Building2, CreditCard, Layers, ShieldCheck, List, Menu, X, ArrowLeft } from 'lucide-react';
+import { LogOut, Home, Users, Building2, CreditCard, Layers, ShieldCheck, List, Menu, X, ArrowLeft } from 'lucide-react';
 
 export function OwnerLayout() {
   const [session, setSession] = useState<any>(null);
@@ -43,6 +43,7 @@ export function OwnerLayout() {
   const navItems = [
     { name: 'Dashboard', path: '/owner/dashboard', icon: Home },
     { name: 'Empresas', path: '/owner/empresas', icon: Building2 },
+    { name: 'Usuários', path: '/owner/usuarios', icon: Users },
     { name: 'Assinaturas', path: '/owner/assinaturas', icon: ShieldCheck },
     { name: 'Pagamentos', path: '/owner/pagamentos', icon: CreditCard },
     { name: 'Planos', path: '/owner/planos', icon: Layers },

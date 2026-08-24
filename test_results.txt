@@ -1,0 +1,11 @@
+--- ANTES ---
+{"empresas":2,"funcionarios":28,"obras":3,"presencas":637,"ferramentas":9,"planos":4,"assinaturas":2}
+Original Empresa Ativa: true
+Empresa Teste ID: 6624e78d-7079-4cc7-b857-433626dfaa2e
+Assinatura Teste ID: f1f44b05-d28a-426c-96c5-7d8cbe1d8670
+--- DEPOIS ---
+{"empresas":3,"funcionarios":28,"obras":3,"presencas":637,"ferramentas":9,"planos":4,"assinaturas":3}
+Status Inativa: ativo=true, status=ACTIVE
+Status Ativa: ativo=true, status=ACTIVE
+Original Empresa (Depois) Ativa: true
+Original Intacta: true

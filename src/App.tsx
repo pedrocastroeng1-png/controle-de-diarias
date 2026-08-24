@@ -35,6 +35,14 @@ import Debug from './pages/debug/Debug';
 import { OwnerLayout } from './components/layout/OwnerLayout';
 import OwnerDashboard from './pages/owner/Dashboard';
 import OwnerPagamentos from './pages/owner/Pagamentos';
+
+import OwnerAssinaturas from './pages/owner/Assinaturas';
+import OwnerPlanos from './pages/owner/Planos';
+import OwnerAuditoria from './pages/owner/Auditoria';
+import OwnerAtualizacoes from './pages/owner/Atualizacoes';
+import OwnerEmpresas from './pages/owner/Empresas';
+import OwnerUsuarios from './pages/owner/Usuarios';
+
 import Placeholder from './pages/owner/Placeholder';
 
 function App() {
@@ -80,12 +88,13 @@ function App() {
             <Route path="/owner" element={<OwnerLayout />}>
               <Route index element={<Navigate to="/owner/dashboard" replace />} />
               <Route path="dashboard" element={<OwnerDashboard />} />
-              <Route path="empresas" element={<Placeholder title="Empresas" />} />
-              <Route path="assinaturas" element={<Placeholder title="Assinaturas" />} />
+              <Route path="empresas" element={<OwnerEmpresas />} />
+              <Route path="usuarios" element={<OwnerUsuarios />} />
+              <Route path="assinaturas" element={<OwnerAssinaturas />} />
               <Route path="pagamentos" element={<OwnerPagamentos />} />
-              <Route path="planos" element={<Placeholder title="Planos" />} />
-              <Route path="atualizacoes" element={<Placeholder title="Atualizações" />} />
-              <Route path="auditoria" element={<Placeholder title="Auditoria" />} />
+              <Route path="planos" element={<OwnerPlanos />} />
+              <Route path="atualizacoes" element={<OwnerAtualizacoes />} />
+              <Route path="auditoria" element={<OwnerAuditoria />} />
             </Route>
             <Route path="/debug" element={<Debug />} />
             <Route path="*" element={<Navigate to="/login" replace />} />
