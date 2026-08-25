@@ -235,17 +235,16 @@ export default function PresencaPage() {
       try {
         setSaving(true);
         const now = new Date().toISOString();
-        await api.salvarPresencas([
-          {
+        await api.salvarPresencas([{
             funcionario_id: actionMenuFuncId,
             obra_id: funcionarios.find((f) => f.id === actionMenuFuncId)
               ?.obra_id,
-            data: selectedDate,
+            empresa_id: usuario?.empresa_id,
+                            data: selectedDate,
             presente: newStatus,
             photo_taken_at: now,
             photo_taken_by: usuario?.id || null,
-          },
-        ]);
+          },], usuario?.empresa_id);
       } catch (err: any) {
         // Revert on error
         setPresencas((prev) => ({
@@ -339,46 +338,62 @@ export default function PresencaPage() {
     setShowConfirm(false);
     setSaving(true);
     setErro("");
+    const uploadedPaths: string[] = [];
 
     try {
       const now = new Date().toISOString();
       const userId = usuario?.id || null;
+      const operationId = Date.now().toString(36);
 
-      const registrosToSave = await Promise.all(
-        funcionarios
-          .filter(
-            (f) => !atestadosAtivos[f.id] && presencas[f.id] !== undefined,
-          )
-          .map(async (f) => {
-            let photo_path = undefined;
-            let photo_taken_at = undefined;
-            let photo_taken_by = undefined;
-
-            if (presencas[f.id] === true) {
-              if (!isAdmin && !capturedFotos[f.id]) {
-                throw new Error(`Falta foto de presença para ${f.nome}`);
-              }
-              if (capturedFotos[f.id]) {
-                photo_path = await api.uploadAttendancePhoto(
-                  capturedFotos[f.id],
-                  f.id,
-                );
-                photo_taken_at = now;
-                photo_taken_by = userId;
-              }
-            }
-
-            return {
-              funcionario_id: f.id,
-              obra_id: f.obra_id,
-              data: selectedDate,
-              presente: presencas[f.id],
-              ...(photo_path && { photo_path, photo_taken_at, photo_taken_by }),
-            };
-          }),
+      const pendingFuncionarios = funcionarios.filter(
+        (f) => !atestadosAtivos[f.id] && presencas[f.id] !== undefined
       );
 
-      await api.salvarPresencas(registrosToSave);
+      for (const f of pendingFuncionarios) {
+        if (presencas[f.id] === true) {
+          if (!isAdmin && !capturedFotos[f.id]) {
+            throw new Error(`Falta foto de presença para ${f.nome}`);
+          }
+        }
+      }
+
+      if (!usuario || !usuario.empresa_id) {
+        console.error("Contexto de empresa inválido:", { empresa_id: usuario?.empresa_id, id: usuario?.id, perfil: usuario?.perfil });
+        throw new Error("Empresa não identificada. Atualize sua sessão e tente novamente.");
+      }
+      if (usuario.perfil === "CONSULTA") {
+        throw new Error("Acesso negado: Usuários com perfil CONSULTA não podem registrar presenças.");
+      }
+
+      const registrosToSave = await Promise.all(
+        pendingFuncionarios.map(async (f) => {
+          let photo_path = undefined;
+          let photo_taken_at = undefined;
+          let photo_taken_by = undefined;
+
+          if (presencas[f.id] === true && capturedFotos[f.id]) {
+            photo_path = await api.uploadAttendancePhoto(
+              capturedFotos[f.id],
+              f.id,
+              operationId
+            );
+            uploadedPaths.push(photo_path);
+            photo_taken_at = now;
+            photo_taken_by = userId;
+          }
+
+          return {
+            funcionario_id: f.id,
+            obra_id: f.obra_id,
+            empresa_id: usuario?.empresa_id,
+                            data: selectedDate,
+            presente: presencas[f.id],
+            ...(photo_path && { photo_path, photo_taken_at, photo_taken_by }),
+          };
+        })
+      );
+
+      await api.salvarPresencas(registrosToSave, usuario?.empresa_id);
 
       // Reload actual records from DB after save
       const presencasData = await api.getPresencas(selectedDate);
@@ -392,6 +407,13 @@ export default function PresencaPage() {
         newSavedRecords[p.funcionario_id] = true;
         newFullPresencas[p.funcionario_id] = p;
       });
+
+      const missingRecords = registrosToSave.filter(
+        (r) => !newSavedRecords[r.funcionario_id]
+      );
+      if (missingRecords.length > 0) {
+        throw new Error("Alguns registros não foram persistidos corretamente. A operação foi abortada.");
+      }
 
       const ativosEsperados = funcionarios.filter(
         (f) => !atestadosAtivos[f.id],
@@ -419,6 +441,9 @@ export default function PresencaPage() {
       setSavedSuccess(true);
       // showToast('✅ Presença registrada com sucesso!', 'success');
     } catch (error: any) {
+      if (uploadedPaths.length > 0) {
+        await api.deleteAttendancePhotos(uploadedPaths).catch(() => {});
+      }
       setErro(
         error.message || "Ocorreu um erro ao salvar a lista de presenças.",
       );
@@ -868,18 +893,17 @@ export default function PresencaPage() {
                       try {
                         if (isAdmin && savedRecords[cameraModalFuncId]) {
                           const now = new Date().toISOString();
-                          await api.salvarPresencas([
-                            {
+                          await api.salvarPresencas([{
                               funcionario_id: cameraModalFuncId,
                               obra_id: funcionarios.find(
                                 (f) => f.id === cameraModalFuncId,
                               )?.obra_id,
-                              data: selectedDate,
+                              empresa_id: usuario?.empresa_id,
+                            data: selectedDate,
                               presente: true,
                               photo_taken_at: now,
                               photo_taken_by: usuario?.id || null,
-                            },
-                          ]);
+                            },], usuario?.empresa_id);
                           showToast(
                             "✅ Presença registrada sem foto!",
                             "success",
@@ -933,6 +957,7 @@ export default function PresencaPage() {
                   disabled={saving}
                   onClick={async () => {
                     setSaving(true);
+                    let uploadedPhotoPath = null;
 
                     try {
                       // If it's a replacement (already saved), update immediately
@@ -941,20 +966,21 @@ export default function PresencaPage() {
                         const photo_path = await api.uploadAttendancePhoto(
                           previewPhoto.file,
                           cameraModalFuncId,
+                          Date.now().toString(36)
                         );
-                        await api.salvarPresencas([
-                          {
+                        uploadedPhotoPath = photo_path;
+                        await api.salvarPresencas([{
                             funcionario_id: cameraModalFuncId,
                             obra_id: funcionarios.find(
                               (f) => f.id === cameraModalFuncId,
                             )?.obra_id,
+                            empresa_id: usuario?.empresa_id,
                             data: selectedDate,
                             presente: true,
                             photo_path,
                             photo_taken_at: now,
                             photo_taken_by: usuario?.id || null,
-                          },
-                        ]);
+                          },], usuario?.empresa_id);
                         showToast(
                           "✅ Foto substituída com sucesso!",
                           "success",
@@ -971,10 +997,12 @@ export default function PresencaPage() {
                         }));
                         setSavedSuccess(false);
                       }
-
                       setCameraModalFuncId(null);
                       setPreviewPhoto(null);
                     } catch (err: any) {
+                      if (uploadedPhotoPath) {
+                        await api.deleteAttendancePhotos([uploadedPhotoPath]).catch(() => {});
+                      }
                       setErro(err.message || "Erro ao processar foto");
                       showToast("❌ Erro ao processar foto", "error");
                     } finally {

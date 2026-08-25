@@ -121,6 +121,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
           if (res.data && res.data.ativo) {
             setUsuario(res.data);
+            
+            localStorage.setItem("@diarias:usuario", JSON.stringify(res.data));
+            try {
+              await Preferences.set({
+                key: "@diarias:usuario",
+                value: JSON.stringify(res.data),
+              });
+            } catch (e) {}
+            
             if (res.data.empresa_id) {
               const emp = await (api as any).getEmpresa(res.data.empresa_id);
               setEmpresa(emp);

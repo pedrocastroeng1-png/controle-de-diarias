@@ -35,9 +35,9 @@ const addEmpresaId = (payload: any) => {
   const empId = getEmpresaId();
   if (!empId) return payload;
   if (Array.isArray(payload)) {
-    return payload.map((p) => ({ ...p, empresa_id: empId }));
+    return payload.map((p) => ({ ...p, empresa_id: p.empresa_id || empId }));
   }
-  return { ...payload, empresa_id: empId };
+  return { ...payload, empresa_id: payload.empresa_id || empId };
 };
 
 const getCurrentUserProfile = () => {
@@ -235,7 +235,7 @@ export const api = {
       return { data: null, error: new Error("Supabase não configurado") };
     const { data, error } = await supabase
       .from("usuarios")
-      .select("id, usuario, perfil, ativo, empresa_id, login, email")
+      .select("*")
       .eq("id", id)
       .single();
     return { data, error };
@@ -511,11 +511,39 @@ export const api = {
     if (error) throw error;
   },
 
-  salvarPresencas: async (presencas: Array<any>): Promise<void> => {
+  salvarPresencas: async (presencas: Array<any>, empresaIdContext?: string): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    if (!presencas || presencas.length === 0) return;
+    if (!presencas || presencas.length === 0) return [];
+
+    let usuarioId = "unknown";
+    try {
+      const uStr = localStorage.getItem("@diarias:usuario");
+      if (uStr) {
+        const u = JSON.parse(uStr);
+        usuarioId = u.id;
+      }
+    } catch(e) {}
 
     const userProfile = getCurrentUserProfile();
+    const empresaIdDoUsuario = empresaIdContext || getEmpresaId();
+    const empresaIdDoPayload = presencas[0]?.empresa_id;
+
+    console.log("Validação de Contexto (salvarPresencas):", {
+      usuarioId,
+      perfil: userProfile,
+      empresaIdDoUsuario,
+      empresaIdDoPayload: empresaIdDoPayload || "NÃO_INFORMADO"
+    });
+
+    if (empresaIdDoPayload && empresaIdDoUsuario && empresaIdDoPayload !== empresaIdDoUsuario) {
+      console.error("Conflito de empresa_id! Abortando.", { empresaIdDoUsuario, empresaIdDoPayload });
+      throw new Error("Conflito de contexto de empresa. Atualize sua sessão.");
+    }
+
+    const empresaIdReal = empresaIdDoUsuario || empresaIdDoPayload;
+    if (!empresaIdReal) {
+      throw new Error("Contexto da empresa não encontrado. Faça login novamente para registrar a presença.");
+    }
 
     if (userProfile === "CONSULTA") {
       throw new Error(
@@ -535,10 +563,23 @@ export const api = {
 
     const { data, error } = await supabase
       .from("presencas")
-      .upsert(addEmpresaId(presencas), { onConflict: "funcionario_id,data" })
+      .upsert(
+        presencas.map(p => ({ ...p, empresa_id: empresaIdReal })),
+        { onConflict: "funcionario_id,data" }
+      )
       .select();
 
-    if (error) throw error;
+    if (error) {
+      console.error("Erro no salvarPresencas:", {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      });
+      throw error;
+    }
+    
+    return data || [];
   },
 
   getRelatorio: async (
@@ -639,16 +680,26 @@ export const api = {
   uploadAttendancePhoto: async (
     file: Blob,
     employeeId: string,
+    operationId?: string
   ): Promise<string> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-    const fileName = `${employeeId}_${timestamp}.jpg`;
+    const suffix = operationId ? operationId : new Date().toISOString().replace(/[:.]/g, "-");
+    const fileName = `${employeeId}_${suffix}.jpg`;
     const { data, error } = await supabase.storage
       .from("attendance-photos")
-      .upload(fileName, file, { contentType: "image/jpeg" });
+      .upload(fileName, file, { contentType: "image/jpeg", upsert: true });
 
     if (error) throw error;
     return data.path;
+  },
+
+  deleteAttendancePhotos: async (paths: string[]): Promise<void> => {
+    if (!supabase || !paths || paths.length === 0) return;
+    try {
+      await supabase.storage.from("attendance-photos").remove(paths);
+    } catch (e) {
+      console.error("Failed to delete orphan photos", e);
+    }
   },
 
   getPhotoUrl: async (
