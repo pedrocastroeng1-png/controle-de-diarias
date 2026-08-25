@@ -138,7 +138,7 @@ export default function Login() {
           {/* Top Content: Icon */}
           <div className="relative z-10 animate-in fade-in slide-in-from-left-8 duration-1000 ease-out 
                           -ml-2 -mt-2 mb-2 md:-ml-6 md:-mt-6 md:mb-6 flex justify-center md:justify-start">
-            <img src="/icons/icone2.png" alt="PCEG Icon" 
+            <img src="/icons/icon1.png" alt="PCEG Icon" 
                  className="h-auto object-contain drop-shadow-2xl 
                             w-[130px] sm:w-[150px] md:w-[210px] lg:w-[240px] xl:w-[280px]" />
           </div>

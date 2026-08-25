@@ -32,7 +32,7 @@ export function UpdateScreen({ latestVersion, onUpdateNow, onUpdateLater, isUpda
         <div className="w-full bg-white rounded-[24px] shadow-2xl p-6 sm:p-8 flex flex-col items-center text-center">
           
           <div className="flex justify-center mb-6">
-            <img src="/icons/icone2.png" alt="PCEG Logo" className="w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] object-contain drop-shadow-md" />
+            <img src="/icons/icon1.png" alt="PCEG Logo" className="w-[80px] h-[80px] sm:w-[100px] sm:h-[100px] object-contain drop-shadow-md" />
           </div>
 
           <div className="mb-2">

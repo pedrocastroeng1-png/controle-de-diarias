@@ -211,7 +211,7 @@ export function AdminLayout() {
       <aside className="w-64 bg-white border-r border-gray-200 flex flex-col hidden md:flex flex-shrink-0 z-10">
         <div className="h-[100px] flex items-center justify-center px-4 py-4 border-b border-gray-200 bg-white">
           <img
-            src="/icons/icone2.png"
+            src="/icons/icon1.png"
             alt="PCEG Logo"
             className="w-full max-w-[180px] max-h-full object-contain"
           />
@@ -374,7 +374,7 @@ export function AdminLayout() {
       <main className="flex-1 flex flex-col h-screen overflow-hidden">
         <header className="h-16 bg-white border-b border-gray-200 flex items-center px-6 gap-3 md:hidden">
           <img
-            src="/icons/icone2.png"
+            src="/icons/icon1.png"
             alt="PCEG Logo"
             className="h-10 w-auto object-contain"
           />
@@ -511,7 +511,7 @@ export function OperadorLayout() {
           <div className="max-w-md md:max-w-5xl w-full mx-auto px-4 h-16 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img
-                src="/icons/icone2.png"
+                src="/icons/icon1.png"
                 alt=""
                 className="h-8 w-8 object-contain"
                 onError={(e) => {
@@ -563,7 +563,7 @@ export function OperadorLayout() {
             onClick={() => navigate("/operador/painel")}
           >
             <img
-              src="/icons/icone2.png"
+              src="/icons/icon1.png"
               alt=""
               className="h-8 w-8 object-contain"
               onError={(e) => {

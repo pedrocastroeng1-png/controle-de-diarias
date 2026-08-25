@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (Notification.permission === "granted") {
           const notification = new Notification(title, {
             body: body,
-            icon: "/icons/icone2.png",
+            icon: "/icons/icon1.png",
             data: payload.data,
           });
           notification.onclick = (event) => {

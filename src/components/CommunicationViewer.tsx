@@ -92,7 +92,7 @@ export function CommunicationViewer({ communications, onComplete }: Props) {
     <div className="fixed inset-0 z-50 bg-gray-100 flex flex-col">
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between shadow-sm">
         <div className="flex items-center">
-          <img src="/icons/icone2.png" alt="Logo" className="h-8 w-8 object-contain mr-3" />
+          <img src="/icons/icon1.png" alt="Logo" className="h-8 w-8 object-contain mr-3" />
           <h1 className="text-xl font-bold text-gray-900">Comunicado Importante</h1>
         </div>
         <div className="text-sm font-medium text-gray-500">

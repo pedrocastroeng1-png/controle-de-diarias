@@ -29,7 +29,7 @@ export function WhatsNewScreen({ onContinue }: WhatsNewScreenProps) {
         {/* Brand Content */}
         <div className="relative z-10 flex flex-col items-center md:items-start text-center md:text-left animate-in fade-in slide-in-from-left-8 duration-1000 ease-out fill-mode-both">
           <div className="flex justify-center md:justify-start -ml-2 mb-2 md:-ml-4 md:mb-6">
-             <img src="/icons/icone2.png" alt="PCEG Icon" 
+             <img src="/icons/icon1.png" alt="PCEG Icon" 
                   className="w-[80px] sm:w-[100px] md:w-[150px] lg:w-[180px] h-auto object-contain drop-shadow-2xl" />
           </div>
           

@@ -19,7 +19,7 @@ async function verifyAssets() {
   try {
     // Avoid cache-busting HEAD requests that might fail offline or be mishandled by SW.
     // The Service Worker is reliable now that we don't manually delete its caches.
-    const res = await fetch('/icons/icone2.png', { method: 'HEAD' });
+    const res = await fetch('/icons/icon1.png', { method: 'HEAD' });
     if (res.status === 404) {
       console.warn('Core asset 404 detected, but we will let the SW recover naturally.');
       // We no longer aggressively purge caches here to avoid destroying a newly installed SW's precache
