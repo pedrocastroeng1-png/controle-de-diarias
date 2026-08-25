@@ -26,6 +26,19 @@ const getEmpresaId = () => {
 const withEmpresa = (query: any, isAuth = false) => {
   const empId = getEmpresaId();
   if (empId && !isAuth) {
+    if (typeof query.eq !== "function") {
+      return new Proxy(query, {
+        get(target, prop) {
+          if (["select", "update", "delete"].includes(prop as string)) {
+            return (...args: any[]) => {
+              const filterBuilder = (target as any)[prop](...args);
+              return filterBuilder.eq("empresa_id", empId);
+            };
+          }
+          return (target as any)[prop];
+        },
+      });
+    }
     return query.eq("empresa_id", empId);
   }
   return query;
@@ -184,20 +197,15 @@ export const api = {
 
   updateCommunication: async (id: string, payload: any): Promise<any> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(supabase.from("communications"))
-      .update(payload)
-      .eq("id", id)
-      .select()
-      .single();
+    let query = withEmpresa(supabase.from("communications")).update(payload);
+    const { data, error } = await query.eq("id", id).select().single();
     if (error) throw error;
     return data;
   },
 
   deleteCommunication: async (id: string): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { error } = await withEmpresa(
-      supabase.from("communications").delete(),
-    ).eq("id", id);
+    const { error } = await withEmpresa(supabase.from("communications").delete().eq("id", id));
     if (error) throw error;
   },
 
@@ -218,10 +226,8 @@ export const api = {
 
   getOperators: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(supabase.from("usuarios"))
-      .select("id, usuario, perfil")
-      .in("perfil", ["OPERADOR", "ADMIN", "CONSULTA"])
-      .eq("ativo", true);
+    let query = withEmpresa(supabase.from("usuarios")).select("id, usuario, perfil");
+    const { data, error } = await query.in("perfil", ["OPERADOR", "ADMIN", "CONSULTA"]).eq("ativo", true);
     if (error) throw error;
     return data || [];
   },
@@ -286,8 +292,7 @@ export const api = {
   // Obras
   getObras: async (): Promise<Obra[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(
-      supabase.from("obras").select("*"),
+    const { data, error } = await withEmpresa(supabase.from("obras").select("*"),
     )
       .eq("ativo", true)
       .order("nome");
@@ -318,16 +323,14 @@ export const api = {
   deleteObra: async (id: string): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
     const { error } = await withEmpresa(
-      supabase.from("obras").update({ ativo: false }),
-    ).eq("id", id);
+      supabase.from("obras").update({ ativo: false }).eq("id", id));
     if (error) throw error;
   },
 
   // Funcoes
   getFuncoes: async (): Promise<Funcao[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(
-      supabase.from("funcoes").select("*"),
+    const { data, error } = await withEmpresa(supabase.from("funcoes").select("*"),
     )
       .eq("ativo", true)
       .order("nome");
@@ -361,8 +364,7 @@ export const api = {
   deleteFuncao: async (id: string): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
     const { error } = await withEmpresa(
-      supabase.from("funcoes").update({ ativo: false }),
-    ).eq("id", id);
+      supabase.from("funcoes").update({ ativo: false }).eq("id", id));
     if (error) throw error;
   },
 
@@ -375,8 +377,7 @@ export const api = {
     let query = withEmpresa(
       supabase
         .from("funcionarios")
-        .select(`*, funcao:funcoes(*), obra:obras(*)`),
-    ).order("nome");
+        .select(`*, funcao:funcoes(*), obra:obras(*)`)).order("nome");
 
     if (status === "ativos") {
       query = query.eq("ativo", true);
@@ -391,9 +392,7 @@ export const api = {
     if (data) {
       // Since vw_relatorio_presencas might not have tipo_colaborador or inner join properly mapped
       // Let's filter out CLT using getFuncionarios
-      const { data: cltData } = await withEmpresa(
-        supabase.from("funcionarios").select("nome"),
-      ).eq("tipo_colaborador", "CLT");
+      const { data: cltData } = await withEmpresa(supabase.from("funcionarios").select("nome").eq("tipo_colaborador", "CLT"));
       const cltNames = cltData?.map((f) => f.nome) || [];
       data = data.filter((r) => !cltNames.includes(r.funcionario));
     }
@@ -417,8 +416,7 @@ export const api = {
     funcionario: Partial<Funcionario>,
   ): Promise<Funcionario> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(
-      supabase.from("funcionarios").update(funcionario),
+    const { data, error } = await withEmpresa(supabase.from("funcionarios").update(funcionario),
     )
       .eq("id", id)
       .select()
@@ -429,8 +427,7 @@ export const api = {
   deleteFuncionario: async (id: string): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
     const { error } = await withEmpresa(
-      supabase.from("funcionarios").update({ ativo: false }),
-    ).eq("id", id);
+      supabase.from("funcionarios").update({ ativo: false }).eq("id", id));
     if (error) throw error;
   },
   getFuncionariosPorObra: async (
@@ -438,8 +435,7 @@ export const api = {
     apenasDiaristas = false,
   ): Promise<Funcionario[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    let query = withEmpresa(supabase.from("funcionarios"))
-      .select(`*, funcao:funcoes(*), obra:obras(*)`)
+    let query = withEmpresa(supabase.from("funcionarios")).select(`*, funcao:funcoes(*), obra:obras(*)`)
       .eq("obra_id", obra_id)
       .eq("ativo", true);
     if (apenasDiaristas) {
@@ -505,9 +501,8 @@ export const api = {
     data: string,
   ): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { error } = await withEmpresa(supabase.from("presencas").delete())
-      .eq("funcionario_id", funcionario_id)
-      .eq("data", data);
+    let query = withEmpresa(supabase.from("presencas")).delete();
+    const { error } = await query.eq("funcionario_id", funcionario_id).eq("data", data);
     if (error) throw error;
   },
 
@@ -711,11 +706,19 @@ export const api = {
     path: string,
   ): Promise<string> => {
     if (!supabase) throw new Error("Supabase não configurado");
+
+    console.log(`[getPhotoUrl] Requesting signed URL - Bucket: ${bucket} | Path: ${path}`);
+
     const { data, error } = await supabase.storage
       .from(bucket)
       .createSignedUrl(path, 60 * 60); // 1 hour
 
-    if (error) throw error;
+    if (error) {
+      console.error(`[getPhotoUrl] Storage error - Bucket: ${bucket} | Path: ${path} | Status: ${(error as any).status} | Message: ${error.message}`);
+      throw error;
+    }
+    
+    console.log(`[getPhotoUrl] Success - Generated URL for ${path}`);
     return data.signedUrl;
   },
 
@@ -730,11 +733,10 @@ export const api = {
     quinzeDiasAtras.setDate(quinzeDiasAtras.getDate() - 15);
     const dataLimite = quinzeDiasAtras.toISOString().split("T")[0];
 
-    const { data, error } = await withEmpresa(supabase.from("presencas"))
-      .select(
+    let query = withEmpresa(supabase.from("presencas")).select(
         `*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`,
-      )
-      .eq("funcionario_id", funcionario_id)
+      );
+    const { data, error } = await query.eq("funcionario_id", funcionario_id)
       .not("photo_path", "is", null)
       .gte("data", dataLimite)
       .order("data", { ascending: false });
@@ -745,11 +747,8 @@ export const api = {
 
   getDashboardStats: async (hoje: string) => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { count: obrasCount } = await withEmpresa(
-      supabase.from("obras").select("*", { count: "exact", head: true }),
-    ).eq("ativo", true);
-    const { count: funcionariosCount } = await withEmpresa(
-      supabase.from("funcionarios").select("*", { count: "exact", head: true }),
+    const { count: obrasCount } = await withEmpresa(supabase.from("obras").select("*", { count: "exact", head: true })).eq("ativo", true);
+    const { count: funcionariosCount } = await withEmpresa(supabase.from("funcionarios").select("*", { count: "exact", head: true }),
     )
       .eq("ativo", true)
       .or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null");
@@ -758,7 +757,7 @@ export const api = {
       supabase
         .from("presencas")
         .select(
-          "presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))",
+          "presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria)",
         ),
     )
       .eq("data", hoje)
@@ -797,9 +796,8 @@ export const api = {
           .from("communication_recipients")
           .select("communication_id, operator_id, read_at"),
       );
-      const { data: operators } = await withEmpresa(supabase.from("usuarios"))
-        .select("id")
-        .eq("perfil", "OPERADOR");
+      let query = withEmpresa(supabase.from("usuarios")).select("id");
+      const { data: operators } = await query.eq("perfil", "OPERADOR");
 
       totalComms = communications?.length || 0;
       readComms = recipients?.filter((r) => r.read_at)?.length || 0;
@@ -835,8 +833,8 @@ export const api = {
   getAtestados: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
     const { data, error } = await withEmpresa(
-      supabase.from("medical_certificates"),
-    ).select("*, funcionario:funcionarios(*)");
+      supabase.from("medical_certificates").select("*, funcionario:funcionarios(*)")
+    );
     if (error) throw error;
     return data;
   },
@@ -854,33 +852,24 @@ export const api = {
 
   updateAtestado: async (id: string, atestado: any): Promise<any> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(
-      supabase.from("medical_certificates").update(atestado),
-    )
-      .eq("id", id)
-      .select()
-      .single();
+    let query = withEmpresa(supabase.from("medical_certificates").update(atestado));
+    const { data, error } = await query.eq("id", id).select().single();
     if (error) throw error;
     return data;
   },
 
   deleteAtestado: async (id: string): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { error } = await withEmpresa(
-      supabase.from("medical_certificates").delete(),
-    ).eq("id", id);
+    let query = withEmpresa(supabase.from("medical_certificates").delete());
+    const { error } = await query.eq("id", id);
     if (error) throw error;
   },
 
   getActiveAtestadosForDate: async (dateStr: string): Promise<any[]> => {
     // dateStr format: YYYY-MM-DD
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(
-      supabase.from("medical_certificates"),
-    )
-      .select("*, funcionario:funcionarios(*)")
-      .lte("start_date", dateStr)
-      .gte("end_date", dateStr);
+    let query = withEmpresa(supabase.from("medical_certificates").select("*, funcionario:funcionarios(*)"));
+    const { data, error } = await query.lte("start_date", dateStr).gte("end_date", dateStr);
     if (error) throw error;
     return data || [];
   },
@@ -888,18 +877,15 @@ export const api = {
   // Ferramentas
   getFerramentas: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(supabase.from("ferramentas"))
-      .select("*")
-      .order("nome", { ascending: true });
+    let query = withEmpresa(supabase.from("ferramentas")).select("*");
+    const { data, error } = await query.order("nome", { ascending: true });
     if (error) throw error;
     return data || [];
   },
   getFerramenta: async (id: string): Promise<any> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(supabase.from("ferramentas"))
-      .select("*")
-      .eq("id", id)
-      .single();
+    let query = withEmpresa(supabase.from("ferramentas")).select("*");
+    const { data, error } = await query.eq("id", id).single();
     if (error) throw error;
     return data;
   },
@@ -934,8 +920,7 @@ export const api = {
     usuario_id: string,
   ): Promise<any> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(
-      supabase.from("ferramentas").update(ferramenta),
+    const { data, error } = await withEmpresa(supabase.from("ferramentas").update(ferramenta),
     )
       .eq("id", id)
       .select()
@@ -962,8 +947,7 @@ export const api = {
   ): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
     const { error: updError } = await withEmpresa(
-      supabase.from("ferramentas").update({ status: "INATIVA" }),
-    ).eq("id", id);
+      supabase.from("ferramentas").update({ status: "INATIVA" }).eq("id", id));
     if (updError) throw updError;
 
     const { error: histError } = await supabase
@@ -987,9 +971,7 @@ export const api = {
     usuario_id: string,
   ): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { error: updError } = await withEmpresa(
-      supabase.from("ferramentas").update({ status: "ATIVA" }),
-    ).eq("id", id);
+    const { error: updError } = await withEmpresa(supabase.from("ferramentas").update({ status: "ATIVA" }).eq("id", id));
     if (updError) throw updError;
 
     const { error: histError } = await supabase
@@ -1084,23 +1066,14 @@ export const api = {
       .single();
     if (empError) throw empError;
 
-    const { error: updError } = await withEmpresa(
-      supabase.from("ferramentas").update({ status: "EMPRESTADA" }),
-    ).eq("id", ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from("ferramentas").update({ status: "EMPRESTADA" }).eq("id", ferramenta_id));
     if (updError) throw updError;
 
-    const { data: funcData } = await withEmpresa(
-      supabase.from("funcionarios").select("nome"),
-    )
-      .eq("id", funcionario_id)
-      .single();
-    const { data: obraData } = await withEmpresa(
-      supabase.from("obras").select("nome"),
-    )
-      .eq("id", obra_id)
-      .single();
-    const { data: ferData } = await withEmpresa(
-      supabase.from("ferramentas").select("nome, codigo_interno"),
+    let queryFunc = withEmpresa(supabase.from("funcionarios").select("nome"));
+    const { data: funcData } = await queryFunc.eq("id", funcionario_id).single();
+    let queryObra = withEmpresa(supabase.from("obras").select("nome"));
+    const { data: obraData } = await queryObra.eq("id", obra_id).single();
+    const { data: ferData } = await withEmpresa(supabase.from("ferramentas").select("nome, codigo_interno"),
     )
       .eq("id", ferramenta_id)
       .single();
@@ -1157,17 +1130,14 @@ export const api = {
         operador_devolucao_id: usuario_id,
         condicao_devolucao: condicao,
         observacao_devolucao: observacao || null,
-      }),
-    ).eq("id", emprestimo_id);
+      }).eq("id", emprestimo_id));
     if (empError) throw empError;
 
-    const { error: updError } = await withEmpresa(
-      supabase.from("ferramentas").update({ status: "ATIVA" }),
-    ).eq("id", ferramenta_id);
+    let queryFer = withEmpresa(supabase.from("ferramentas").update({ status: "ATIVA" }));
+    const { error: updError } = await queryFer.eq("id", ferramenta_id);
     if (updError) throw updError;
 
-    const { data: ferData } = await withEmpresa(
-      supabase.from("ferramentas").select("nome, codigo_interno"),
+    const { data: ferData } = await withEmpresa(supabase.from("ferramentas").select("nome, codigo_interno"),
     )
       .eq("id", ferramenta_id)
       .single();
@@ -1204,8 +1174,7 @@ export const api = {
         .update({
           status: "EM_REPARO",
           ultima_manutencao: new Date().toISOString(),
-        }),
-    ).eq("id", ferramenta_id);
+        }).eq("id", ferramenta_id));
     if (updError) throw updError;
 
     const { error: histError } = await supabase
@@ -1236,8 +1205,7 @@ export const api = {
         .update({
           status: "ATIVA",
           ultima_manutencao: new Date().toISOString(),
-        }),
-    ).eq("id", ferramenta_id);
+        }).eq("id", ferramenta_id));
     if (updError) throw updError;
 
     const { error: histError } = await supabase
@@ -1262,13 +1230,10 @@ export const api = {
     usuario_id: string,
   ): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { error: updError } = await withEmpresa(
-      supabase.from("ferramentas").update({ status: "QUEBRADA" }),
-    ).eq("id", ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from("ferramentas").update({ status: "QUEBRADA" }).eq("id", ferramenta_id));
     if (updError) throw updError;
 
-    const { data: fData } = await withEmpresa(
-      supabase.from("ferramentas").select("nome, codigo_interno"),
+    const { data: fData } = await withEmpresa(supabase.from("ferramentas").select("nome, codigo_interno"),
     )
       .eq("id", ferramenta_id)
       .single();
@@ -1300,8 +1265,7 @@ export const api = {
 
   getCentralComunicacoes: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(supabase.from("communications"))
-      .select(
+    const { data, error } = await withEmpresa(supabase.from("communications")).select(
         `
         *,
         remetente:usuarios!created_by(id, usuario),
@@ -1434,8 +1398,7 @@ export const api = {
       await withEmpresa(
         supabase
           .from("communication_recipients")
-          .update({ read_at: new Date().toISOString() }),
-      ).eq("id", id);
+          .update({ read_at: new Date().toISOString() }).eq("id", id));
     } catch (e) {}
   },
   registerPushDevice: async (
@@ -1471,9 +1434,7 @@ export const api = {
   deactivatePushDevice: async (token: string): Promise<void> => {
     if (!supabase) return;
     try {
-      await withEmpresa(
-        supabase.from("push_devices").update({ ativo: false }),
-      ).eq("token", token);
+      await withEmpresa(supabase.from("push_devices").update({ ativo: false }).eq("token", token));
     } catch (e) {
       console.error("Error deactivating push device:", e);
     }
@@ -1484,9 +1445,7 @@ export const api = {
     usuario_id: string,
   ): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { error: updError } = await withEmpresa(
-      supabase.from("ferramentas").update({ status: "PERDIDA" }),
-    ).eq("id", ferramenta_id);
+    const { error: updError } = await withEmpresa(supabase.from("ferramentas").update({ status: "PERDIDA" }).eq("id", ferramenta_id));
     if (updError) throw updError;
 
     const { error: histError } = await supabase
@@ -1507,9 +1466,7 @@ export const api = {
   // Automations
   getAutomationRules: async (): Promise<AutomationRule[]> => {
     if (!supabase) return [];
-    const { data, error } = await withEmpresa(
-      supabase.from("automation_rules").select("*"),
-    ).order("created_at", { ascending: false });
+    const { data, error } = await withEmpresa(supabase.from("automation_rules").select("*").order("created_at", { ascending: false }));
     if (error) throw error;
     return data || [];
   },
@@ -1527,8 +1484,7 @@ export const api = {
 
   getAutomationRuns: async (): Promise<AutomationRun[]> => {
     if (!supabase) return [];
-    const { data, error } = await withEmpresa(
-      supabase.from("automation_runs").select("*, rule:rule_id(*)"),
+    const { data, error } = await withEmpresa(supabase.from("automation_runs").select("*, rule:rule_id(*)"),
     )
       .order("created_at", { ascending: false })
       .limit(100);
@@ -1567,8 +1523,7 @@ export const api = {
   deleteAutomationRule: async (id: string): Promise<void> => {
     if (!supabase) throw new Error("Supabase not connected");
     const { error } = await withEmpresa(
-      supabase.from("automation_rules").delete(),
-    ).eq("id", id);
+      supabase.from("automation_rules").delete().eq("id", id));
     if (error) throw error;
   },
 
@@ -1647,9 +1602,8 @@ export const api = {
 
   getMateriais: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(supabase.from("materiais"))
-      .select("*, category:material_categories(*)")
-      .order("nome");
+    let query = withEmpresa(supabase.from("materiais")).select("*, category:material_categories(*)");
+    const { data, error } = await query.order("nome");
     if (error) throw error;
     return data || [];
   },
@@ -1691,7 +1645,7 @@ export const api = {
     const { data: itens, error: itensError } = await withEmpresa(
       supabase.from("compras_materiais_itens"),
     )
-      .select("*, material:materiais(*, category:material_categories(*))")
+      .select("*, material:materiais(*, category:material_categories(*)")
       .eq("compra_id", compraId);
     if (itensError) throw itensError;
 
@@ -1715,7 +1669,7 @@ export const api = {
         quantidade,
         valor_unitario,
         valor_total,
-        compra:compras_materiais!inner(id, data_compra, fornecedor, obra_id, obra:obras(nome)),
+        compra:compras_materiais!inner(id, data_compra, fornecedor, obra_id, obra:obras(nome),
         material:materiais!inner(id, nome, unidade, categoria_id, category:material_categories(nome))
       `);
 
@@ -1829,10 +1783,8 @@ export const api = {
         .insert(addEmpresaId(itensToInsert));
 
       if (itensError) {
-        await withEmpresa(supabase.from("compras_materiais").delete()).eq(
-          "id",
-          compra.id,
-        );
+        let query = withEmpresa(supabase.from("compras_materiais")).delete();
+        await query.eq("id", compra.id);
         throw itensError;
       }
     }

@@ -72,8 +72,13 @@ export default function AuditoriaPresencas() {
     try {
       // Carrega foto de registro se houver
       if (f.photo_path) {
-        const url = await api.getPhotoUrl('employee-photos', f.photo_path);
-        setRegistrationPhotoUrl(url);
+        try {
+          const url = await api.getPhotoUrl('employee-photos', f.photo_path);
+          setRegistrationPhotoUrl(url);
+        } catch (err) {
+          console.warn("Could not load employee photo:", err);
+          setRegistrationPhotoUrl('ERROR');
+        }
       }
       
       const history = await api.getAuditoriaPresencas(f.id);
@@ -150,6 +155,7 @@ export default function AuditoriaPresencas() {
     } catch (err: any) {
       console.error('Erro ao carregar foto de presença', err);
       console.error('Error details:', err.message || err);
+      setAttendancePhotoUrl('ERROR');
     } finally {
       setModalOpen(true);
     }
@@ -240,7 +246,12 @@ export default function AuditoriaPresencas() {
           <div className="col-span-1">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 text-center">
               <div className="mx-auto h-32 w-32 rounded-full overflow-hidden bg-gray-100 border-4 border-white shadow-md mb-4 flex items-center justify-center">
-                {registrationPhotoUrl ? (
+                {registrationPhotoUrl === 'ERROR' ? (
+                            <span className="text-red-500 text-sm font-medium flex flex-col items-center p-2 text-center">
+                              <User className="h-12 w-12 text-red-300 mb-2 opacity-50" />
+                              Foto indisponível
+                            </span>
+                          ) : registrationPhotoUrl ? (
                   <img src={registrationPhotoUrl} alt={selectedFuncionario.nome} className="h-full w-full object-cover" />
                 ) : (
                   <User className="h-12 w-12 text-gray-300" />
@@ -328,7 +339,12 @@ export default function AuditoriaPresencas() {
                       <div className="flex flex-col items-center">
                         <span className="text-sm font-bold text-gray-500 uppercase tracking-wider mb-4">Foto de Cadastro</span>
                         <div className="h-64 w-64 rounded-xl overflow-hidden bg-gray-100 border border-gray-200 flex items-center justify-center">
-                          {registrationPhotoUrl ? (
+                          {registrationPhotoUrl === 'ERROR' ? (
+                            <span className="text-red-500 text-sm font-medium flex flex-col items-center p-2 text-center">
+                              <User className="h-12 w-12 text-red-300 mb-2 opacity-50" />
+                              Foto indisponível
+                            </span>
+                          ) : registrationPhotoUrl ? (
                             <img src={registrationPhotoUrl} alt="Cadastro" className="h-full w-full object-cover" onError={(e) => {
                               console.error('Failed to load reg image from URL:', registrationPhotoUrl);
                               e.currentTarget.style.display = 'none';
@@ -358,12 +374,17 @@ export default function AuditoriaPresencas() {
                               e.currentTarget.parentElement?.classList.add('flex', 'flex-col', 'items-center', 'justify-center');
                               e.currentTarget.parentElement?.insertAdjacentHTML('beforeend', '<span class="text-xs text-red-500 mt-2 text-center p-2">Foto Expirada ou Inacessível</span>');
                             }} />
-                          ) : (
-                            <span className="text-gray-400 text-sm font-medium flex flex-col items-center">
-                              <User className="h-12 w-12 text-gray-300 mb-2" />
-                              Sem Foto
-                            </span>
-                          )}
+                          ) : attendancePhotoUrl === 'ERROR' ? (
+                              <span className="text-red-500 text-sm font-medium flex flex-col items-center">
+                                <Camera className="h-12 w-12 text-red-300 mb-2 opacity-50" />
+                                Foto indisponível
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-sm font-medium flex flex-col items-center">
+                                <User className="h-12 w-12 text-gray-300 mb-2" />
+                                Sem Foto
+                              </span>
+                            )}
                         </div>
                         <div className="mt-6 text-center bg-gray-50 p-4 rounded-lg w-full">
                            <p className="text-sm font-medium text-gray-900">

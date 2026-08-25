@@ -1,0 +1,11 @@
+const fs = require('fs');
+let code = fs.readFileSync('src/lib/api.ts', 'utf8');
+code = code.replace(/\}\.eq\(/g, '}).eq(');
+code = code.replace(/"\.eq\(/g, '").eq(');
+code = code.replace(/"\.order\(/g, '").order(');
+code = code.replace(/"\.gte\(/g, '").gte(');
+code = code.replace(/'\.eq\(/g, "').eq(");
+code = code.replace(/\]\.eq\(/g, "]).eq(");
+code = code.replace(/true\.eq\(/g, "true).eq(");
+code = code.replace(/head:\s*true\s*\}\.eq/g, "head: true}).eq");
+fs.writeFileSync('src/lib/api.ts', code);

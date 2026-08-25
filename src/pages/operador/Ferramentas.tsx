@@ -51,7 +51,9 @@ export default function FerramentasOperador() {
         const urls: Record<string, string> = {};
         for (const f of filtered) {
           if (f.foto_path) {
-            urls[f.id] = await api.getPhotoUrl('fotos_ferramentas', f.foto_path);
+            try {
+              urls[f.id] = await api.getPhotoUrl('fotos_ferramentas', f.foto_path);
+            } catch (e) { console.warn(e); }
           }
         }
         setImageUrls(urls);
@@ -61,7 +63,9 @@ export default function FerramentasOperador() {
         const urls: Record<string, string> = {};
         for (const emp of data) {
           if (emp.ferramenta?.foto_path) {
-            urls[emp.ferramenta_id] = await api.getPhotoUrl('fotos_ferramentas', emp.ferramenta.foto_path);
+            try {
+              urls[emp.ferramenta_id] = await api.getPhotoUrl('fotos_ferramentas', emp.ferramenta.foto_path);
+            } catch (e) { console.warn(e); }
           }
         }
         setImageUrls(urls);
