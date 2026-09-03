@@ -411,6 +411,11 @@ export const api = {
     if (error) throw error;
     return data as any;
   },
+  updateFuncionariosObra: async (ids: string[], obra_id: string): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await withEmpresa(supabase.from("funcionarios").update({ obra_id }).in("id", ids));
+    if (error) throw error;
+  },
   updateFuncionario: async (
     id: string,
     funcionario: Partial<Funcionario>,
