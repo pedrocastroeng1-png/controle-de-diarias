@@ -52,7 +52,7 @@ export default function AuditoriaPresencas() {
     try {
       setLoading(true);
       const [funcData, obrasData, funcoesData] = await Promise.all([
-        api.getFuncionarios('todos', true),
+        api.getFuncionarios('todos'),
         api.getObras(),
         api.getFuncoes()
       ]);
@@ -386,7 +386,14 @@ export default function AuditoriaPresencas() {
                             }}
                             className="w-full text-left px-4 py-2 hover:bg-gray-50 text-sm focus:outline-none focus:bg-gray-50"
                           >
-                            <div className="font-medium text-gray-900">{f.nome}</div>
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium text-gray-900">{f.nome}</span>
+                              {f.tipo_colaborador === 'CLT' && (
+                                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800 border border-blue-200 ml-2">
+                                  CLT
+                                </span>
+                              )}
+                            </div>
                           </button>
                         ))
                       ) : (

@@ -61,7 +61,7 @@ export default function Relatorios() {
     try {
       [data, funcionarios] = await Promise.all([
         api.getRelatorio(inicio, fim, obra),
-        api.getFuncionarios('todos', true)
+        api.getFuncionarios('todos')
       ]);
       
       try {
@@ -130,12 +130,13 @@ export default function Relatorios() {
   }
 
   const agruparPorFuncionario = () => {
-    const agrupado: Record<string, { id: string, nome: string, funcao: string, obra: string, dias: number, faltas: number, valorDiaria: number, total: number }> = {};
+    const agrupado: Record<string, { id: string, nome: string, funcao: string, obra: string, dias: number, faltas: number, valorDiaria: number, total: number, isCLT?: boolean }> = {};
     
     relatorio.forEach((p: any) => {
       const fId = p.funcionario_id || p.funcionario_nome || p.funcionario;
       if (fId) {
         if (!agrupado[fId]) {
+          const funcBase = funcionariosBase.find(f => f.id === (p.funcionario_id || fId)) || funcionariosBase.find(f => f.nome === (p.funcionario_nome || p.funcionario));
           agrupado[fId] = {
             id: p.funcionario_id || fId,
             nome: p.funcionario_nome || p.funcionario || '',
@@ -143,13 +144,17 @@ export default function Relatorios() {
             obra: p.obra_nome || p.obra || '',
             dias: 0,
             faltas: 0,
-            valorDiaria: Number(p.valor_diaria) || 0,
-            total: 0
+            valorDiaria: funcBase?.tipo_colaborador === 'CLT' ? 0 : (Number(p.valor_diaria) || 0),
+            total: 0,
+            isCLT: funcBase?.tipo_colaborador === 'CLT'
           };
         }
         
         // Use row's valor_calculado for the exact amount (fallback to valor_diaria if old record)
-        const rowValor = Number(p.valor_calculado) || Number(p.valor_diaria) || 0;
+        let rowValor = Number(p.valor_calculado) || Number(p.valor_diaria) || 0;
+        if (agrupado[fId].isCLT) {
+           rowValor = 0;
+        }
         
         if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO' || p.status === 'MEIA_DIARIA' || p.tipo_diaria === 'MEIA_DIARIA') {
           // If it's half day, we count as 1 presence but total will be 50%
@@ -1280,7 +1285,7 @@ const handlePrint = () => {
                           {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(vBase)}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 text-right">
-                          {p.status === 'FALTOU' ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(vCalc)}
+                          {p.status === 'FALTOU' ? '-' : (funcionariosBase.find(fb => fb.id === p.funcionario_id || fb.nome === p.funcionario_nome)?.tipo_colaborador === 'CLT' ? <span className="text-blue-600 font-bold text-xs">PAGAMENTO EM FOLHA - CLT</span> : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(vCalc))}
                         </td>
                       </tr>
                     );
@@ -1330,13 +1335,13 @@ const handlePrint = () => {
                         {item.obra}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valorDiaria)}
+                        {item.isCLT ? '-' : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valorDiaria)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-center font-medium">
                         {item.dias}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                        {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
+                        {item.isCLT ? <span className="text-blue-600 text-xs uppercase tracking-wide">PAGAMENTO EM FOLHA - CLT</span> : new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.total)}
                       </td>
                     </tr>
                   ))}

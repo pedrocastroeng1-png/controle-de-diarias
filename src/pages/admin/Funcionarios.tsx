@@ -11,7 +11,7 @@ export default function Funcionarios() {
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'ativos' | 'inativos' | 'todos'>('ativos');
+  const [filter, setFilter] = useState<'ativos' | 'inativos' | 'todos'>('todos');
   
   const [nome, setNome] = useState('');
   const [funcaoId, setFuncaoId] = useState('');

@@ -389,13 +389,7 @@ export const api = {
     }
 
     let { data, error } = await query;
-    if (data) {
-      // Since vw_relatorio_presencas might not have tipo_colaborador or inner join properly mapped
-      // Let's filter out CLT using getFuncionarios
-      const { data: cltData } = await withEmpresa(supabase.from("funcionarios").select("nome").eq("tipo_colaborador", "CLT"));
-      const cltNames = cltData?.map((f) => f.nome) || [];
-      data = data.filter((r) => !cltNames.includes(r.nome));
-    }
+    
     if (error) throw error;
     return data as any;
   },
@@ -462,9 +456,6 @@ export const api = {
           `*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`,
         ),
     )
-      .or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null", {
-        referencedTable: "funcionarios",
-      })
       .eq("data", data);
 
     if (obra_id) {

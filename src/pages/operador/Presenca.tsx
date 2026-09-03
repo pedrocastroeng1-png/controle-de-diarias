@@ -100,7 +100,7 @@ export default function PresencaPage() {
     let funcs: Funcionario[] = [];
     let presencasData: any[] = [];
     try {
-      funcsRaw = await api.getFuncionarios("todos", true);
+      funcsRaw = await api.getFuncionarios("todos");
       presencasData = await api.getPresencas(selectedDate);
       
       const presencasIds = new Set(presencasData.map((p) => p.funcionario_id));
@@ -687,9 +687,16 @@ export default function PresencaPage() {
                             <span className="text-xl">🩺</span>
                           </div>
                           <div className="flex-1 min-w-0 pr-3">
-                            <p className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
-                              {f.nome}
-                            </p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-base sm:text-lg font-bold text-slate-800 leading-tight">
+                                {f.nome}
+                              </p>
+                              {f.tipo_colaborador === 'CLT' && (
+                                <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                  CLT
+                                </span>
+                              )}
+                            </div>
                             <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
                               <span className="text-xs font-medium text-slate-500 truncate">
                                 {f.funcao?.nome || "Função não definida"}
@@ -755,9 +762,16 @@ export default function PresencaPage() {
                           />
                         </div>
                         <div className="flex-1 min-w-0 pr-3">
-                          <p className="text-base sm:text-lg font-bold text-slate-800 leading-tight transition-colors">
-                            {f.nome}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-base sm:text-lg font-bold text-slate-800 leading-tight transition-colors">
+                              {f.nome}
+                            </p>
+                            {f.tipo_colaborador === 'CLT' && (
+                              <span className="px-2 py-0.5 text-[10px] font-bold rounded bg-blue-100 text-blue-800 border border-blue-200">
+                                CLT
+                              </span>
+                            )}
+                          </div>
                           <p className="text-xs font-medium text-slate-500 mt-1 truncate">
                             {f.funcao?.nome || "Função não definida"}
                           </p>
