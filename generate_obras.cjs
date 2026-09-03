@@ -1,4 +1,8 @@
-import React, { useState, useEffect } from 'react';
+const fs = require('fs');
+let code = fs.readFileSync('src/pages/admin/Obras.tsx', 'utf8');
+
+// We will replace Obras.tsx with a new version that supports hierarchy
+const newCode = `import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
 import { Obra } from '../../lib/types';
 import { Edit2, Trash2, Plus, ChevronRight, ChevronDown } from 'lucide-react';
@@ -271,3 +275,5 @@ export default function Obras() {
     </div>
   );
 }
+`;
+fs.writeFileSync('src/pages/admin/Obras.tsx', newCode);

@@ -394,7 +394,7 @@ export const api = {
       // Let's filter out CLT using getFuncionarios
       const { data: cltData } = await withEmpresa(supabase.from("funcionarios").select("nome").eq("tipo_colaborador", "CLT"));
       const cltNames = cltData?.map((f) => f.nome) || [];
-      data = data.filter((r) => !cltNames.includes(r.funcionario));
+      data = data.filter((r) => !cltNames.includes(r.nome));
     }
     if (error) throw error;
     return data as any;
@@ -595,15 +595,31 @@ export const api = {
       query = query.lte("data", dataFinal);
     }
     if (obraId) {
-      // Obras are filtered by name since the view has 'obra' column
-      query = query.eq("obra", obraId);
+      query = query.eq("obra_id", obraId);
     }
 
     const { data, error } = await query;
     if (error) {
       throw error;
     }
-    return data as any;
+    
+    const filteredData = (data as any[]).filter((row) => {
+      const dataDiaria = new Date(row.data).getTime();
+      
+      if (row.data_admissao) {
+        const admissao = new Date(row.data_admissao).getTime();
+        if (dataDiaria < admissao) return false;
+      }
+      
+      if (row.data_desligamento) {
+        const desligamento = new Date(row.data_desligamento).getTime();
+        if (dataDiaria > desligamento) return false;
+      }
+      
+      return true;
+    });
+
+    return filteredData;
   },
 
   // Storage
@@ -1669,7 +1685,7 @@ export const api = {
         quantidade,
         valor_unitario,
         valor_total,
-        compra:compras_materiais!inner(id, data_compra, fornecedor, obra_id, obra:obras(nome),
+        compra:compras_materiais!inner(id, data_compra, fornecedor, obra_id, obra:obras(nome)),
         material:materiais!inner(id, nome, unidade, categoria_id, category:material_categories(nome))
       `);
 

@@ -10,6 +10,8 @@ export interface Usuario {
 export interface Obra {
   id: string;
   nome: string;
+  ativo?: boolean;
+  parent_obra_id?: string | null;
 }
 
 export interface Funcao {
@@ -32,6 +34,8 @@ export interface Funcionario {
   conta?: string | null;
   chave_pix?: string | null;
   observacao_pagamento?: string | null;
+  data_admissao?: string | null;
+  data_desligamento?: string | null;
   funcao?: Funcao;
   obra?: Obra;
 }

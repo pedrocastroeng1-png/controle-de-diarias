@@ -1,10 +1,25 @@
 with open('src/lib/types.ts', 'r') as f:
-    content = f.read()
+    code = f.read()
 
-content = content.replace(
-    'presente: boolean;',
-    'presente: boolean;\n  meia_diaria?: boolean;'
-)
+old_code = """  tipo_conta?: "CONTA CORRENTE" | "CONTA POUPANÇA" | null;
+  conta?: string | null;
+  chave_pix?: string | null;
+  observacao_pagamento?: string | null;
+  funcao?: Funcao;
+  obra?: Obra;
+}"""
+
+new_code = """  tipo_conta?: "CONTA CORRENTE" | "CONTA POUPANÇA" | null;
+  conta?: string | null;
+  chave_pix?: string | null;
+  observacao_pagamento?: string | null;
+  data_admissao?: string | null;
+  data_desligamento?: string | null;
+  funcao?: Funcao;
+  obra?: Obra;
+}"""
+
+code = code.replace(old_code, new_code)
 
 with open('src/lib/types.ts', 'w') as f:
-    f.write(content)
+    f.write(code)

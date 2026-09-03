@@ -96,18 +96,35 @@ export default function PresencaPage() {
     setSavedSuccess(false);
     setErro("");
 
+    let funcsRaw: Funcionario[] = [];
     let funcs: Funcionario[] = [];
+    let presencasData: any[] = [];
     try {
-      funcs = await api.getFuncionarios("ativos", true);
+      funcsRaw = await api.getFuncionarios("todos", true);
+      presencasData = await api.getPresencas(selectedDate);
+      
+      const presencasIds = new Set(presencasData.map((p) => p.funcionario_id));
+      
+      funcs = funcsRaw.filter(f => {
+        if (presencasIds.has(f.id)) return true;
+        
+        if (f.data_admissao && selectedDate < f.data_admissao) return false;
+        
+        if (!f.ativo) {
+            if (f.data_desligamento && selectedDate > f.data_desligamento) return false;
+            if (!f.data_desligamento) return false;
+        }
+        
+        return true;
+      });
       setFuncionarios(funcs);
     } catch (error) {
-      setErro("Ocorreu um erro ao carregar a lista de funcionários.");
+      setErro("Ocorreu um erro ao carregar os dados.");
       setLoading(false);
       return;
     }
 
     try {
-      const presencasData = await api.getPresencas(selectedDate);
 
       let atestados: any[] = [];
       try {

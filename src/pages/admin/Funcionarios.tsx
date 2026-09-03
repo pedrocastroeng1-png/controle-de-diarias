@@ -254,8 +254,13 @@ export default function Funcionarios() {
               required
             >
               <option value="" disabled>Selecione</option>
-              {obras.map(o => (
-                <option key={o.id} value={o.id}>{o.nome}</option>
+              {obras.filter(o => !o.parent_obra_id).map(o => (
+                <optgroup key={o.id} label={o.nome}>
+                  <option value={o.id}>{o.nome} (Principal)</option>
+                  {obras.filter(sub => sub.parent_obra_id === o.id).map(sub => (
+                    <option key={sub.id} value={sub.id}>- {sub.nome}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
