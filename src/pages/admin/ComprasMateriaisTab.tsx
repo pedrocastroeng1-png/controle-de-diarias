@@ -22,6 +22,9 @@ export default function ComprasMateriaisTab() {
   const [obras, setObras] = useState<any[]>([]);
   const [materiais, setMateriais] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
+  const [fornecedores, setFornecedores] = useState<any[]>([]);
+  const [showFornecedorModal, setShowFornecedorModal] = useState(false);
+  const [novoFornecedorNome, setNovoFornecedorNome] = useState('');
   
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -31,6 +34,8 @@ export default function ComprasMateriaisTab() {
     data_compra: format(new Date(), 'yyyy-MM-dd'),
     obra_id: '',
     fornecedor: '',
+      fornecedor_id: '',
+    fornecedor_id: '',
     numero_recibo: '',
     observacao: ''
   });
@@ -47,16 +52,18 @@ export default function ComprasMateriaisTab() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [comprasData, obrasData, materiaisData, categoriasData] = await Promise.all([
+      const [comprasData, obrasData, materiaisData, categoriasData, fornecedoresData] = await Promise.all([
         api.getComprasMateriais(),
         api.getObras(),
         api.getMateriais(),
-        api.getMaterialCategories()
+        api.getMaterialCategories(),
+        api.getFornecedores({ ativo: true })
       ]);
       setCompras(comprasData);
       setObras(obrasData);
       setMateriais(materiaisData);
       setCategorias(categoriasData);
+      setFornecedores(fornecedoresData);
     } catch (err: any) {
       setError(err.message || 'Erro ao carregar dados');
     } finally {
@@ -69,6 +76,8 @@ export default function ComprasMateriaisTab() {
       data_compra: format(new Date(), 'yyyy-MM-dd'),
       obra_id: '',
       fornecedor: '',
+      fornecedor_id: '',
+    fornecedor_id: '',
       numero_recibo: '',
       observacao: ''
     });
@@ -190,7 +199,7 @@ export default function ComprasMateriaisTab() {
   // LIST VIEW
   if (view === 'list') {
     const filteredCompras = compras.filter(c => 
-      c.fornecedor?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.fornecedor_rel?.nome || c.fornecedor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.obra?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.numero_recibo?.toLowerCase().includes(searchTerm.toLowerCase())
     );
@@ -246,7 +255,7 @@ export default function ComprasMateriaisTab() {
                         {compra.obra?.nome || 'N/A'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {compra.fornecedor || '-'}
+                        {compra.fornecedor_rel?.nome || compra.fornecedor || '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(compra.total_calculado)}
@@ -298,7 +307,7 @@ export default function ComprasMateriaisTab() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Fornecedor</p>
-              <p className="text-base text-gray-900 mt-1">{selectedCompra.fornecedor || '-'}</p>
+              <p className="text-base text-gray-900 mt-1">{selectedCompra.fornecedor_rel?.nome || selectedCompra.fornecedor || '-'}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Nº do Recibo</p>
@@ -411,13 +420,29 @@ export default function ComprasMateriaisTab() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor</label>
-            <input
-              type="text"
-              placeholder="Nome do fornecedor ou loja"
-              value={compraForm.fornecedor}
-              onChange={e => setCompraForm({...compraForm, fornecedor: e.target.value})}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-            />
+            <div className="flex gap-2">
+              <select
+                value={compraForm.fornecedor_id}
+                onChange={e => {
+                  const f = fornecedores.find(x => x.id === e.target.value);
+                  setCompraForm({ ...compraForm, fornecedor_id: e.target.value, fornecedor: f ? f.nome : '' });
+                }}
+                className="flex-1 rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="">Selecione ou adicione...</option>
+                {fornecedores.map(f => (
+                  <option key={f.id} value={f.id}>{f.nome}</option>
+                ))}
+              </select>
+              <button 
+                type="button" 
+                onClick={() => setShowFornecedorModal(true)}
+                className="bg-gray-100 text-gray-700 p-2 rounded-lg hover:bg-gray-200 border border-gray-300"
+                title="Cadastrar Novo Fornecedor"
+              >
+                <Plus className="w-5 h-5" />
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Nº do Recibo / NFe</label>

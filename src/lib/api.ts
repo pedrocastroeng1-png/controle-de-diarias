@@ -1626,7 +1626,7 @@ export const api = {
       supabase.from("compras_materiais"),
     )
       .select(
-        "*, obra:obras(nome), registrador:usuarios!registrado_por(usuario), itens:compras_materiais_itens(valor_total)",
+        "*, obra:obras(nome), fornecedor_rel:fornecedores(nome), registrador:usuarios!registrado_por(usuario), itens:compras_materiais_itens(valor_total)",
       )
       .order("data_compra", { ascending: false })
       .order("created_at", { ascending: false });
@@ -1648,7 +1648,7 @@ export const api = {
       supabase.from("compras_materiais"),
     )
       .select(
-        "*, obra:obras(nome), registrador:usuarios!registrado_por(usuario)",
+        "*, obra:obras(nome), fornecedor_rel:fornecedores(nome), registrador:usuarios!registrado_por(usuario)",
       )
       .eq("id", compraId)
       .single();
@@ -1803,4 +1803,40 @@ export const api = {
 
     return compra;
   },
+
+  // --- FORNECEDORES ---
+  getFornecedores: async (filtros?: { ativo?: boolean }): Promise<any[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    let query = withEmpresa(supabase.from("fornecedores")).select("*").order("nome", { ascending: true });
+    
+    if (filtros && filtros.ativo !== undefined) {
+      query = query.eq("ativo", filtros.ativo);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+  getFornecedor: async (id: string): Promise<any> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(supabase.from("fornecedores")).select("*").eq("id", id).single();
+    if (error) throw error;
+    return data;
+  },
+  createFornecedor: async (fornecedor: any): Promise<any> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await supabase.from("fornecedores").insert(addEmpresaId(fornecedor)).select().single();
+    if (error) throw error;
+    return data;
+  },
+  updateFornecedor: async (id: string, fornecedor: any): Promise<any> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { data, error } = await withEmpresa(supabase.from("fornecedores")).update(fornecedor).eq("id", id).select().single();
+    if (error) throw error;
+    return data;
+  },
+  toggleFornecedorStatus: async (id: string, ativo: boolean): Promise<void> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    const { error } = await withEmpresa(supabase.from("fornecedores")).update({ ativo }).eq("id", id);
+  }
 };

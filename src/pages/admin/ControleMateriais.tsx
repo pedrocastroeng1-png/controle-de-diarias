@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Package, ShoppingCart, FileText, Database, LayoutDashboard } from 'lucide-react';
+import { Package, ShoppingCart, FileText, Database, LayoutDashboard, Truck } from 'lucide-react';
 import ComprasMateriaisTab from './ComprasMateriaisTab';
 import RelatoriosMateriaisTab from './RelatoriosMateriaisTab';
 import PainelMateriaisTab from './PainelMateriaisTab';
+import FornecedoresTab from './FornecedoresTab';
 
 export default function ControleMateriais() {
   const { usuario } = useAuth();
@@ -44,6 +45,17 @@ export default function ControleMateriais() {
               <ShoppingCart className="w-4 h-4" />
               Entradas (Compras)
             </button>
+            <button
+              onClick={() => setActiveTab('fornecedores')}
+              className={`flex items-center gap-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                activeTab === 'fornecedores' 
+                  ? 'border-blue-500 text-blue-700 bg-blue-50/50' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Truck className="w-4 h-4" />
+              Fornecedores
+            </button>
             {isAdmin && (
               <button
                 onClick={() => setActiveTab('relatorios')}
@@ -63,6 +75,7 @@ export default function ControleMateriais() {
         <div className="p-6 bg-gray-50/30 min-h-[500px]">
           {activeTab === 'painel' && <PainelMateriaisTab />}
           {activeTab === 'compras' && <ComprasMateriaisTab />}
+          {activeTab === 'fornecedores' && <FornecedoresTab />}
           {activeTab === 'relatorios' && isAdmin && <RelatoriosMateriaisTab />}
         </div>
       </div>
