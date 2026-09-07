@@ -13,7 +13,7 @@ import {
   AtestadoMedico,
 } from "./types";
 
-const getEmpresaId = () => {
+export const getEmpresaId = () => {
   try {
     const userStr = localStorage.getItem("@diarias:usuario");
     if (userStr) {
@@ -23,7 +23,7 @@ const getEmpresaId = () => {
   return null;
 };
 
-const withEmpresa = (query: any, isAuth = false) => {
+export const withEmpresa = (query: any, isAuth = false) => {
   const empId = getEmpresaId();
   if (empId && !isAuth) {
     if (typeof query.eq !== "function") {

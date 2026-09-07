@@ -281,3 +281,109 @@ export interface MaterialQuantityRow {
   quantidade_total: number;
   registros: MaterialQuantityDetail[];
 }
+
+export type MaterialMovimentacaoTipo = 'ENTRADA' | 'SAIDA' | 'PERDA' | 'TRANSFERENCIA' | 'AJUSTE_ENTRADA' | 'AJUSTE_SAIDA';
+
+export interface MaterialMovimentacao {
+  id: string;
+  empresa_id: string;
+  material_id: string;
+  obra_id: string;
+  tipo: MaterialMovimentacaoTipo;
+  quantidade: number;
+  data_movimento: string;
+  obra_destino_id?: string;
+  compra_item_id?: string;
+  valor_unitario?: number;
+  motivo?: string;
+  observacao?: string;
+  registrado_por: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface VwEstoqueMateriais {
+  empresa_id: string;
+  obra_id: string;
+  obra: string;
+  parent_obra_id: string | null;
+  obra_principal_id: string | null;
+  obra_principal: string | null;
+  material_id: string;
+  material: string;
+  unidade: string;
+  categoria_id: string;
+  categoria: string;
+  entradas: number;
+  saidas: number;
+  saldo: number;
+  status_estoque: 'POSITIVO' | 'ZERADO' | 'NEGATIVO';
+}
+
+export interface VwEstoqueMateriaisConsolidado {
+  empresa_id: string;
+  obra_principal_id: string;
+  obra_principal: string;
+  material_id: string;
+  material: string;
+  unidade: string;
+  categoria_id: string;
+  categoria: string;
+  entradas: number;
+  saidas: number;
+  saldo: number;
+  status_estoque: 'POSITIVO' | 'ZERADO' | 'NEGATIVO';
+}
+
+export interface VwMovimentacoesMateriais {
+  id: string;
+  empresa_id: string;
+  material_id: string;
+  material: string;
+  categoria_id: string;
+  categoria: string;
+  unidade: string;
+  obra_id: string;
+  obra: string;
+  parent_obra_id: string | null;
+  obra_principal_id: string | null;
+  obra_principal: string | null;
+  obra_destino_id: string | null;
+  obra_destino: string | null;
+  tipo: MaterialMovimentacaoTipo;
+  quantidade: number;
+  valor_unitario: number | null;
+  valor_total: number | null;
+  data_movimento: string;
+  motivo: string | null;
+  observacao: string | null;
+  registrado_por: string;
+  usuario_registro: string;
+  compra_item_id: string | null;
+  created_at: string;
+}
+
+export interface VwRelatorioComprasMateriais {
+  compra_id: string;
+  item_id: string;
+  empresa_id: string;
+  data_compra: string;
+  obra_id: string;
+  obra: string;
+  parent_obra_id: string | null;
+  obra_principal_id: string | null;
+  obra_principal: string | null;
+  fornecedor: string | null;
+  numero_recibo: string | null;
+  material_id: string;
+  material: string;
+  categoria_id: string;
+  categoria: string;
+  unidade: string;
+  quantidade: number;
+  valor_unitario: number;
+  valor_total: number;
+  registrado_por: string;
+  usuario_registro: string;
+  created_at: string;
+}
