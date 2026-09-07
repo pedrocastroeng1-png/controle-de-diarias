@@ -1,22 +1,21 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { Package, ShoppingCart, ArrowRightLeft, FileText, Database } from 'lucide-react';
+import { Package, ShoppingCart, FileText, Database, LayoutDashboard } from 'lucide-react';
 import ComprasMateriaisTab from './ComprasMateriaisTab';
-import EstoqueMateriaisTab from './EstoqueMateriaisTab';
-import MovimentacoesMateriaisTab from './MovimentacoesMateriaisTab';
 import RelatoriosMateriaisTab from './RelatoriosMateriaisTab';
+import PainelMateriaisTab from './PainelMateriaisTab';
 
 export default function ControleMateriais() {
   const { usuario } = useAuth();
   const isAdmin = usuario?.perfil === 'ADMIN';
-  const [activeTab, setActiveTab] = useState('estoque');
+  const [activeTab, setActiveTab] = useState('painel');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
           <Package className="w-8 h-8 text-blue-600" />
-          Controle de Materiais
+          Gestão e Destinação de Materiais
         </h1>
       </div>
 
@@ -24,15 +23,15 @@ export default function ControleMateriais() {
         <div className="border-b border-gray-200 bg-gray-50/50">
           <nav className="flex overflow-x-auto">
             <button
-              onClick={() => setActiveTab('estoque')}
+              onClick={() => setActiveTab('painel')}
               className={`flex items-center gap-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'estoque' 
+                activeTab === 'painel' 
                   ? 'border-blue-500 text-blue-700 bg-blue-50/50' 
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
               }`}
             >
-              <Database className="w-4 h-4" />
-              Estoque
+              <LayoutDashboard className="w-4 h-4" />
+              Painel Gerencial
             </button>
             <button
               onClick={() => setActiveTab('compras')}
@@ -43,18 +42,7 @@ export default function ControleMateriais() {
               }`}
             >
               <ShoppingCart className="w-4 h-4" />
-              Compras
-            </button>
-            <button
-              onClick={() => setActiveTab('movimentacoes')}
-              className={`flex items-center gap-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'movimentacoes' 
-                  ? 'border-blue-500 text-blue-700 bg-blue-50/50' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              <ArrowRightLeft className="w-4 h-4" />
-              Movimentações
+              Entradas (Compras)
             </button>
             {isAdmin && (
               <button
@@ -66,16 +54,15 @@ export default function ControleMateriais() {
                 }`}
               >
                 <FileText className="w-4 h-4" />
-                Relatórios
+                Relatórios & Exportação
               </button>
             )}
           </nav>
         </div>
         
         <div className="p-6 bg-gray-50/30 min-h-[500px]">
-          {activeTab === 'estoque' && <EstoqueMateriaisTab />}
+          {activeTab === 'painel' && <PainelMateriaisTab />}
           {activeTab === 'compras' && <ComprasMateriaisTab />}
-          {activeTab === 'movimentacoes' && <MovimentacoesMateriaisTab />}
           {activeTab === 'relatorios' && isAdmin && <RelatoriosMateriaisTab />}
         </div>
       </div>
