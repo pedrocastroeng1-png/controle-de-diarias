@@ -660,6 +660,8 @@ export default function Relatorios() {
     doc.save(`relatorio_diario_${targetDate}.pdf`);
   };
 
+  const handlePrint = () => { window.print(); };
+
   const handleExportExcel = async () => {
     try {
       const obraNome = obras.find(o => o.id === obraId)?.nome || 'Todas as Obras';
