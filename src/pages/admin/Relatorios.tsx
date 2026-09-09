@@ -1032,7 +1032,6 @@ export default function Relatorios() {
           };
         }
         
-        if (p.eh_clt || p.tipo_colaborador === "CLT") return;
         let pStatus = '✘ Faltou';
         if (row.status === 'ATESTADO MÉDICO') pStatus = '🩺 Atestado';
         else if (row.status === 'PRESENTE') pStatus = '✔ Presente';
