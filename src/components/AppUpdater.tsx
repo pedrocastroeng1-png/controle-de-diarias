@@ -41,7 +41,7 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
         }
       }
     } catch (e) {
-      console.error('Failed to check version:', e);
+      // console.warn('Failed to check version:', e);
     } finally {
       setIsChecking(false);
     }
