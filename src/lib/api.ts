@@ -573,6 +573,53 @@ export const api = {
     return data || [];
   },
 
+  
+  getFolhaDiarias: async (
+    dataInicial?: string,
+    dataFinal?: string,
+    obraId?: string,
+  ): Promise<any[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    let query = supabase.from("vw_folha_diarias").select("*");
+    
+    if (dataInicial) {
+      query = query.gte("data", dataInicial);
+    }
+    if (dataFinal) {
+      query = query.lte("data", dataFinal);
+    }
+    if (obraId) {
+      query = query.eq("obra_id", obraId);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
+  getRelatorioCLT: async (
+    dataInicial?: string,
+    dataFinal?: string,
+    obraId?: string,
+  ): Promise<any[]> => {
+    if (!supabase) throw new Error("Supabase não configurado");
+    let query = supabase.from("vw_relatorio_funcionarios_clt").select("*");
+    
+    if (dataInicial) {
+      query = query.gte("data", dataInicial);
+    }
+    if (dataFinal) {
+      query = query.lte("data", dataFinal);
+    }
+    if (obraId) {
+      query = query.eq("obra_id", obraId);
+    }
+    
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  },
+
   getRelatorio: async (
     dataInicial?: string,
     dataFinal?: string,

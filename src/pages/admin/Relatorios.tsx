@@ -166,7 +166,7 @@ export default function Relatorios() {
       }
     });
 
-    return Object.values(agrupado).sort((a, b) => a.nome.localeCompare(b.nome));
+    return Object.values(agrupado).filter((a: any) => a.total > 0 || a.dias > 0).sort((a, b) => a.nome.localeCompare(b.nome));
   };
 
   const relatorioAgrupado = agruparPorFuncionario().filter(item => 
@@ -662,14 +662,46 @@ export default function Relatorios() {
 
   const handleExportExcel = async () => {
     try {
-      const workbook = new ExcelJS.Workbook();
-      
       const obraNome = obras.find(o => o.id === obraId)?.nome || 'Todas as Obras';
       const periodStr = dataInicial && dataFinal 
         ? `${format(parseISO(dataInicial), 'dd/MM/yyyy')} até ${format(parseISO(dataFinal), 'dd/MM/yyyy')}`
         : 'Todos os períodos';
 
-      // 1. _BD Worksheet (Hidden)
+      // Fetch from new views
+      const obraSelecionada = obras.find(o => o.id === obraId)?.nome || '';
+      const folhaData = await api.getFolhaDiarias(dataInicial, dataFinal, obraSelecionada);
+      const cltData = await api.getRelatorioCLT(dataInicial, dataFinal, obraSelecionada);
+
+      // Group DIARISTAS
+      const diaristasMap: Record<string, any> = {};
+      folhaData.forEach((p: any) => {
+        const fId = p.funcionario_id || p.funcionario;
+        if (p.eh_clt || p.tipo_colaborador === "CLT") return;
+        if (!fId) return;
+        if (!diaristasMap[fId]) {
+          diaristasMap[fId] = {
+            id: fId,
+            nome: p.funcionario || '',
+            funcao: p.funcao || '',
+            obra: p.obra || '',
+            dias: 0,
+            valorDiaria: Number(p.valor_diaria) || 0,
+            total: 0
+          };
+        }
+        let rowValor = Number(p.valor_calculado) || Number(p.valor_diaria) || 0;
+        if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO' || p.status === 'MEIA_DIARIA' || p.tipo_diaria === 'MEIA_DIARIA' || p.status === 'MEIA DIÁRIA') {
+          diaristasMap[fId].dias += 1;
+          diaristasMap[fId].total += rowValor;
+        }
+      });
+      const diaristasAgrupado = Object.values(diaristasMap).filter((a: any) => a.total > 0 || a.dias > 0).sort((a, b) => a.nome.localeCompare(b.nome));
+      const valorTotal = diaristasAgrupado.reduce((acc, curr) => acc + curr.total, 0);
+      const totaisDias = diaristasAgrupado.reduce((acc, curr) => acc + curr.dias, 0);
+
+      const workbook = new ExcelJS.Workbook();
+      
+      // 1. _BD Worksheet (Hidden) - ONLY DIARISTAS
       const wsBD = workbook.addWorksheet('_BD', { state: 'hidden' });
       wsBD.columns = [
         { header: 'HelperID', key: 'helper', width: 20 },
@@ -684,10 +716,10 @@ export default function Relatorios() {
         { header: 'Valor Calculado', key: 'valor', width: 15 }
       ];
 
-      const relatorioOrdenado = [...relatorio].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+      const folhaOrdenada = [...folhaData].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
       
-      relatorioOrdenado.forEach((p) => {
-        const funcName = p.funcionario_nome || p.funcionario || '';
+      folhaOrdenada.forEach((p) => {
+        if (p.eh_clt || p.tipo_colaborador === "CLT") return;
         let pStatus = '✘ Faltou';
         if (p.status === 'ATESTADO MÉDICO') pStatus = '🩺 Atestado Médico';
         else if (p.status === 'PRESENTE' && p.tipo_diaria === 'MEIA_DIARIA') pStatus = '🌗 Meia Diária';
@@ -696,15 +728,15 @@ export default function Relatorios() {
         
         wsBD.addRow({
           helper: '', 
-          funcionario: funcName,
+          funcionario: p.funcionario || '',
           funcao: p.funcao || '',
-          obra: p.obra_nome || p.obra || '',
+          obra: p.obra || '',
           data: p.data ? format(parseISO(p.data), 'dd/MM/yyyy') : '',
           status: pStatus,
           tipo_diaria: p.tipo_diaria === 'MEIA_DIARIA' ? 'Meia Diária' : 'Diária',
           percentual: (p.percentual_diaria || (p.tipo_diaria === 'MEIA_DIARIA' ? 50 : 100)) + '%',
-          valor_base: Number(p.valor_diaria) || Number(p.valorDiaria) || 0,
-          valor: Number(p.valor_calculado) || Number(p.valor_diaria) || Number(p.valorDiaria) || 0
+          valor_base: Number(p.valor_diaria) || 0,
+          valor: Number(p.valor_calculado) || Number(p.valor_diaria) || 0
         });
       });
       
@@ -714,14 +746,14 @@ export default function Relatorios() {
         }
       });
 
-      const sortedFuncs = relatorioAgrupado.map(f => f.nome).sort();
+      const sortedFuncs = diaristasAgrupado.map(f => f.nome);
       wsBD.getCell('J1').value = 'UniqueNames';
       sortedFuncs.forEach((name, idx) => {
         wsBD.getCell(`J${idx + 2}`).value = name;
       });
 
-      // 2. Resumo Worksheet
-      const wsResumo = workbook.addWorksheet('Resumo');
+      // 2. TOTAL DIARIAS Worksheet (was Resumo)
+      const wsResumo = workbook.addWorksheet('TOTAL DIARIAS');
       
       wsResumo.mergeCells('A1:F1');
       const cellA1 = wsResumo.getCell('A1');
@@ -753,7 +785,7 @@ export default function Relatorios() {
       wsResumo.mergeCells('B6:C6');
       wsResumo.getCell('B6').value = 'Quantidade de Funcionários';
       wsResumo.mergeCells('B7:C7');
-      wsResumo.getCell('B7').value = relatorioAgrupado.length;
+      wsResumo.getCell('B7').value = diaristasAgrupado.length;
       
       wsResumo.getCell('D6').value = 'Total de Diárias';
       wsResumo.getCell('D7').value = totaisDias;
@@ -771,6 +803,7 @@ export default function Relatorios() {
         cell.alignment = { vertical: 'middle', horizontal: 'center' };
         cell.border = { top: { style: 'thin', color: { argb: 'FFD1D5DB' } }, left: { style: 'thin', color: { argb: 'FFD1D5DB' } }, right: { style: 'thin', color: { argb: 'FFD1D5DB' } } };
       });
+
       ['B7','D7','E7'].forEach(col => {
         const cell = wsResumo.getCell(col);
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
@@ -793,7 +826,7 @@ export default function Relatorios() {
         { key: 'total', width: 20 }
       ];
 
-      relatorioAgrupado.forEach((f, index) => {
+      diaristasAgrupado.forEach((f, index) => {
         const row = wsResumo.addRow([
           f.nome,
           f.funcao,
@@ -819,12 +852,12 @@ export default function Relatorios() {
         });
       });
 
-      wsResumo.autoFilter = `A${startRow}:F${startRow + relatorioAgrupado.length}`;
+      wsResumo.autoFilter = `A${startRow}:F${startRow + diaristasAgrupado.length}`;
       wsResumo.views = [{ state: 'frozen', ySplit: startRow }];
 
-      const summaryRowStart = startRow + relatorioAgrupado.length + 2;
+      const summaryRowStart = startRow + diaristasAgrupado.length + 2;
       wsResumo.getCell(`A${summaryRowStart}`).value = 'Quantidade de Funcionários';
-      wsResumo.getCell(`B${summaryRowStart}`).value = relatorioAgrupado.length;
+      wsResumo.getCell(`B${summaryRowStart}`).value = diaristasAgrupado.length;
       wsResumo.getCell(`A${summaryRowStart + 1}`).value = 'Total de Diárias';
       wsResumo.getCell(`B${summaryRowStart + 1}`).value = totaisDias;
       wsResumo.getCell(`A${summaryRowStart + 2}`).value = 'Valor Total da Folha';
@@ -838,10 +871,11 @@ export default function Relatorios() {
         wsResumo.getCell(`B${summaryRowStart+i}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEFF6FF' } };
       }
 
-      // 3. Funcionário Worksheet
-      const wsFunc = workbook.addWorksheet('Funcionário');
+      // 3. DIARISTAS Worksheet (was Funcionário)
+      const wsFunc = workbook.addWorksheet('DIARISTAS');
       wsFunc.columns = [
         { width: 5 },
+        { width: 25 },
         { width: 25 },
         { width: 35 },
         { width: 20 },
@@ -872,22 +906,18 @@ export default function Relatorios() {
 
       wsFunc.getCell('B6').value = 'Nome:';
       wsFunc.getCell('C6').value = { formula: 'C4', result: '' };
-
       wsFunc.getCell('B7').value = 'Função:';
-      wsFunc.getCell('C7').value = { formula: `IFERROR(VLOOKUP(C4, Resumo!A:F, 2, FALSE), "")`, result: '' };
-
+      wsFunc.getCell('C7').value = { formula: `IFERROR(VLOOKUP(C4, 'TOTAL DIARIAS'!A:F, 2, FALSE), "")`, result: '' };
       wsFunc.getCell('B8').value = 'Obra:';
-      wsFunc.getCell('C8').value = { formula: `IFERROR(VLOOKUP(C4, Resumo!A:F, 3, FALSE), "")`, result: '' };
+      wsFunc.getCell('C8').value = { formula: `IFERROR(VLOOKUP(C4, 'TOTAL DIARIAS'!A:F, 3, FALSE), "")`, result: '' };
 
       wsFunc.getCell('B10').value = 'Valor da Diária';
-      wsFunc.getCell('B11').value = { formula: `IFERROR(VLOOKUP(C4, Resumo!A:F, 4, FALSE), 0)`, result: 0 };
+      wsFunc.getCell('B11').value = { formula: `IFERROR(VLOOKUP(C4, 'TOTAL DIARIAS'!A:F, 4, FALSE), 0)`, result: 0 };
       wsFunc.getCell('B11').numFmt = '"R$" #,##0.00';
-
       wsFunc.getCell('C10').value = 'Dias Trabalhados';
-      wsFunc.getCell('C11').value = { formula: `IFERROR(VLOOKUP(C4, Resumo!A:F, 5, FALSE), 0)`, result: 0 };
-
+      wsFunc.getCell('C11').value = { formula: `IFERROR(VLOOKUP(C4, 'TOTAL DIARIAS'!A:F, 5, FALSE), 0)`, result: 0 };
       wsFunc.getCell('D10').value = 'Valor Total Recebido';
-      wsFunc.getCell('D11').value = { formula: `IFERROR(VLOOKUP(C4, Resumo!A:F, 6, FALSE), 0)`, result: 0 };
+      wsFunc.getCell('D11').value = { formula: `IFERROR(VLOOKUP(C4, 'TOTAL DIARIAS'!A:F, 6, FALSE), 0)`, result: 0 };
       wsFunc.getCell('D11').numFmt = '"R$" #,##0.00';
 
       ['B10', 'C10', 'D10'].forEach(col => {
@@ -923,21 +953,132 @@ export default function Relatorios() {
 
       for(let i = 1; i <= 31; i++) {
         const rowNum = 15 + i;
-        wsFunc.getCell(`B${rowNum}`).value = { formula: `IFERROR(INDEX(_BD!F:F, MATCH($C$4 & ${i}, _BD!A:A, 0)), "")`, result: '' };
-        wsFunc.getCell(`C${rowNum}`).value = { formula: `IFERROR(INDEX(_BD!G:G, MATCH($C$4 & ${i}, _BD!A:A, 0)), "")`, result: '' };
+        wsFunc.getCell(`B${rowNum}`).value = { formula: `IFERROR(INDEX(_BD!E:E, MATCH($C$4 & ${i}, _BD!A:A, 0)), "")`, result: '' };
+        wsFunc.getCell(`C${rowNum}`).value = { formula: `IFERROR(INDEX(_BD!F:F, MATCH($C$4 & ${i}, _BD!A:A, 0)), "")`, result: '' };
       }
 
+      // 4. FUNCIONARIO CLT Worksheet
+      const wsCLT = workbook.addWorksheet('FUNCIONARIO CLT');
+      
+      wsCLT.mergeCells('A1:J1');
+      const cellCLT1 = wsCLT.getCell('A1');
+      cellCLT1.value = `${empresa?.nome || "PCEG"} - RELATÓRIO DE FREQUÊNCIA CLT`;
+      cellCLT1.font = { size: 16, bold: true, color: { argb: 'FFFFFFFF' } };
+      cellCLT1.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1E3A8A' } };
+      cellCLT1.alignment = { vertical: 'middle', horizontal: 'center' };
+      
+      wsCLT.mergeCells('A2:J2');
+      const cellCLT2 = wsCLT.getCell('A2');
+      cellCLT2.value = `Período: ${periodStr} ${obraId ? '| Obra: ' + obraNome : ''}`;
+      cellCLT2.font = { size: 12, italic: true };
+      cellCLT2.alignment = { vertical: 'middle', horizontal: 'center' };
+      
+      // Calculate distinct dates for columns (Monday to Friday only)
+      const dateSet = new Set<string>();
+      cltData.forEach((row: any) => {
+        if (row.data) {
+          const d = parseISO(row.data);
+          const day = d.getUTCDay(); // 0 is Sunday, 6 is Saturday
+          if (day !== 0 && day !== 6) {
+            dateSet.add(row.data);
+          }
+        }
+      });
+      const distinctDates = Array.from(dateSet).sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
+      
+      const cltColumns: any[] = [
+        { header: 'Funcionário', key: 'funcionario', width: 35 },
+        { header: 'Função', key: 'funcao', width: 25 },
+        { header: 'Obra Principal', key: 'obra_principal', width: 25 },
+        { header: 'Sub-obra', key: 'subobra', width: 25 },
+      ];
+      
+      distinctDates.forEach(dateStr => {
+        const [y, m, day] = dateStr.split('-');
+        const d = new Date(Date.UTC(Number(y), Number(m) - 1, Number(day)));
+        const dayName = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'][d.getUTCDay()];
+        cltColumns.push({ 
+          header: `${dayName} - ${day}/${m}`, 
+          key: `date_${dateStr}`, 
+          width: 20 
+        });
+      });
+      
+      wsCLT.columns = cltColumns;
+      const cltHeaderRow = wsCLT.getRow(4);
+      cltHeaderRow.values = cltColumns.map(c => c.header);
+      cltHeaderRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+      cltHeaderRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+      
+      // Group CLT data by employee
+      const cltAgrupado: Record<string, any> = {};
+      cltData.forEach((row: any) => {
+        const d = parseISO(row.data);
+        const day = d.getUTCDay();
+        if (day === 0 || day === 6) return; // Skip weekends
+        
+        const fId = row.funcionario_id || row.funcionario;
+        if (!fId) return;
+        
+        if (!cltAgrupado[fId]) {
+          cltAgrupado[fId] = {
+            funcionario: row.funcionario || '',
+            funcao: row.funcao || '',
+            obra_principal: row.obra_principal || row.obra || '',
+            subobra: row.subobra || '',
+            presencas: {}
+          };
+        }
+        
+        if (p.eh_clt || p.tipo_colaborador === "CLT") return;
+        let pStatus = '✘ Faltou';
+        if (row.status === 'ATESTADO MÉDICO') pStatus = '🩺 Atestado';
+        else if (row.status === 'PRESENTE') pStatus = '✔ Presente';
+        else if (row.status === 'MEIA DIÁRIA' || row.status === 'MEIA_DIARIA') pStatus = '🌗 Meio Período';
+        
+        cltAgrupado[fId].presencas[row.data] = pStatus;
+      });
+      
+      const cltSorted = Object.values(cltAgrupado).sort((a, b) => a.funcionario.localeCompare(b.funcionario));
+      
+      cltSorted.forEach((f, idx) => {
+        const rowData: any = {
+          funcionario: f.funcionario,
+          funcao: f.funcao,
+          obra_principal: f.obra_principal,
+          subobra: f.subobra
+        };
+        
+        distinctDates.forEach(dateStr => {
+          rowData[`date_${dateStr}`] = f.presencas[dateStr] || '-';
+        });
+        
+        const row = wsCLT.addRow(rowData);
+        if (idx % 2 === 1) {
+          row.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF9FAFB' } };
+        }
+        row.eachCell((cell) => {
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            bottom: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            left: { style: 'thin', color: { argb: 'FFE5E7EB' } },
+            right: { style: 'thin', color: { argb: 'FFE5E7EB' } }
+          };
+        });
+      });
+      
+      wsCLT.autoFilter = `A4:${String.fromCharCode(65 + cltColumns.length - 1)}4`;
+      wsCLT.views = [{ state: 'frozen', ySplit: 4 }];
+
       const buffer = await workbook.xlsx.writeBuffer();
-      saveAs(new Blob([buffer]), `${getFileNameBase()}.xlsx`);
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      saveAs(blob, `Relatorio_Obras_${format(new Date(), 'dd_MM_yyyy')}.xlsx`);
     } catch (e) {
+      console.error(e);
       setErro('Ocorreu um erro ao exportar o Excel.');
     }
   };
-const handlePrint = () => {
-    window.print();
-  };
-
-  const handleExportPagamentosCaixa = () => {
+const handleExportPagamentosCaixa = () => {
     const doc = new jsPDF();
     const periodStr = (dataInicial && dataFinal) 
       ? `${format(parseISO(dataInicial), 'dd/MM/yyyy')} a ${format(parseISO(dataFinal), 'dd/MM/yyyy')}`
