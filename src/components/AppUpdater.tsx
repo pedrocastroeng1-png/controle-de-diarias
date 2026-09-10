@@ -18,7 +18,7 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
     needRefresh: [needRefresh, setNeedRefresh],
     updateServiceWorker,
   } = useRegisterSW({
-    onRegistered(r) {
+    onRegistered(r: any) {
       if (r) {
         setInterval(() => r.update(), 10 * 60 * 1000); // 10 mins
         document.addEventListener('visibilitychange', () => {
@@ -26,7 +26,7 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
         });
       }
     },
-    onRegisterError(error) {
+    onRegisterError(error: any) {
       console.error('SW registration error', error);
     },
   });

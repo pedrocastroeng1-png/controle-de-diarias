@@ -101,7 +101,7 @@ export default function PainelMateriaisTab() {
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
                 <XAxis type="number" tickFormatter={(val) => `R$ ${val/1000}k`} />
                 <YAxis type="category" dataKey="obra" width={150} tick={{fontSize: 12, fill: '#4B5563'}} />
-                <Tooltip formatter={(val: number) => formatCurrency(val)} />
+                <Tooltip formatter={(val: any) => formatCurrency(val)} />
                 <Bar dataKey="valor" radius={[0, 4, 4, 0]}>
                   {valorPorObra.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -120,7 +120,7 @@ export default function PainelMateriaisTab() {
                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E5E7EB" />
                 <XAxis type="number" tickFormatter={(val) => `R$ ${val/1000}k`} />
                 <YAxis type="category" dataKey="categoria" width={150} tick={{fontSize: 12, fill: '#4B5563'}} />
-                <Tooltip formatter={(val: number) => formatCurrency(val)} />
+                <Tooltip formatter={(val: any) => formatCurrency(val)} />
                 <Bar dataKey="valor" radius={[0, 4, 4, 0]}>
                   {valorPorCategoria.map((entry, index) => (
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

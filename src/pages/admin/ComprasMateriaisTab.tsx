@@ -25,6 +25,7 @@ export default function ComprasMateriaisTab() {
   const [materiais, setMateriais] = useState<any[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
   const [fornecedores, setFornecedores] = useState<any[]>([]);
+  const [funcionarios, setFuncionarios] = useState<any[]>([]);
   const [showFornecedorModal, setShowFornecedorModal] = useState(false);
   const [novoFornecedorNome, setNovoFornecedorNome] = useState('');
   
@@ -38,11 +39,22 @@ export default function ComprasMateriaisTab() {
     fornecedor: '',
       fornecedor_id: '',
     numero_recibo: '',
-    observacao: ''
-  });
+    });
+
   
   const [itensForm, setItensForm] = useState<any[]>([]);
   
+  useEffect(() => {
+    if (compraForm.obra_id) {
+      api.getFuncionariosPorObra(compraForm.obra_id).then(setFuncionarios).catch(console.error);
+    } else {
+      setFuncionarios([]);
+    }
+    
+    // Clear EPI employees when work changes
+    setItensForm(prev => prev.map(item => ({ ...item, funcionario_id: null })));
+  }, [compraForm.obra_id]);
+
   // Search
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -94,8 +106,8 @@ export default function ComprasMateriaisTab() {
       fornecedor: '',
       fornecedor_id: '',
       numero_recibo: '',
-      observacao: ''
-    });
+      });
+
     setItensForm([]);
     setFormError('');
     setFormSuccess('');
@@ -118,7 +130,7 @@ export default function ComprasMateriaisTab() {
   const addItem = () => {
     setItensForm([
       ...itensForm, 
-      { id: Date.now().toString(), categoria_id: '', material_id: '', quantidade: 1, valor_unitario: 0 }
+      { id: Date.now().toString(), categoria_id: '', material_id: '', quantidade: 1, valor_unitario: 0, funcionario_id: null }
     ]);
   };
 
@@ -129,6 +141,10 @@ export default function ComprasMateriaisTab() {
         // Reset material if category changes
         if (field === 'categoria_id') {
           updated.material_id = '';
+          const isEpi = categorias.find((c: any) => c.id === value)?.nome?.trim().toLowerCase() === 'epi';
+          if (!isEpi) {
+            updated.funcionario_id = null;
+          }
         }
         return updated;
       }
@@ -189,10 +205,16 @@ export default function ComprasMateriaisTab() {
       if (item.quantidade <= 0) return setFormError(`A quantidade do item ${i + 1} deve ser maior que zero.`);
       if (item.valor_unitario < 0) return setFormError(`O valor unitário do item ${i + 1} não pode ser negativo.`);
       
+      const isEpi = categorias.find((c: any) => c.id === item.categoria_id)?.nome?.trim().toLowerCase() === 'epi';
+      if (isEpi && !item.funcionario_id) {
+        return setFormError(`Para materiais EPI (Item ${i + 1}), selecione o funcionário.`);
+      }
+      
       itensValidos.push({
         material_id: item.material_id,
         quantidade: item.quantidade,
-        valor_unitario: item.valor_unitario
+        valor_unitario: item.valor_unitario,
+        funcionario_id: isEpi ? item.funcionario_id : null
       });
     }
 
@@ -339,10 +361,7 @@ export default function ComprasMateriaisTab() {
               <p className="text-sm font-medium text-gray-500">Nº do Recibo</p>
               <p className="text-base text-gray-900 mt-1">{selectedCompra.numero_recibo || '-'}</p>
             </div>
-            <div className="md:col-span-2 lg:col-span-4">
-              <p className="text-sm font-medium text-gray-500">Observação</p>
-              <p className="text-base text-gray-900 mt-1 whitespace-pre-wrap">{selectedCompra.observacao || '-'}</p>
-            </div>
+            
           </div>
           
           <div className="border-t border-gray-200 pt-6">
@@ -353,6 +372,7 @@ export default function ComprasMateriaisTab() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Funcionário</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qtd</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Unidade</th>
                     <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Valor Unit.</th>
@@ -365,6 +385,9 @@ export default function ComprasMateriaisTab() {
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         <div className="font-medium">{item.material?.nome}</div>
                         <div className="text-xs text-gray-500">{item.material?.category?.nome}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {item.funcionario?.nome || '-'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
                         {item.quantidade}
@@ -527,15 +550,7 @@ export default function ComprasMateriaisTab() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Observação</label>
-            <textarea
-              rows={2}
-              value={compraForm.observacao}
-              onChange={e => setCompraForm({...compraForm, observacao: e.target.value})}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
-            />
-          </div>
+          
         </div>
       </div>
 
@@ -577,6 +592,7 @@ export default function ComprasMateriaisTab() {
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
+                    
                     <div className="sm:col-span-3">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Categoria</label>
                       <select
@@ -585,13 +601,13 @@ export default function ComprasMateriaisTab() {
                         className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       >
                         <option value="">Categoria...</option>
-                        {categorias.map(c => (
+                        {categorias.map((c: any) => (
                           <option key={c.id} value={c.id}>{c.nome}</option>
                         ))}
                       </select>
                     </div>
                     
-                    <div className="sm:col-span-4">
+                    <div className="sm:col-span-3">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Produto *</label>
                       <select
                         required
@@ -601,11 +617,29 @@ export default function ComprasMateriaisTab() {
                         className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100"
                       >
                         <option value="">Produto...</option>
-                        {catMateriais.map(m => (
+                        {catMateriais.map((m: any) => (
                           <option key={m.id} value={m.id}>{m.nome}</option>
                         ))}
                       </select>
                     </div>
+
+                    {categorias.find((c: any) => c.id === item.categoria_id)?.nome?.trim().toLowerCase() === 'epi' && (
+                      <div className="sm:col-span-3">
+                        <label className="block text-xs font-medium text-gray-500 mb-1">Funcionário *</label>
+                        <select
+                          required
+                          value={item.funcionario_id || ''}
+                          onChange={e => updateItem(item.id, 'funcionario_id', e.target.value)}
+                          className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 bg-white"
+                        >
+                          <option value="">Selecione...</option>
+                          {funcionarios.map((f: any) => (
+                            <option key={f.id} value={f.id}>{f.nome}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     
                     <div className="sm:col-span-2 grid grid-cols-2 gap-2">
                       <div>

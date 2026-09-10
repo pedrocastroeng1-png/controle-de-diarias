@@ -128,7 +128,7 @@ export default function Communications() {
         const created = await api.createCommunication(payload);
         commId = created.id;
         if (payload.target_audience === 'OPERATOR' && payload.target_operator_id) {
-           await api.createCommunicationRecipient(commId, payload.target_operator_id);
+           await api.createCommunicationRecipient(commId, payload.target_operator_id as string);
         }
       }
 
@@ -287,13 +287,13 @@ export default function Communications() {
                       
                       <div className="flex items-center flex-wrap gap-4 mt-2 text-xs text-gray-500">
                         <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/> Criado em {format(parseISO(c.created_at), 'dd/MM/yyyy')}</span>
-                        {c.push_dispatch_status && (
-                          <span className={`flex items-center font-semibold ${c.push_dispatch_status === 'FAILED' ? 'text-red-500' : 'text-blue-600'}`}>
-                            {c.push_dispatch_status === 'QUEUED' && 'Push na fila...'}
-                            {c.push_dispatch_status === 'SENDING' && 'Enviando...'}
-                            {c.push_dispatch_status === 'SENT' && 'Push enviado'}
-                            {c.push_dispatch_status === 'PARTIAL' && 'Push parcialmente enviado'}
-                            {c.push_dispatch_status === 'FAILED' && 'Falha no Push'}
+                        {c.status && (
+                          <span className={`flex items-center font-semibold ${c.status === 'FAILED' ? 'text-red-500' : 'text-blue-600'}`}>
+                            {c.status === 'QUEUED' && 'Push na fila...'}
+                            {c.status === 'SENDING' && 'Enviando...'}
+                            {c.status === 'SENT' && 'Push enviado'}
+                            {c.status === 'PARTIAL' && 'Push parcialmente enviado'}
+                            {c.status === 'FAILED' && 'Falha no Push'}
                           </span>
                         )}
                         <span className="flex items-center">

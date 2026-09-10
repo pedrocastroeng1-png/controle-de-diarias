@@ -249,7 +249,7 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
                       <label key={dia.value} className="flex items-center gap-2 bg-white px-3 py-2 rounded-lg border border-slate-200 cursor-pointer hover:bg-slate-50">
                         <input
                           type="checkbox"
-                          checked={(formData.days_of_week || []).includes(dia.value)}
+                          checked={(formData.days_of_week || []).includes(dia.value as any)}
                           onChange={() => toggleArrayItem('days_of_week', dia.value)}
                           className="rounded text-blue-600 focus:ring-blue-500"
                         />

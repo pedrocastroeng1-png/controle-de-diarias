@@ -48,7 +48,7 @@ const addEmpresaId = (payload: any) => {
   const empId = getEmpresaId();
   if (!empId) return payload;
   if (Array.isArray(payload)) {
-    return payload.map((p) => ({ ...p, empresa_id: p.empresa_id || empId }));
+    return payload.map((p: any) => ({ ...p, empresa_id: p.empresa_id || empId }));
   }
   return { ...payload, empresa_id: payload.empresa_id || empId };
 };
@@ -97,7 +97,7 @@ export const api = {
     if (commsError) throw commsError;
 
     // Get all recipient records for this operator
-    const commIds = (comms || []).map((c) => c.id);
+    const commIds = (comms || []).map((c: any) => c.id);
     let reads: any[] = [];
     if (commIds.length > 0) {
       const { data, error: readsError } = await supabase
@@ -109,9 +109,9 @@ export const api = {
       reads = data || [];
     }
 
-    const recipientRecords = new Map(reads.map((r) => [r.communication_id, r]));
+    const recipientRecords = new Map(reads.map((r: any) => [r.communication_id, r]));
 
-    const validComms = (comms || []).filter((c) => {
+    const validComms = (comms || []).filter((c: any) => {
       // Check expiration
       if (c.expiration_date && c.expiration_date < today) return false;
 
@@ -827,7 +827,7 @@ export const api = {
     let presentesHoje = 0;
     let faltasHoje = 0;
     let valorTotalHoje = 0;
-    presencasHojeData?.forEach((p) => {
+    presencasHojeData?.forEach((p: any) => {
       if (p.presente) {
         presentesHoje++;
         let valor = Number((p.funcionario as any)?.funcao?.valor_diaria || 0);
@@ -859,11 +859,11 @@ export const api = {
       const { data: operators } = await query.eq("perfil", "OPERADOR");
 
       totalComms = communications?.length || 0;
-      readComms = recipients?.filter((r) => r.read_at)?.length || 0;
+      readComms = recipients?.filter((r: any) => r.read_at)?.length || 0;
       numOperators = operators?.length || 0;
 
       if (communications) {
-        communications.forEach((c) => {
+        communications.forEach((c: any) => {
           if (c.target_audience === "ALL") {
             totalExpectedReads += numOperators;
           } else {
@@ -1704,7 +1704,7 @@ export const api = {
     const { data: itens, error: itensError } = await withEmpresa(
       supabase.from("compras_materiais_itens"),
     )
-      .select("*, material:materiais(*, category:material_categories(*)")
+      .select("*, material:materiais(*, category:material_categories(*)), funcionario:funcionarios(nome)")
       .eq("compra_id", compraId);
     if (itensError) throw itensError;
 
