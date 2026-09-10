@@ -150,19 +150,25 @@ export default function ComprasMateriaisTab() {
     ]);
   };
 
-  const updateItem = (id: string, field: string, value: any) => {
-    setItensForm(itensForm.map(item => {
+    const updateItem = (id: string, fieldOrUpdates: string | any, value?: any) => {
+    setItensForm(prev => prev.map(item => {
       if (item.id === id) {
-        const updated = { ...item, [field]: value };
-        // Reset material if category changes
-        if (field === 'categoria_id') {
-          updated.material_id = '';
-          updated.produto_search = '';
-          updated.is_open = false;
-          const isEpi = categorias.find((c: any) => c.id === value)?.nome?.trim().toLowerCase() === 'epi';
-          if (!isEpi) {
-            updated.funcionario_id = null;
+        let updated = { ...item };
+        
+        if (typeof fieldOrUpdates === 'string') {
+          updated[fieldOrUpdates] = value;
+          // Reset material if category changes
+          if (fieldOrUpdates === 'categoria_id') {
+            updated.material_id = '';
+            updated.produto_search = '';
+            updated.is_open = false;
+            const isEpi = categorias.find((c: any) => c.id === value)?.nome?.trim().toLowerCase() === 'epi';
+            if (!isEpi) {
+              updated.funcionario_id = null;
+            }
           }
+        } else {
+          updated = { ...updated, ...fieldOrUpdates };
         }
         return updated;
       }
@@ -636,12 +642,10 @@ export default function ComprasMateriaisTab() {
                         placeholder={!item.categoria_id ? 'Selecione o tipo primeiro' : 'Digite para pesquisar...'}
                         value={item.produto_search || ''}
                         onChange={e => {
-                           updateItem(item.id, 'produto_search', e.target.value);
-                           updateItem(item.id, 'is_open', true);
-                           if (item.material_id) updateItem(item.id, 'material_id', '');
+                           updateItem(item.id, { produto_search: e.target.value, is_open: true, material_id: '' });
                         }}
                         onFocus={() => updateItem(item.id, 'is_open', true)}
-                        onBlur={() => setTimeout(() => updateItem(item.id, 'is_open', false), 200)}
+                        onBlur={() => updateItem(item.id, 'is_open', false)}
                         onKeyDown={e => {
                           if (e.key === 'Escape') {
                             updateItem(item.id, 'is_open', false);
@@ -652,8 +656,18 @@ export default function ComprasMateriaisTab() {
                       {item.is_open && item.categoria_id && (
                         <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
                           {(() => {
-                             const search = (item.produto_search || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
-                             const filtered = catMateriais.filter((m: any) => m.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(search));
+                             const normalizeSearchText = (text: string) => 
+                               (text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().replace(/\s+/g, ' ');
+                               
+                             const search = normalizeSearchText(item.produto_search || '');
+                             const tokens = search.split(' ').filter(Boolean);
+                             
+                             const filtered = catMateriais.filter((m: any) => {
+                               if (tokens.length === 0) return true; // Show all when empty
+                               const normalizedName = normalizeSearchText(m.nome);
+                               return tokens.every(token => normalizedName.includes(token));
+                             });
+                             
                              if (filtered.length === 0) {
                                return (
                                  <div className="p-2 text-sm text-gray-500">
@@ -666,10 +680,9 @@ export default function ComprasMateriaisTab() {
                                <div
                                  key={m.id}
                                  className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50"
-                                 onClick={() => {
-                                    updateItem(item.id, 'material_id', m.id);
-                                    updateItem(item.id, 'produto_search', m.nome);
-                                    updateItem(item.id, 'is_open', false);
+                                 onPointerDown={(e) => {
+                                    e.preventDefault();
+                                    updateItem(item.id, { material_id: m.id, produto_search: m.nome, is_open: false });
                                  }}
                                >
                                  {m.nome}
