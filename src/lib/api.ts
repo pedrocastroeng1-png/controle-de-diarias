@@ -129,7 +129,7 @@ export const api = {
       return true;
     });
 
-    return validComms.sort((a, b) => a.created_at.localeCompare(b.created_at));
+    return validComms.sort((a: any, b: any) => a.created_at.localeCompare(b.created_at));
   },
 
   getCommunicationRecipients: async (
@@ -555,7 +555,7 @@ export const api = {
     const { data, error } = await supabase
       .from("presencas")
       .upsert(
-        presencas.map(p => ({ ...p, empresa_id: empresaIdReal })),
+        presencas.map((p: any) => ({ ...p, empresa_id: empresaIdReal })),
         { onConflict: "funcionario_id,data" }
       )
       .select();
@@ -1805,7 +1805,7 @@ export const api = {
       });
     }
 
-    return Array.from(map.values()).sort((a, b) =>
+    return Array.from(map.values()).sort((a: any, b: any) =>
       a.material_nome.localeCompare(b.material_nome),
     );
   },

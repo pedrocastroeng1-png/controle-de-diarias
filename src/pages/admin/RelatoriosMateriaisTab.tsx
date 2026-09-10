@@ -96,7 +96,7 @@ export default function RelatoriosMateriaisTab() {
               {hierarchy.map(p => (
                 <optgroup key={p.id} label={p.nome}>
                   <option value={p.id}>{p.nome}</option>
-                  {p.subobras?.map(s => (
+                  {p.subobras?.map((s: any) => (
                     <option key={s.id} value={s.id}>&nbsp;&nbsp;↳ {s.nome}</option>
                   ))}
                 </optgroup>

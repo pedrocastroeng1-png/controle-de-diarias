@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
+// @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useLocation } from 'react-router-dom';
 import { version } from '../config/appVersion';

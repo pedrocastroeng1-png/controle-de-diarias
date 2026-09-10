@@ -9,7 +9,7 @@ import FornecedoresTab from './FornecedoresTab';
 export default function ControleMateriais() {
   const { usuario } = useAuth();
   const isAdmin = usuario?.perfil === 'ADMIN';
-  const [activeTab, setActiveTab] = useState('painel');
+  const [activeTab, setActiveTab] = useState(isAdmin ? 'painel' : 'compras');
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -23,17 +23,19 @@ export default function ControleMateriais() {
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
         <div className="border-b border-gray-200 bg-gray-50/50">
           <nav className="flex overflow-x-auto">
-            <button
-              onClick={() => setActiveTab('painel')}
-              className={`flex items-center gap-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'painel' 
-                  ? 'border-blue-500 text-blue-700 bg-blue-50/50' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              <LayoutDashboard className="w-4 h-4" />
-              Painel Gerencial
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('painel')}
+                className={`flex items-center gap-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'painel' 
+                    ? 'border-blue-500 text-blue-700 bg-blue-50/50' 
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <LayoutDashboard className="w-4 h-4" />
+                Resumo (Administrativo)
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('compras')}
               className={`flex items-center gap-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
@@ -45,17 +47,19 @@ export default function ControleMateriais() {
               <ShoppingCart className="w-4 h-4" />
               Entradas (Compras)
             </button>
-            <button
-              onClick={() => setActiveTab('fornecedores')}
-              className={`flex items-center gap-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
-                activeTab === 'fornecedores' 
-                  ? 'border-blue-500 text-blue-700 bg-blue-50/50' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              <Truck className="w-4 h-4" />
-              Fornecedores
-            </button>
+            {isAdmin && (
+              <button
+                onClick={() => setActiveTab('fornecedores')}
+                className={`flex items-center gap-2 whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors ${
+                  activeTab === 'fornecedores' 
+                    ? 'border-blue-500 text-blue-700 bg-blue-50/50' 
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 hover:bg-gray-50'
+                }`}
+              >
+                <Truck className="w-4 h-4" />
+                Fornecedores
+              </button>
+            )}
             {isAdmin && (
               <button
                 onClick={() => setActiveTab('relatorios')}

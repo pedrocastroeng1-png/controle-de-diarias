@@ -111,3 +111,54 @@ export const apiMateriais = {
     return data;
   }
 };
+
+// ADDED RPC WRAPPERS
+export const apiMateriaisRPC = {
+  cadastrarFornecedorRapido: async (params: { p_nome: string }) => {
+    const { supabase } = await import('./supabase');
+    const { getEmpresaId } = await import('./api');
+    if (!supabase) throw new Error("Supabase não configurado");
+    const empresa_id = getEmpresaId();
+    const usuario_id = getCurrentUserId();
+    if (!empresa_id) throw new Error("Empresa não identificada.");
+    if (!usuario_id) throw new Error("Usuário não identificado.");
+    
+    const { data, error } = await supabase.rpc('cadastrar_fornecedor_rapido', {
+      p_empresa_id: empresa_id,
+      p_nome: params.p_nome,
+      p_usuario_id: usuario_id
+    });
+    
+    if (error) throw error;
+    return data;
+  },
+  
+  registrarCompraMaterial: async (params: {
+    p_data_compra: string | null;
+    p_fornecedor_id: string | null;
+    p_numero_recibo: string | null;
+    p_obra_id: string;
+    p_itens: any[];
+  }) => {
+    const { supabase } = await import('./supabase');
+    const { getEmpresaId } = await import('./api');
+    if (!supabase) throw new Error("Supabase não configurado");
+    const empresa_id = getEmpresaId();
+    const usuario_id = getCurrentUserId();
+    if (!empresa_id) throw new Error("Empresa não identificada.");
+    if (!usuario_id) throw new Error("Usuário não identificado.");
+    
+    const { data, error } = await supabase.rpc('registrar_compra_material', {
+      p_data_compra: params.p_data_compra,
+      p_empresa_id: empresa_id,
+      p_fornecedor_id: params.p_fornecedor_id,
+      p_itens: params.p_itens,
+      p_numero_recibo: params.p_numero_recibo,
+      p_obra_id: params.p_obra_id,
+      p_usuario_id: usuario_id
+    });
+    
+    if (error) throw error;
+    return data;
+  }
+};

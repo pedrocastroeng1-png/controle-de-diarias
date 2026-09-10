@@ -3,10 +3,12 @@ import { Plus, Search, Loader2, FileText, ChevronLeft, Save, X, Eye, Trash2, Arr
 import SmartPurchaseForm from '../../components/SmartPurchaseForm';
 import { api } from '../../lib/api';
 import { format } from 'date-fns';
+import { apiMateriaisRPC } from '../../lib/api-materiais';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function ComprasMateriaisTab() {
   const { usuario } = useAuth();
+  const isAdmin = usuario?.perfil === 'ADMIN';
   
   // Views: 'list', 'new', 'details'
   const [view, setView] = useState<'list' | 'new' | 'details'>('list');
@@ -35,7 +37,6 @@ export default function ComprasMateriaisTab() {
     obra_id: '',
     fornecedor: '',
       fornecedor_id: '',
-    fornecedor_id: '',
     numero_recibo: '',
     observacao: ''
   });
@@ -64,9 +65,24 @@ export default function ComprasMateriaisTab() {
       setMateriais(materiaisData);
       setCategorias(categoriasData);
       setFornecedores(fornecedoresData);
+    
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar dados');
+      if (err.message && err.message.includes('já está cadastrado')) {
+        alert('Este fornecedor já está cadastrado. Selecionando-o automaticamente...');
+        // Refresh and find it
+        const fornecedoresData = await api.getFornecedores({ ativo: true });
+        setFornecedores(fornecedoresData);
+        const existing = fornecedoresData.find(f => f.nome.toLowerCase() === novoFornecedorNome.trim().toLowerCase());
+        if (existing) {
+          setCompraForm(prev => ({ ...prev, fornecedor_id: existing.id }));
+        }
+        setShowFornecedorModal(false);
+        setNovoFornecedorNome('');
+      } else {
+        alert('Erro ao cadastrar fornecedor.');
+      }
     } finally {
+
       setLoading(false);
     }
   };
@@ -77,7 +93,6 @@ export default function ComprasMateriaisTab() {
       obra_id: '',
       fornecedor: '',
       fornecedor_id: '',
-    fornecedor_id: '',
       numero_recibo: '',
       observacao: ''
     });
@@ -125,66 +140,74 @@ export default function ComprasMateriaisTab() {
     setItensForm(itensForm.filter(item => item.id !== id));
   };
 
-  const handleSave = async (e: React.FormEvent) => {
+
+  const handleCadastrarFornecedor = async () => {
+    if (!novoFornecedorNome.trim()) {
+      alert('Informe o nome do fornecedor');
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const novoId = await apiMateriaisRPC.cadastrarFornecedorRapido({ p_nome: novoFornecedorNome.trim() });
+      setFormSuccess('Fornecedor cadastrado com sucesso!');
+      setShowFornecedorModal(false);
+      setNovoFornecedorNome('');
+      
+      // Refresh list
+      const fornecedoresData = await api.getFornecedores({ ativo: true });
+      setFornecedores(fornecedoresData);
+      
+      // Auto-select
+      if (novoId) {
+        setCompraForm(prev => ({ ...prev, fornecedor_id: novoId }));
+      }
+    } catch (err: any) {
+      if (err.message && err.message.includes('já está cadastrado')) {
+        alert('Este fornecedor já está cadastrado.');
+      } else {
+        alert('Erro ao cadastrar fornecedor.');
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+    const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     setFormSuccess('');
 
-    if (!compraForm.data_compra) {
-      return setFormError('A data da compra é obrigatória.');
-    }
-    if (!compraForm.obra_id) {
-      return setFormError('A obra é obrigatória.');
-    }
-    if (itensForm.length === 0) {
-      return setFormError('Adicione pelo menos um item à compra.');
-    }
+    if (!compraForm.data_compra) return setFormError('A data da compra é obrigatória.');
+    if (!compraForm.obra_id) return setFormError('A obra é obrigatória.');
+    if (!compraForm.fornecedor_id) return setFormError('O fornecedor é obrigatório.');
+    if (itensForm.length === 0) return setFormError('Adicione pelo menos um item à compra.');
 
-    // Validate Items
-    let totalCompra = 0;
     const itensValidos = [];
-
     for (let i = 0; i < itensForm.length; i++) {
       const item = itensForm[i];
-      if (!item.material_id) {
-        return setFormError(`Selecione o produto para o item ${i + 1}.`);
-      }
-      if (item.quantidade <= 0) {
-        return setFormError(`A quantidade do item ${i + 1} deve ser maior que zero.`);
-      }
-      if (item.valor_unitario < 0) {
-        return setFormError(`O valor unitário do item ${i + 1} não pode ser negativo.`);
-      }
-      
-      const totalItem = item.quantidade * item.valor_unitario;
-      totalCompra += totalItem;
+      if (!item.material_id) return setFormError(`Selecione o produto para o item ${i + 1}.`);
+      if (item.quantidade <= 0) return setFormError(`A quantidade do item ${i + 1} deve ser maior que zero.`);
+      if (item.valor_unitario < 0) return setFormError(`O valor unitário do item ${i + 1} não pode ser negativo.`);
       
       itensValidos.push({
         material_id: item.material_id,
         quantidade: item.quantidade,
-        valor_unitario: item.valor_unitario,
-        funcionario_id: item.funcionario_id || null
+        valor_unitario: item.valor_unitario
       });
     }
 
     try {
       setIsSaving(true);
-      
-      const payloadCompra = {
-        ...compraForm,
-        
-        registrado_por: usuario?.id
-      };
-      
-      await api.createCompraMaterial(payloadCompra, itensValidos);
-      
+      await apiMateriaisRPC.registrarCompraMaterial({
+        p_data_compra: compraForm.data_compra,
+        p_fornecedor_id: compraForm.fornecedor_id,
+        p_numero_recibo: compraForm.numero_recibo || null,
+        p_obra_id: compraForm.obra_id,
+        p_itens: itensValidos
+      });
       setFormSuccess('Compra registrada com sucesso!');
       await fetchData();
-      
-      setTimeout(() => {
-        setView('list');
-      }, 1500);
-      
+      setTimeout(() => { setView('list'); }, 1500);
     } catch (err: any) {
       setFormError(err.message || 'Erro ao registrar compra.');
     } finally {
@@ -204,8 +227,11 @@ export default function ComprasMateriaisTab() {
       c.numero_recibo?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    return (
-      <div className="space-y-4">
+    
+      
+
+  return (
+    <div className="space-y-4">
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
           <div className="relative w-full sm:w-96">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -379,7 +405,48 @@ export default function ComprasMateriaisTab() {
 
   // NEW PURCHASE FORM
   return (
-    <form onSubmit={handleSave} className="space-y-6">
+    <>
+      {showFornecedorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+            <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-bold text-gray-900">Cadastro Rápido de Fornecedor</h3>
+              <button onClick={() => setShowFornecedorModal(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-6">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nome do fornecedor *</label>
+              <input
+                type="text"
+                autoFocus
+                value={novoFornecedorNome}
+                onChange={e => setNovoFornecedorNome(e.target.value)}
+                className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500 mb-4"
+              />
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowFornecedorModal(false)}
+                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                  disabled={isSaving}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCadastrarFornecedor}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  disabled={isSaving}
+                >
+                  {isSaving ? 'Salvando...' : 'Cadastrar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      <form onSubmit={handleSave} className="space-y-6">
       {formError && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-start gap-3">
           <p className="text-sm font-medium">{formError}</p>
@@ -399,9 +466,10 @@ export default function ComprasMateriaisTab() {
             <input
               type="date"
               required
+              disabled={!isAdmin}
               value={compraForm.data_compra}
               onChange={e => setCompraForm({...compraForm, data_compra: e.target.value})}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500"
             />
           </div>
           <div>
@@ -413,8 +481,13 @@ export default function ComprasMateriaisTab() {
               className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
             >
               <option value="">Selecione uma obra...</option>
-              {obras.map(obra => (
-                <option key={obra.id} value={obra.id}>{obra.nome}</option>
+              {obras.filter(o => !o.parent_obra_id).map(obra => (
+                <optgroup key={obra.id} label={obra.nome}>
+                  <option value={obra.id}>{obra.nome} (Principal)</option>
+                  {obras.filter(sub => sub.parent_obra_id === obra.id).map(sub => (
+                    <option key={sub.id} value={sub.id}>-- {sub.nome}</option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
@@ -605,5 +678,6 @@ export default function ComprasMateriaisTab() {
         </button>
       </div>
     </form>
+    </>
   );
 }
