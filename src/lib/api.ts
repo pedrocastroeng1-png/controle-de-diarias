@@ -1654,6 +1654,7 @@ export const api = {
       supabase.from("material_categories"),
     )
       .select("*")
+      .eq("ativo", true)
       .order("nome");
     if (error) throw error;
     return data || [];
@@ -1662,7 +1663,7 @@ export const api = {
   getMateriais: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
     let query = withEmpresa(supabase.from("materiais")).select("*, category:material_categories(*)");
-    const { data, error } = await query.order("nome");
+    const { data, error } = await query.eq("ativo", true).order("nome");
     if (error) throw error;
     return data || [];
   },

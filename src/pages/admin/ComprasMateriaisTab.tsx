@@ -1,10 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Loader2, FileText, ChevronLeft, Save, X, Eye, Trash2, ArrowLeft, Sparkles } from 'lucide-react';
-import SmartPurchaseForm from '../../components/SmartPurchaseForm';
+import { Plus, Search, Loader2, FileText, ChevronLeft, Save, X, Eye, Trash2, ArrowLeft } from 'lucide-react';
 import { api } from '../../lib/api';
 import { format } from 'date-fns';
 import { apiMateriaisRPC } from '../../lib/api-materiais';
 import { useAuth } from '../../contexts/AuthContext';
+
+
+const CATEGORY_EMOJIS: Record<string, string> = {
+  'Materiais de Construção': '🧱',
+  'Ferragens': '🔩',
+  'Esquadrias e Acessórios': '🚪',
+  'Madeira': '🪚',
+  'Elétrica': '⚡',
+  'Hidráulica': '🚰',
+  'Pintura': '🎨',
+  'Ferramentas': '🧰',
+  'EPI': '🦺',
+  'Limpeza': '🧹',
+  'Fixadores': '🪛',
+  'Acabamentos': '🧱',
+  'Materiais Diversos': '📦'
+};
 
 export default function ComprasMateriaisTab() {
   const { usuario } = useAuth();
@@ -130,7 +146,7 @@ export default function ComprasMateriaisTab() {
   const addItem = () => {
     setItensForm([
       ...itensForm, 
-      { id: Date.now().toString(), categoria_id: '', material_id: '', quantidade: 1, valor_unitario: 0, funcionario_id: null }
+      { id: Date.now().toString(), categoria_id: '', material_id: '', quantidade: 1, valor_unitario: 0, funcionario_id: null, produto_search: '', is_open: false }
     ]);
   };
 
@@ -141,6 +157,8 @@ export default function ComprasMateriaisTab() {
         // Reset material if category changes
         if (field === 'categoria_id') {
           updated.material_id = '';
+          updated.produto_search = '';
+          updated.is_open = false;
           const isEpi = categorias.find((c: any) => c.id === value)?.nome?.trim().toLowerCase() === 'epi';
           if (!isEpi) {
             updated.funcionario_id = null;
@@ -594,33 +612,72 @@ export default function ComprasMateriaisTab() {
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-4">
                     
                     <div className="sm:col-span-3">
-                      <label className="block text-xs font-medium text-gray-500 mb-1">Categoria</label>
+                      <label className="block text-xs font-medium text-gray-500 mb-1">Tipo de Produto</label>
                       <select
                         value={item.categoria_id}
                         onChange={e => updateItem(item.id, 'categoria_id', e.target.value)}
                         className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       >
-                        <option value="">Categoria...</option>
-                        {categorias.map((c: any) => (
-                          <option key={c.id} value={c.id}>{c.nome}</option>
-                        ))}
+                        <option value="">Tipo de Produto...</option>
+                        {categorias.map((c: any) => {
+                          const emoji = CATEGORY_EMOJIS[c.nome] || '';
+                          return <option key={c.id} value={c.id}>{emoji ? `${emoji} ${c.nome}` : c.nome}</option>;
+                        })}
                       </select>
                     </div>
                     
-                    <div className="sm:col-span-3">
+                    
+                    <div className="sm:col-span-3 relative">
                       <label className="block text-xs font-medium text-gray-500 mb-1">Produto *</label>
-                      <select
+                      <input
+                        type="text"
                         required
                         disabled={!item.categoria_id}
-                        value={item.material_id}
-                        onChange={e => updateItem(item.id, 'material_id', e.target.value)}
+                        placeholder={!item.categoria_id ? 'Selecione o tipo primeiro' : 'Digite para pesquisar...'}
+                        value={item.produto_search || ''}
+                        onChange={e => {
+                           updateItem(item.id, 'produto_search', e.target.value);
+                           updateItem(item.id, 'is_open', true);
+                           if (item.material_id) updateItem(item.id, 'material_id', '');
+                        }}
+                        onFocus={() => updateItem(item.id, 'is_open', true)}
+                        onBlur={() => setTimeout(() => updateItem(item.id, 'is_open', false), 200)}
+                        onKeyDown={e => {
+                          if (e.key === 'Escape') {
+                            updateItem(item.id, 'is_open', false);
+                          }
+                        }}
                         className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 bg-white disabled:bg-gray-100"
-                      >
-                        <option value="">Produto...</option>
-                        {catMateriais.map((m: any) => (
-                          <option key={m.id} value={m.id}>{m.nome}</option>
-                        ))}
-                      </select>
+                      />
+                      {item.is_open && item.categoria_id && (
+                        <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                          {(() => {
+                             const search = (item.produto_search || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+                             const filtered = catMateriais.filter((m: any) => m.nome.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').includes(search));
+                             if (filtered.length === 0) {
+                               return (
+                                 <div className="p-2 text-sm text-gray-500">
+                                   <p>Nenhum produto encontrado neste tipo.</p>
+                                   <p className="text-xs mt-1">Solicite ao administrador o cadastro do material.</p>
+                                 </div>
+                               );
+                             }
+                             return filtered.map((m: any) => (
+                               <div
+                                 key={m.id}
+                                 className="px-3 py-2 text-sm cursor-pointer hover:bg-blue-50"
+                                 onClick={() => {
+                                    updateItem(item.id, 'material_id', m.id);
+                                    updateItem(item.id, 'produto_search', m.nome);
+                                    updateItem(item.id, 'is_open', false);
+                                 }}
+                               >
+                                 {m.nome}
+                               </div>
+                             ));
+                          })()}
+                        </div>
+                      )}
                     </div>
 
                     {categorias.find((c: any) => c.id === item.categoria_id)?.nome?.trim().toLowerCase() === 'epi' && (
