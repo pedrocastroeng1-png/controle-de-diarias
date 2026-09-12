@@ -111,8 +111,14 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
     }
   };
 
-  const toggleArrayItem = (field: 'days_of_week' | 'recipients' | 'channels', item: any) => {
+  const toggleArrayItem = (field: 'days_of_week' | 'recipients' | 'channels', item: string | number) => {
     setFormData(prev => {
+      if (field === 'days_of_week') {
+        if (typeof item !== 'number') return prev;
+        const current = prev.days_of_week || [];
+        return { ...prev, days_of_week: current.includes(item) ? current.filter(i => i !== item) : [...current, item] };
+      }
+      if (typeof item !== 'string') return prev;
       const current = prev[field] || [];
       if (current.includes(item)) {
         return { ...prev, [field]: current.filter(i => i !== item) };
@@ -222,7 +228,7 @@ export default function AutomationsForm({ rule, catalog, onClose, onSave }: Auto
                 <div className="space-y-2">
                   <label className="block text-sm font-medium text-slate-700">Evento / Condição</label>
                   <select
-                    value={formData.trigger_code}
+                    value={formData.trigger_code || ''}
                     onChange={(e) => setFormData({ ...formData, trigger_code: e.target.value })}
                     className="w-full rounded-lg border-slate-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     required

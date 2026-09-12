@@ -128,7 +128,7 @@ export default function Communications() {
         const created = await api.createCommunication(payload);
         commId = created.id;
         if (payload.target_audience === 'OPERATOR' && payload.target_operator_id) {
-           await api.createCommunicationRecipient(commId, payload.target_operator_id as string);
+           await api.createCommunicationRecipient(created.id, payload.target_operator_id);
         }
       }
 
@@ -287,18 +287,18 @@ export default function Communications() {
                       
                       <div className="flex items-center flex-wrap gap-4 mt-2 text-xs text-gray-500">
                         <span className="flex items-center"><Clock className="w-3 h-3 mr-1"/> Criado em {format(parseISO(c.created_at), 'dd/MM/yyyy')}</span>
-                        {c.status && (
-                          <span className={`flex items-center font-semibold ${c.status === 'FAILED' ? 'text-red-500' : 'text-blue-600'}`}>
-                            {c.status === 'QUEUED' && 'Push na fila...'}
-                            {c.status === 'SENDING' && 'Enviando...'}
-                            {c.status === 'SENT' && 'Push enviado'}
-                            {c.status === 'PARTIAL' && 'Push parcialmente enviado'}
-                            {c.status === 'FAILED' && 'Falha no Push'}
+                        {c.push_dispatch_status && c.push_dispatch_status !== 'NOT_REQUESTED' && (
+                          <span className={`flex items-center font-semibold ${c.push_dispatch_status === 'FAILED' ? 'text-red-500' : 'text-blue-600'}`}>
+                            {c.push_dispatch_status === 'QUEUED' && 'Push na fila...'}
+                            {c.push_dispatch_status === 'SENDING' && 'Enviando...'}
+                            {c.push_dispatch_status === 'SENT' && 'Push enviado'}
+                            {c.push_dispatch_status === 'PARTIAL' && 'Push parcialmente enviado'}
+                            {c.push_dispatch_status === 'FAILED' && 'Falha no Push'}
                           </span>
                         )}
                         <span className="flex items-center">
                           <Users className="w-3 h-3 mr-1"/> 
-                          {c.target_audience === 'ALL' ? 'Todos os Operadores' : (c.target_operator ? (c.target_operator as any).usuario : 'Operador Específico')}
+                          {c.target_audience === 'ALL' ? 'Todos os Operadores' : c.target_audience === 'ADMIN' ? 'Administradores' : (c.target_operator ? c.target_operator.usuario : 'Operador Específico')}
                         </span>
                         {c.expiration_date && (
                            <span className="flex items-center text-orange-600 font-medium">Expira em {format(parseISO(c.expiration_date), 'dd/MM/yyyy')}</span>

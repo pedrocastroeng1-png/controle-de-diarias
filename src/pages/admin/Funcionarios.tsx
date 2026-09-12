@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../lib/api';
 import { Funcionario, Funcao, Obra } from '../../lib/types';
 import { Edit2, Ban, Plus, RefreshCcw, CheckSquare, Square, Check, X } from 'lucide-react';
@@ -31,13 +31,12 @@ export default function Funcionarios() {
   const [showMassEdit, setShowMassEdit] = useState(false);
   const [massEditObraId, setMassEditObraId] = useState('');
   const [massEditSaving, setMassEditSaving] = useState(false);
+  const loadSequence = useRef(0);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
 
-  useEffect(() => {
-    loadData();
-  }, [filter]);
-
-  async function loadData() {
-    setLoading(true);
+  const loadData = useCallback(async (silent = false) => {
+    const sequence = ++loadSequence.current;
+    if (!silent) setLoading(true);
     setErro('');
     try {
       const [funcs, funcsData, obsData] = await Promise.all([
@@ -45,15 +44,36 @@ export default function Funcionarios() {
         api.getFuncoes(),
         api.getObras()
       ]);
+      if (sequence !== loadSequence.current) return;
       setFuncionarios(funcs);
       setFuncoes(funcsData);
       setObras(obsData);
+      setUpdatedAt(new Date());
+      setSelectedIds(ids => ids.filter(id => funcs.some(func => func.id === id)));
     } catch (error) {
-      setErro('Ocorreu um erro ao carregar os dados.');
+      if (sequence === loadSequence.current) setErro('Não foi possível atualizar os dados. A lista pode estar desatualizada.');
     } finally {
-      setLoading(false);
+      if (sequence === loadSequence.current) setLoading(false);
     }
-  }
+  }, [filter]);
+
+  useEffect(() => {
+    void loadData();
+    const refresh = () => {
+      if (document.visibilityState === 'visible') void loadData(true);
+    };
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
+    const interval = window.setInterval(refresh, 60_000);
+    return () => {
+      loadSequence.current++;
+      window.clearInterval(interval);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
+    };
+  }, [loadData]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -224,7 +244,11 @@ export default function Funcionarios() {
   return (
     <div className="max-w-6xl mx-auto">
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-6 gap-4">
-        <h2 className="text-2xl font-bold text-gray-900">Funcionários</h2>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Funcionários</h2>
+          <p className="text-sm text-gray-500" aria-live="polite">{loading ? 'Atualizando…' : `${funcionarios.length} registros no filtro ${filter}`}{updatedAt && ` · Atualizado às ${updatedAt.toLocaleTimeString('pt-BR')}`}</p>
+          <button type="button" disabled={loading} onClick={() => void loadData()} className="mt-1 text-sm text-blue-700 disabled:opacity-50">Atualizar lista</button>
+        </div>
         <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
           <div className="flex bg-gray-100 p-1 rounded-lg w-full sm:w-auto">
             <button

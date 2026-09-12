@@ -1,3 +1,5 @@
+import type { Tables, Enums } from '../types/database.generated';
+
 export type Perfil = 'ADMIN' | 'OPERADOR' | 'CONSULTA';
 
 export interface Usuario {
@@ -20,7 +22,7 @@ export interface Funcao {
   valor_diaria: number;
 }
 
-export interface Funcionario {
+export interface Funcionario extends Partial<Tables<'funcionarios'>> {
   id: string;
   nome: string;
   funcao_id: string;
@@ -48,6 +50,10 @@ export interface Presenca {
   data: string;
   presente: boolean;
   tipo_diaria?: string;
+  percentual_diaria?: number;
+  empresa_id?: string;
+  created_at?: string;
+  updated_at?: string;
   photo_path?: string | null;
   photo_taken_at?: string;
   photo_taken_by?: string;
@@ -83,11 +89,12 @@ export interface RelatorioPresenca {
 }
 
 
-export type TargetAudience = 'ALL' | 'OPERATOR';
+export type TargetAudience = 'ALL' | 'OPERATOR' | 'ADMIN';
 export type Priority = 'NORMAL' | 'URGENT';
-export type CommunicationType = 'INFO' | 'ATTENTION' | 'URGENT' | 'EMPLOYEE' | 'WORKSITE' | 'MATERIAL' | 'MEDICAL_CERTIFICATE';
+// The live column is unconstrained text; automations also emit FORNECEDOR.
+export type CommunicationType = Tables<'communications'>['type'];
 
-export interface Communication {
+export interface Communication extends Partial<Tables<'communications'>> {
   id: string;
   title: string;
   message: string;
@@ -121,7 +128,7 @@ export interface CommunicationAttachment {
   file_type: string;
   created_at: string;
 }
-export type ToolStatus = 'ATIVA' | 'EMPRESTADA' | 'QUEBRADA' | 'EM_REPARO' | 'PERDIDA' | 'INATIVA';
+export type ToolStatus = Enums<'tool_status'>;
 export type ToolEventType = 'CADASTRO' | 'EDICAO' | 'EMPRESTIMO' | 'DEVOLUCAO' | 'QUEBRA' | 'REPARO' | 'PERDA' | 'INATIVACAO' | 'REATIVACAO';
 export type ReturnCondition = 'PERFEITO_ESTADO' | 'DANIFICADA';
 
@@ -169,13 +176,13 @@ export interface HistoricoFerramenta {
 export interface AutomationRule {
   id: string;
   name: string;
-  description?: string;
-  kind: 'PROGRAMADA' | 'CONDICIONAL' | 'EVENTO';
+  description?: string | null;
+  kind: string;
   module: string;
-  trigger_code?: string;
-  days_of_week?: string[];
-  schedule_time?: string;
-  timezone?: string;
+  trigger_code?: string | null;
+  days_of_week?: number[];
+  schedule_time?: string | null;
+  timezone?: string | null;
   recipients?: string[];
   channels?: string[];
   title_template?: string;
@@ -183,7 +190,7 @@ export interface AutomationRule {
   condition?: any;
   priority?: string;
   is_active: boolean;
-  created_by?: string;
+  created_by?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -193,7 +200,7 @@ export interface AutomationEventCatalog {
   module: string;
   event_code: string;
   label: string;
-  description?: string;
+  description?: string | null;
   supports_conditions: boolean;
   is_active: boolean;
   created_at?: string;
@@ -203,10 +210,10 @@ export interface AutomationEventCatalog {
 export interface AutomationRun {
   id: string;
   rule_id: string;
-  status: 'EXECUTADA' | 'PARCIAL' | 'FALHOU' | 'IGNORADA';
+  status: string;
   recipients?: string[];
   message_id?: string;
-  error_message?: string;
+  error_message?: string | null;
   created_at?: string;
   rule?: AutomationRule;
 }

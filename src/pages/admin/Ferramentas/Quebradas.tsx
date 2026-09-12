@@ -23,7 +23,8 @@ export default function Quebradas() {
     try {
       setLoading(true);
       const data = await api.getFerramentas();
-      setFerramentas(data.filter(f => f.status === 'QUEBRADA'));
+      // This legacy screen has no matching status in the live database.
+      setFerramentas([]);
     } catch (error) {
       console.error(error);
     } finally {
@@ -63,6 +64,7 @@ export default function Quebradas() {
 
   return (
     <div className="space-y-6">
+      <p role="status" className="rounded-lg border border-amber-300 bg-amber-50 p-4 text-amber-900">O status QUEBRADA não existe no banco atual. Esta tela está indisponível até a definição desse fluxo; a lista vazia não representa uma contagem de ferramentas danificadas.</p>
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="relative">
           <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

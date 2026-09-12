@@ -71,7 +71,7 @@ export default function Relatorios() {
       }
       
       const funcionariosMap = new Map(funcionarios.map(f => [f.id, f]));
-      const atestadoRecords = [];
+      const atestadoRecords: Record<string, unknown>[] = [];
       
       // Parse atestados and create simulated records
       atestados.forEach(atestado => {
@@ -87,7 +87,7 @@ export default function Relatorios() {
             const func = funcionariosMap.get(atestado.employee_id);
             if (func) {
               // Check if obra matches
-              if (!obra || func.obra?.nome === obra) {
+              if (!obra || func.obra_id === obra) {
                 atestadoRecords.push({
                   id: `atestado-${atestado.id}-${dateStr}`,
                   data: dateStr,
@@ -125,8 +125,7 @@ export default function Relatorios() {
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const obraSelecionada = obras.find(o => o.id === obraId)?.nome || '';
-    loadRelatorio(dataInicial, dataFinal, obraSelecionada);
+    loadRelatorio(dataInicial, dataFinal, obraId);
   }
 
   const agruparPorFuncionario = () => {
@@ -670,9 +669,10 @@ export default function Relatorios() {
         : 'Todos os períodos';
 
       // Fetch from new views
-      const obraSelecionada = obras.find(o => o.id === obraId)?.nome || '';
-      const folhaData = await api.getFolhaDiarias(dataInicial, dataFinal, obraSelecionada);
-      const cltData = await api.getRelatorioCLT(dataInicial, dataFinal, obraSelecionada);
+      const [folhaData, cltData] = await Promise.all([
+        api.getFolhaDiarias(dataInicial, dataFinal, obraId),
+        api.getRelatorioCLT(dataInicial, dataFinal, obraId),
+      ]);
 
       // Group DIARISTAS
       const diaristasMap: Record<string, any> = {};

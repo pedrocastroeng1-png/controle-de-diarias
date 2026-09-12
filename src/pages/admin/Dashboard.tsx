@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../../lib/api';
+import { calcularDiaria } from '../../lib/diarias';
 import { supabase } from '../../lib/supabase';
 import { Funcionario, Obra, Funcao, Presenca } from '../../lib/types';
 import { HardHat, Users, CheckCircle, XCircle, AlertTriangle, Info, ChevronRight, Activity, ArrowLeft, DollarSign } from 'lucide-react';
@@ -93,7 +94,7 @@ export default function Dashboard() {
 
   // Helper para analisar a composição de uma lista de funcionários e suas presenças
   const analyzeComposition = (emps: Funcionario[], pres: Presenca[]) => {
-    const presentes = emps.filter(e => pres.some(p => p.funcionario_id === e.id && (p.presente === true || (p as any).status === 'PRESENTE' || (p as any).status === 'MEIA_DIARIA' || p.tipo_diaria === 'MEIA_DIARIA')));
+    const presentes = emps.filter(e => pres.some(p => p.funcionario_id === e.id && p.presente === true));
     const faltas = emps.length - presentes.length;
     
     let pedreiros = 0;
@@ -114,13 +115,9 @@ export default function Dashboard() {
       if (emp.tipo_colaborador !== 'CLT') {
         diaristasPresentes++;
         
-        const pRecord = pres.find(p => p.funcionario_id === emp.id && (p.presente === true || (p as any).status === 'PRESENTE' || (p as any).status === 'MEIA_DIARIA' || p.tipo_diaria === 'MEIA_DIARIA'));
+        const pRecord = pres.find(p => p.funcionario_id === emp.id && p.presente === true);
         if (pRecord) {
-            let valor = fn?.valor_diaria || 0;
-            if (pRecord.tipo_diaria === 'MEIA_DIARIA' || (pRecord as any).status === 'MEIA_DIARIA') valor = valor / 2;
-            if ((pRecord as any).percentual_diaria) valor = valor * ((pRecord as any).percentual_diaria / 100);
-            
-            custoDiarias += valor;
+            custoDiarias += calcularDiaria({ ...pRecord, tipo_colaborador: emp.tipo_colaborador, valor_diaria: fn?.valor_diaria });
         }
       }
     });
