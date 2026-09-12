@@ -36,7 +36,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (!cacheName.includes(BUILD_ID)) {
+          if (['diarias-', 'html-cache-', 'assets-cache-', 'pceg-v'].some(prefix => cacheName.startsWith(prefix)) && !cacheName.endsWith(BUILD_ID)) {
             console.log('[Service Worker] Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -61,7 +61,8 @@ precacheAndRoute(filteredManifest);
 registerRoute(
   ({ request, url }) => request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html',
   new NetworkFirst({
-    cacheName: HTML_CACHE
+    cacheName: HTML_CACHE,
+    networkTimeoutSeconds: 5
   })
 );
 

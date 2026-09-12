@@ -4,7 +4,7 @@ import type { TablesUpdate } from '../types/database.generated';
 import { calcularDiaria } from './diarias';
 import { requireToolStatus } from './tool-status';
 import { collectPages } from './pagination';
-import { aplicarAtestados } from './atestados-relatorio';
+import { aplicarAtestados, diasUteisAtestado } from './atestados-relatorio';
 
 import {
   AutomationRule,
@@ -18,45 +18,8 @@ import {
   AtestadoMedico,
 } from "./types";
 
-export const getEmpresaId = () => {
-  try {
-    const userStr = localStorage.getItem("@diarias:usuario");
-    if (userStr) {
-      return JSON.parse(userStr).empresa_id;
-    }
-  } catch (e) {}
-  return null;
-};
-
-export const withEmpresa = <T>(query: T, isAuth = false): T => {
-  const empId = getEmpresaId();
-  if (empId && !isAuth) {
-    if (typeof (query as any).eq !== "function") {
-      return new Proxy(query as object, {
-        get(target, prop) {
-          if (["select", "update", "delete"].includes(prop as string)) {
-            return (...args: any[]) => {
-              const filterBuilder = (target as any)[prop](...args);
-              return filterBuilder.eq("empresa_id", empId);
-            };
-          }
-          return (target as any)[prop];
-        },
-      }) as T;
-    }
-    return (query as any).eq("empresa_id", empId) as T;
-  }
-  return query;
-};
-
-const addEmpresaId = (payload: any) => {
-  const empId = getEmpresaId();
-  if (!empId) return payload;
-  if (Array.isArray(payload)) {
-    return payload.map((p: any) => ({ ...p, empresa_id: p.empresa_id || empId }));
-  }
-  return { ...payload, empresa_id: payload.empresa_id || empId };
-};
+import { getEmpresaId, withEmpresa, addEmpresaId } from './company-scope';
+export { getEmpresaId, withEmpresa } from './company-scope';
 
 const getCurrentUserProfile = () => {
   try {
@@ -436,16 +399,14 @@ export const api = {
     apenasDiaristas = false,
   ): Promise<Funcionario[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    let query = withEmpresa(supabase.from("funcionarios")).select(`*, funcao:funcoes(*), obra:obras(*)`)
+    let query = withEmpresa(supabase.from("funcionarios")).select(`*, funcao:funcoes(*), obra:obras(*)`, { count: 'exact' })
       .eq("obra_id", obra_id)
       .eq("ativo", true);
     if (apenasDiaristas) {
       query = query.or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null");
     }
-    query = query.order("nome");
-    const { data, error } = await query;
-    if (error) throw error;
-    return data as any;
+    query = query.order("nome").order("id");
+    return await collectPages((from, to) => query.range(from, to)) as Funcionario[];
   },
 
   // Presencas
@@ -456,6 +417,7 @@ export const api = {
         .from("presencas")
         .select(
           `*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`,
+          { count: 'exact' },
         ),
     )
       .eq("data", data);
@@ -464,9 +426,8 @@ export const api = {
       query = query.eq("obra_id", obra_id);
     }
 
-    const { data: presencas, error } = await query;
-    if (error) throw error;
-    return presencas as any;
+    query = query.order("id");
+    return await collectPages((from, to) => query.range(from, to)) as Presenca[];
   },
 
   toggleMeiaDiaria: async (
@@ -927,7 +888,7 @@ export const api = {
   },
 
   getActiveAtestadosForDate: async (dateStr: string): Promise<any[]> => {
-    // dateStr format: YYYY-MM-DD
+    if (!diasUteisAtestado(dateStr, dateStr).length) return [];
     if (!supabase) throw new Error("Supabase não configurado");
     let query = withEmpresa(supabase.from("medical_certificates").select("*, funcionario:funcionarios(*)"));
     const { data, error } = await query.lte("start_date", dateStr).gte("end_date", dateStr);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 // @ts-ignore
 import { useRegisterSW } from 'virtual:pwa-register/react';
 import { useLocation } from 'react-router-dom';
@@ -9,7 +9,8 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
   const [isOutdated, setIsOutdated] = useState(false);
   const [latestVersion, setLatestVersion] = useState(version);
   const [isUpdating, setIsUpdating] = useState(false);
-  const [isChecking, setIsChecking] = useState(true);
+  const registrationCleanup = useRef<(() => void) | null>(null);
+  useEffect(() => () => registrationCleanup.current?.(), []);
   
   const location = useLocation();
   const isOperadorPresenca = location.pathname.includes('/operador/presenca');
@@ -20,10 +21,16 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
   } = useRegisterSW({
     onRegistered(r: any) {
       if (r) {
-        setInterval(() => r.update(), 10 * 60 * 1000); // 10 mins
-        document.addEventListener('visibilitychange', () => {
-          if (document.visibilityState === 'visible') r.update();
-        });
+        registrationCleanup.current?.();
+        const refresh = () => {
+          if (document.visibilityState === 'visible') void r.update().catch(console.error);
+        };
+        const interval = window.setInterval(refresh, 10 * 60 * 1000);
+        document.addEventListener('visibilitychange', refresh);
+        registrationCleanup.current = () => {
+          window.clearInterval(interval);
+          document.removeEventListener('visibilitychange', refresh);
+        };
       }
     },
     onRegisterError(error: any) {
@@ -32,8 +39,10 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
   });
 
   const checkVersion = useCallback(async () => {
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10_000);
     try {
-      const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-cache' });
+      const res = await fetch(`/version.json?t=${Date.now()}`, { cache: 'no-store', signal: controller.signal });
       if (res.ok) {
         const data = await res.json();
         if (data.version && data.version !== version) {
@@ -44,7 +53,7 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
     } catch (e) {
       // console.warn('Failed to check version:', e);
     } finally {
-      setIsChecking(false);
+      window.clearTimeout(timeout);
     }
   }, []);
 
@@ -107,12 +116,6 @@ export function AppUpdater({ children }: { children: React.ReactNode }) {
     setIsOutdated(false);
     setNeedRefresh(false);
   };
-
-  if (isChecking && !isOutdated) {
-    // We can show nothing while initially checking so it doesn't flash login if outdated
-    // But since it's fast, we'll just return null initially if still checking
-    return null;
-  }
 
   const hasUpdate = isOutdated || needRefresh;
 
