@@ -4,6 +4,9 @@ import {
   X, Image as ImageIcon, Plus, Users, Upload, User, DollarSign,
   AlertCircle
 } from 'lucide-react';
+import { CenteredDialog } from '../../components/ui/CenteredDialog';
+import { allVisibleSelected, toggleVisibleSelection } from '../../lib/employee-selection';
+import { saveEmployee } from '../../lib/save-employee';
 import { api } from '../../lib/api';
 import type { Funcionario, Funcao, Obra } from '../../lib/types';
 import RelatorioFuncionarios from '../../components/funcionarios/RelatorioFuncionarios';
@@ -16,6 +19,10 @@ export default function Funcionarios() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [erro, setErro] = useState('');
+  const [formError, setFormError] = useState('');
+  const [editEmployee, setEditEmployee] = useState<Funcionario | null>(null);
+  const savingRef = useRef(false);
+  const massSavingRef = useRef(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'ativos' | 'inativos' | 'todos'>('todos');
   
@@ -90,16 +97,6 @@ export default function Funcionarios() {
     };
   }, [loadData]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && isModalOpen) {
-        closeModal();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isModalOpen, isDirty]);
-
   // Clean up preview URL on unmount or when photo changes
   useEffect(() => {
     return () => {
@@ -111,7 +108,10 @@ export default function Funcionarios() {
 
   const handlePhotoSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    e.target.value = '';
     if (file) {
+      if (!file.type.startsWith('image/')) { setFormError('Selecione um arquivo de imagem.'); return; }
+      setFormError('');
       markDirty();
       setFoto(file);
       setRemoveFoto(false);
@@ -132,6 +132,8 @@ export default function Funcionarios() {
 
   const resetForm = () => {
     setEditId(null);
+    setEditEmployee(null);
+    setFormError('');
     setNome('');
     setFuncaoId('');
     setObraId('');
@@ -158,6 +160,7 @@ export default function Funcionarios() {
   };
 
   const closeModal = () => {
+    if (savingRef.current) return;
     if (isDirty) {
       if (!window.confirm("Você tem alterações não salvas. Deseja realmente cancelar?")) {
         return;
@@ -169,12 +172,14 @@ export default function Funcionarios() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!nome.trim() || !funcaoId || !obraId || saving) return;
+    if (!nome.trim() || !funcaoId || !obraId || savingRef.current) return;
+    savingRef.current = true;
     setSaving(true);
-    setErro('');
+    setFormError('');
+    let createdDuringSave = false;
     try {
-      const payload: Partial<Funcionario> = { 
-        nome, 
+      const payload: Omit<Funcionario, 'id' | 'funcao' | 'obra'> = {
+        nome: nome.trim(),
         funcao_id: funcaoId, 
         obra_id: obraId,
         tipo_colaborador: tipoColaborador,
@@ -199,20 +204,11 @@ export default function Funcionarios() {
         payload.chave_pix = null;
       }
 
-      let fId = editId;
-      if (editId) {
-        await api.updateFuncionario(editId, payload);
-      } else {
-        const created = await api.createFuncionario(payload as any);
-        fId = created.id;
-      }
-
-      if (removeFoto && fId) {
-        await api.updateFuncionario(fId, { photo_path: null });
-      } else if (foto && fId) {
-        const path = await api.uploadEmployeePhoto(foto, fId);
-        await api.updateFuncionario(fId, { photo_path: path });
-      }
+      await saveEmployee(api, editId, payload, foto, removeFoto, created => {
+        createdDuringSave = true;
+        setEditId(created.id);
+        setEditEmployee(created);
+      });
 
       setIsModalOpen(false);
       resetForm();
@@ -222,8 +218,9 @@ export default function Funcionarios() {
       const msg = error.message ? error.message : JSON.stringify(error);
       const status = error.statusCode ? `(Status: ${error.statusCode})` : '';
       const errObj = error.error ? `[${error.error}]` : '';
-      setErro(`Ocorreu um erro: ${msg} ${status} ${errObj}`);
+      setFormError(`${createdDuringSave ? 'Cadastro criado, mas a foto não foi salva. Tente salvar novamente nesta ficha para concluir.' : 'Não foi possível salvar as alterações.'} ${msg} ${status} ${errObj}`);
     } finally {
+      savingRef.current = false;
       setSaving(false);
     }
   }
@@ -231,6 +228,7 @@ export default function Funcionarios() {
   function handleEdit(funcionario: Funcionario) {
     resetForm();
     setEditId(funcionario.id);
+    setEditEmployee(funcionario);
     setNome(funcionario.nome);
     setFuncaoId(funcionario.funcao_id);
     setObraId(funcionario.obra_id);
@@ -277,29 +275,21 @@ export default function Funcionarios() {
     f.nome.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const handleSelectAll = () => {
-    if (selectedIds.length === filteredFuncionarios.length) {
-      setSelectedIds([]);
-    } else {
-      setSelectedIds(filteredFuncionarios.map(f => f.id));
-    }
-  };
-
-  const handleSelect = (id: string) => {
-    if (selectedIds.includes(id)) {
-      setSelectedIds(selectedIds.filter(selId => selId !== id));
-    } else {
-      setSelectedIds([...selectedIds, id]);
-    }
-  };
+  const visibleIds = filteredFuncionarios.map(f => f.id);
+  const allSelected = allVisibleSelected(selectedIds, visibleIds);
+  const handleSelectAll = () => setSelectedIds(ids => toggleVisibleSelection(ids, visibleIds, !allVisibleSelected(ids, visibleIds)));
+  const handleSelect = (id: string) => setSelectedIds(ids => ids.includes(id) ? ids.filter(value => value !== id) : [...ids, id]);
+  const closeMassEdit = () => { if (!massSavingRef.current) setShowMassEdit(false); };
 
   const handleMassEdit = async () => {
+    if (massSavingRef.current || !selectedIds.length) return;
     if (!massEditObraId) {
       alert("Selecione uma obra para alterar.");
       return;
     }
     const confirm = window.confirm(`Você está prestes a alterar a obra de ${selectedIds.length} funcionários. Deseja continuar?`);
     if (!confirm) return;
+    massSavingRef.current = true;
     setMassEditSaving(true);
     setErro('');
     try {
@@ -309,7 +299,7 @@ export default function Funcionarios() {
       selectedIds.forEach(id => {
         const index = updated.findIndex(f => f.id === id);
         if (index > -1) {
-          updated[index] = { ...updated[index], obra_id: massEditObraId };
+          updated[index] = { ...updated[index], obra_id: massEditObraId, obra: obras.find(o => o.id === massEditObraId) };
         }
       });
       setFuncionarios(updated);
@@ -321,6 +311,7 @@ export default function Funcionarios() {
     } catch (err: any) {
       alert(err.message || "Erro ao atualizar funcionários.");
     } finally {
+      massSavingRef.current = false;
       setMassEditSaving(false);
     }
   };
@@ -375,12 +366,19 @@ export default function Funcionarios() {
           </div>
           <input
             type="text"
+            aria-label="Buscar funcionário por nome"
             placeholder="Buscar por nome..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-50/50"
           />
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500">
+        <button type="button" onClick={handleSelectAll} disabled={loading || !visibleIds.length} aria-pressed={allSelected} className="md:hidden text-blue-700 disabled:opacity-50">{allSelected ? 'Desmarcar busca' : 'Selecionar todos na busca'}</button>
+        <span aria-live="polite">{loading ? 'Atualizando…' : `${filteredFuncionarios.length} de ${funcionarios.length} funcionários no filtro ${filter}`}{updatedAt && ` · Atualizado às ${updatedAt.toLocaleTimeString('pt-BR')}`}</span>
+        <button type="button" onClick={() => void loadData()} disabled={loading} className="text-blue-700 disabled:opacity-50">Atualizar lista</button>
       </div>
 
       {/* Mass Edit Banner */}
@@ -410,11 +408,11 @@ export default function Funcionarios() {
       )}
 
       {showMassEdit && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-gray-900/50 backdrop-blur-sm">
+        <CenteredDialog labelId="mass-edit-title" onClose={closeMassEdit}>
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="flex items-center justify-between p-4 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Alteração em Massa</h3>
-              <button onClick={() => setShowMassEdit(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+              <h3 id="mass-edit-title" className="text-lg font-bold text-gray-900">Alteração em Massa</h3>
+              <button aria-label="Fechar alteração em massa" disabled={massEditSaving} onClick={closeMassEdit} className="text-gray-400 hover:text-gray-600 transition-colors">
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -428,6 +426,7 @@ export default function Funcionarios() {
                 </label>
                 <select
                   id="massObra"
+                  disabled={massEditSaving}
                   value={massEditObraId}
                   onChange={(e) => setMassEditObraId(e.target.value)}
                   className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -446,7 +445,7 @@ export default function Funcionarios() {
             </div>
             <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
               <button
-                onClick={() => setShowMassEdit(false)}
+                disabled={massEditSaving} onClick={closeMassEdit}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm"
               >
                 Cancelar
@@ -460,17 +459,17 @@ export default function Funcionarios() {
               </button>
             </div>
           </div>
-        </div>
+        </CenteredDialog>
       )}
 
       {/* Desktop Table */}
-      <div className="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-hidden">
+      <div className="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50/80">
             <tr>
               <th scope="col" className="px-6 py-4 w-10 text-center">
-                <button onClick={handleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
-                  {selectedIds.length > 0 && selectedIds.length === filteredFuncionarios.length ? (
+                <button aria-label="Selecionar todos na busca" aria-pressed={allSelected} disabled={loading || !visibleIds.length} onClick={handleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
+                  {allSelected ? (
                     <CheckSquare className="h-5 w-5 text-blue-600" />
                   ) : (
                     <Square className="h-5 w-5" />
@@ -504,7 +503,7 @@ export default function Funcionarios() {
             ) : filteredFuncionarios.map((funcionario) => (
               <tr key={funcionario.id} className={`hover:bg-gray-50/80 transition-colors ${funcionario.ativo === false ? 'opacity-60 bg-gray-50' : ''}`}>
                 <td className="px-6 py-4 whitespace-nowrap text-center">
-                  <button onClick={() => handleSelect(funcionario.id)} className="text-gray-400 hover:text-blue-600 transition-colors">
+                  <button aria-label={`Selecionar ${funcionario.nome}`} aria-pressed={selectedIds.includes(funcionario.id)} onClick={() => handleSelect(funcionario.id)} className="text-gray-400 hover:text-blue-600 transition-colors">
                     {selectedIds.includes(funcionario.id) ? (
                       <CheckSquare className="h-5 w-5 text-blue-600" />
                     ) : (
@@ -586,7 +585,7 @@ export default function Funcionarios() {
             <div key={funcionario.id} className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col gap-4 relative overflow-hidden ${funcionario.ativo === false ? 'opacity-75 bg-gray-50/50' : ''}`}>
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
-                  <button onClick={() => handleSelect(funcionario.id)} className="text-gray-400 hover:text-blue-600 transition-colors -ml-1">
+                  <button aria-label={`Selecionar ${funcionario.nome}`} aria-pressed={selectedIds.includes(funcionario.id)} onClick={() => handleSelect(funcionario.id)} className="text-gray-400 hover:text-blue-600 transition-colors -ml-1">
                     {selectedIds.includes(funcionario.id) ? (
                       <CheckSquare className="h-6 w-6 text-blue-600" />
                     ) : (
@@ -660,32 +659,31 @@ export default function Funcionarios() {
 
       {/* Registration/Edit Modal */}
       {isModalOpen && (
-        <div 
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-gray-900/60 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-        >
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-in zoom-in-95 duration-200">
+        <CenteredDialog labelId="employee-dialog-title" onClose={closeModal}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-200">
             <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 className="text-xl font-bold text-gray-900">
+              <h3 id="employee-dialog-title" className="text-xl font-bold text-gray-900">
                 {editId ? 'Editar Funcionário' : 'Cadastrar Funcionário'}
               </h3>
               <button 
+                disabled={saving}
                 onClick={closeModal} 
+                aria-label="Fechar ficha do funcionário"
                 className="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-5 sm:p-6">
-              {erro && (
+            <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6">
+              {formError && (
                 <div className="mb-6 rounded-lg bg-red-50 p-4 border border-red-100">
-                  <p className="text-sm text-red-700">{erro}</p>
+                  <p role="alert" className="text-sm text-red-700">{formError}</p>
                 </div>
               )}
 
-              <form id="funcionarioForm" onSubmit={handleSubmit} className="space-y-8">
+              <form id="funcionarioForm" onSubmit={handleSubmit}>
+                <fieldset disabled={saving} className="space-y-8 min-w-0">
                 
                 {/* Photo Section */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-gray-100">
@@ -710,12 +708,14 @@ export default function Funcionarios() {
                         id="foto"
                         accept="image/*"
                         onChange={handlePhotoSelect}
-                        className="hidden"
+                        className="sr-only"
+                        aria-label="Selecionar foto do funcionário"
                       />
                     </label>
                   </div>
                   <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">Foto do Perfil</h4>
+                    <h4 className="font-semibold text-gray-900 mb-1">{nome || 'Novo funcionário'}</h4>
+                    <p className="text-sm text-gray-600 mb-2">{tipoColaborador}{editEmployee && ` · ${editEmployee.ativo ? 'Ativo' : 'Inativo'}`}</p>
                     <p className="text-sm text-gray-500 mb-3">Recomendado: imagem quadrada, formato JPG ou PNG.</p>
                     {((currentPhotoPath && !removeFoto) || previewUrl) && (
                       <button
@@ -763,6 +763,7 @@ export default function Funcionarios() {
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
                       >
                         <option value="" disabled>Selecione uma função</option>
+                        {editEmployee?.funcao && !funcoes.some(f => f.id === editEmployee.funcao_id) && <option value={editEmployee.funcao_id}>{editEmployee.funcao.nome} (atual)</option>}
                         {funcoes.map((f) => (
                           <option key={f.id} value={f.id}>{f.nome}</option>
                         ))}
@@ -781,6 +782,7 @@ export default function Funcionarios() {
                         className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
                       >
                         <option value="" disabled>Selecione uma obra</option>
+                        {editEmployee?.obra && !obras.some(o => o.id === editEmployee.obra_id) && <option value={editEmployee.obra_id}>{editEmployee.obra.nome} (atual)</option>}
                         {obras.filter(o => !o.parent_obra_id).map(o => (
                           <optgroup key={o.id} label={o.nome}>
                             <option value={o.id}>{o.nome} (Principal)</option>
@@ -903,12 +905,14 @@ export default function Funcionarios() {
                   </div>
                 </div>
 
+                </fieldset>
               </form>
             </div>
 
             <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
               <button
                 type="button"
+                disabled={saving}
                 onClick={closeModal}
                 className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm transition-colors"
               >
@@ -934,7 +938,7 @@ export default function Funcionarios() {
               </button>
             </div>
           </div>
-        </div>
+        </CenteredDialog>
       )}
     </div>
   );
