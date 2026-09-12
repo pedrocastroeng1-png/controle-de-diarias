@@ -4,6 +4,7 @@ import type { TablesUpdate } from '../types/database.generated';
 import { calcularDiaria } from './diarias';
 import { requireToolStatus } from './tool-status';
 import { collectPages } from './pagination';
+import { aplicarAtestados } from './atestados-relatorio';
 
 import {
   AutomationRule,
@@ -662,6 +663,14 @@ export const api = {
   },
 
   // Storage
+  getRelatorioComAtestados: async (inicio?: string, fim?: string, obraId?: string) => {
+    if (!getEmpresaId()) throw new Error('Empresa não identificada. Faça login novamente.');
+    // Merge before filtering worksite: actual attendance may reference a previous worksite.
+    const [registros, atestados, funcionarios] = await Promise.all([
+      api.getRelatorio(inicio, fim), api.getAtestados(), api.getFuncionarios('todos'),
+    ]);
+    return { registros: aplicarAtestados(registros, atestados, funcionarios, { inicio, fim, obraId }), funcionarios };
+  },
 
   uploadPhoto: async (
     bucket: string,
@@ -885,11 +894,10 @@ export const api = {
   // Atestados
   getAtestados: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(
-      supabase.from("medical_certificates").select("*, funcionario:funcionarios(*)")
-    );
-    if (error) throw error;
-    return data;
+    const query = withEmpresa(
+      supabase.from("medical_certificates").select("*, funcionario:funcionarios(*)", { count: 'exact' })
+    ).order('id');
+    return collectPages((from, to) => query.range(from, to));
   },
 
   createAtestado: async (atestado: any): Promise<any> => {

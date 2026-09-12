@@ -17,7 +17,7 @@ Base GitHub: `f3b75ab1e1a8be54f04fc495be3adb8858a0c5e1`. Nenhuma alteração no 
 
 ## Bloqueios para declarar o sistema pronto
 
-1. Atestados: o frontend atual remunera dias de atestado e pode sobrepor presença/falta. A view da folha não faz isso. A regra precisa de decisão explícita; não se retirou remuneração de ninguém nesta etapa. A correção do filtro/paginação não resolve essa divergência.
+1. Atestados: regra confirmada por Pedro em 12/09/2026 — diária integral apenas de segunda a sexta para diaristas. Implementada na camada compartilhada de relatórios, PDF e Excel, com um lançamento por empresa/funcionário/data. Sobreposição com presença, meia diária, falta ou outro atestado resulta em uma única diária integral. Preserva a obra da presença histórica e respeita período/vínculo. CLT permanece sem cálculo financeiro de atestado. A view bruta no banco ainda não inclui esses valores; esta etapa não alterou views/migrations. A integração definitiva da regra ao banco e os demais dashboards continuam pendentes.
 2. Ferramenta quebrada: decidir entre um status novo e um fluxo com os status existentes; qualquer mudança no enum exige migration autorizada.
 3. Segurança: RLS público, autenticação customizada em usuarios, policies de Storage e funções privilegiadas continuam como estavam. Isolamento via filtro do navegador não é segurança. Migração de Auth/RLS exige contas e estratégia de transição para não bloquear usuários.
 4. Baseline: inventário/tipos não substituem dump restaurável, grants, corpos de funções, Edge Functions, secrets e cron. Histórico local/remoto ainda não está integralmente reconciliado.
@@ -34,5 +34,7 @@ Base GitHub: `f3b75ab1e1a8be54f04fc495be3adb8858a0c5e1`. Nenhuma alteração no 
 - A view de relatório tem 1.065 linhas; a folha tem 714 e soma R$ 70.020,00 na consulta de 11/09/2026. Totais não são comprovantes de transferência.
 
 ## Validação e próximo passo
+
+Atestados: 11 testes adicionais cobrem finais de semana, fusos/DST, sobreposição, meia diária, filtros/vínculo, obra histórica, CLT, homônimos, zeros e dados inválidos. Consulta SQL somente leitura confirmou 10 dias de atestado elegíveis, cobertura de R$ 800,00, sendo R$ 240,00 já cobertos por presenças. O acréscimo líquido à folha bruta é R$ 560,00; isso não é confirmação de pagamento. Não há calendário de feriados no sistema: a regra implementada é segunda a sexta, sem exclusão automática de feriados.
 
 Validação local em 11/09/2026: `npm ci --ignore-scripts` passou, `npm run check` passou (TypeScript + 19 testes), `npm run build` passou com avisos existentes de bundle grande/importações mistas. Testes cobrem fórmula, paginação, retornos RPC e nomes literais de relações/RPCs; não houve gravação em produção. Não houve homologação visual/end-to-end: o navegador de verificação não está instalado neste ambiente. Revisar diff em branch separada. Não fazer merge para main antes das decisões acima e da homologação. ZIP e financeiro CLT continuam fora desta etapa.
