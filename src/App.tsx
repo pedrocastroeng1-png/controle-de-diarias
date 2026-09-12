@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 import React from 'react';
+import { isSupabaseConfigured } from './lib/supabase';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { AdminLayout, OperadorLayout } from './components/layout/Layout';
@@ -46,6 +47,9 @@ import OwnerUsuarios from './pages/owner/Usuarios';
 import Placeholder from './pages/owner/Placeholder';
 
 function App() {
+  if (!isSupabaseConfigured) {
+    return <main className="p-8"><h1 className="text-xl font-bold">Configuração necessária</h1><p>Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY para conectar o sistema. Nenhuma consulta foi enviada.</p></main>;
+  }
   return (
     <BrowserRouter>
       <AuthProvider>

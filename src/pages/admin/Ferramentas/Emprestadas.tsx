@@ -320,7 +320,7 @@ export default function Emprestadas() {
                               </div>
                               <div>
                                 <p className="text-sm font-medium text-gray-900">
-                                  {emp.ferramenta?.codigo_interno} - {emp.ferramenta?.nome} {emp.ferramenta?.status === 'QUEBRADA' && <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">Quebrada</span>}
+                                  {emp.ferramenta?.codigo_interno} - {emp.ferramenta?.nome}
                                 </p>
                                 <p className="text-xs text-gray-500">
                                   {emp.ferramenta?.marca} {emp.ferramenta?.modelo && `• ${emp.ferramenta.modelo}`} 
@@ -339,7 +339,8 @@ export default function Emprestadas() {
                                 <CornerDownLeft className="h-3.5 w-3.5 mr-1 text-blue-600" /> Devolver
                               </button>
                               <button 
-                                onClick={(e) => { e.stopPropagation(); openQuebrada(emp); }}
+                                disabled
+                                title="Status QUEBRADA indisponível no banco atual; fluxo pendente de definição."
                                 className="text-xs inline-flex items-center px-3 py-1.5 border border-transparent shadow-sm font-medium rounded text-orange-700 bg-orange-100 hover:bg-orange-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-orange-500"
                               >
                                 <Frown className="h-3.5 w-3.5 mr-1" /> Quebrada

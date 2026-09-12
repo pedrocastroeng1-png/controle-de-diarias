@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { fornecedorIdFromResult } from './rpc-results';
 import { withEmpresa, getEmpresaId } from './api';
 
 const getCurrentUserId = () => {
@@ -100,10 +101,9 @@ export const apiMateriais = {
       p_tipo: params.tipo,
       p_quantidade: params.quantidade,
       p_data_movimento: params.data_movimento || new Date().toISOString().split('T')[0],
-      p_obra_destino_id: params.obra_destino_id || null,
-      p_valor_unitario: null,
-      p_motivo: params.motivo || null,
-      p_observacao: params.observacao || null,
+      p_obra_destino_id: params.obra_destino_id || undefined,
+      p_motivo: params.motivo || undefined,
+      p_observacao: params.observacao || undefined,
       p_usuario_id: usuario_id
     });
     
@@ -130,7 +130,7 @@ export const apiMateriaisRPC = {
     });
     
     if (error) throw error;
-    return data;
+    return fornecedorIdFromResult(data);
   },
   
   registrarCompraMaterial: async (params: {
@@ -148,12 +148,13 @@ export const apiMateriaisRPC = {
     if (!empresa_id) throw new Error("Empresa não identificada.");
     if (!usuario_id) throw new Error("Usuário não identificado.");
     
+    if (!params.p_fornecedor_id) throw new Error('Selecione um fornecedor.');
     const { data, error } = await supabase.rpc('registrar_compra_material', {
-      p_data_compra: params.p_data_compra,
+      p_data_compra: params.p_data_compra || undefined,
       p_empresa_id: empresa_id,
       p_fornecedor_id: params.p_fornecedor_id,
       p_itens: params.p_itens,
-      p_numero_recibo: params.p_numero_recibo,
+      p_numero_recibo: params.p_numero_recibo || undefined,
       p_obra_id: params.p_obra_id,
       p_usuario_id: usuario_id
     });

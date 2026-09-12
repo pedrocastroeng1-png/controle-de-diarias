@@ -208,7 +208,6 @@ export default function ListaFerramentas() {
               <option value="ATIVA">Ativa</option>
               <option value="EMPRESTADA">Emprestada</option>
               <option value="EM_REPARO">Em Reparo</option>
-              <option value="QUEBRADA">Quebrada</option>
               <option value="PERDIDA">Perdida</option>
               <option value="INATIVA">Inativa</option>
             </select>

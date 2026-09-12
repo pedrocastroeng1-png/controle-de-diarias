@@ -1,5 +1,10 @@
 import { supabase } from "./supabase";
 import bcrypt from "bcryptjs";
+import type { TablesUpdate } from '../types/database.generated';
+import { calcularDiaria } from './diarias';
+import { requireToolStatus } from './tool-status';
+import { collectPages } from './pagination';
+import { aplicarAtestados } from './atestados-relatorio';
 
 import {
   AutomationRule,
@@ -23,11 +28,11 @@ export const getEmpresaId = () => {
   return null;
 };
 
-export const withEmpresa = (query: any, isAuth = false) => {
+export const withEmpresa = <T>(query: T, isAuth = false): T => {
   const empId = getEmpresaId();
   if (empId && !isAuth) {
-    if (typeof query.eq !== "function") {
-      return new Proxy(query, {
+    if (typeof (query as any).eq !== "function") {
+      return new Proxy(query as object, {
         get(target, prop) {
           if (["select", "update", "delete"].includes(prop as string)) {
             return (...args: any[]) => {
@@ -37,9 +42,9 @@ export const withEmpresa = (query: any, isAuth = false) => {
           }
           return (target as any)[prop];
         },
-      });
+      }) as T;
     }
-    return query.eq("empresa_id", empId);
+    return (query as any).eq("empresa_id", empId) as T;
   }
   return query;
 };
@@ -377,7 +382,7 @@ export const api = {
     let query = withEmpresa(
       supabase
         .from("funcionarios")
-        .select(`*, funcao:funcoes(*), obra:obras(*)`)).order("nome");
+        .select(`*, funcao:funcoes(*), obra:obras(*)`, { count: 'exact' })).order("nome").order('id');
 
     if (status === "ativos") {
       query = query.eq("ativo", true);
@@ -388,10 +393,7 @@ export const api = {
       query = query.or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null");
     }
 
-    let { data, error } = await query;
-    
-    if (error) throw error;
-    return data as any;
+    return await collectPages((from, to) => query.range(from, to)) as Funcionario[];
   },
   createFuncionario: async (
     funcionario: Omit<Funcionario, "id" | "funcao" | "obra">,
@@ -412,7 +414,7 @@ export const api = {
   },
   updateFuncionario: async (
     id: string,
-    funcionario: Partial<Funcionario>,
+    funcionario: TablesUpdate<'funcionarios'>,
   ): Promise<Funcionario> => {
     if (!supabase) throw new Error("Supabase não configurado");
     const { data, error } = await withEmpresa(supabase.from("funcionarios").update(funcionario),
@@ -580,7 +582,8 @@ export const api = {
     obraId?: string,
   ): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    let query = supabase.from("vw_folha_diarias").select("*");
+    let query = withEmpresa(supabase.from("vw_folha_diarias").select("*", { count: 'exact' }))
+      .order('data', { ascending: false }).order('funcionario_id');
     
     if (dataInicial) {
       query = query.gte("data", dataInicial);
@@ -592,9 +595,7 @@ export const api = {
       query = query.eq("obra_id", obraId);
     }
     
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
+    return collectPages((from, to) => query.range(from, to));
   },
 
   getRelatorioCLT: async (
@@ -603,7 +604,8 @@ export const api = {
     obraId?: string,
   ): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    let query = supabase.from("vw_relatorio_funcionarios_clt").select("*");
+    let query = withEmpresa(supabase.from("vw_relatorio_funcionarios_clt").select("*", { count: 'exact' }))
+      .order('data', { ascending: false }).order('funcionario_id');
     
     if (dataInicial) {
       query = query.gte("data", dataInicial);
@@ -615,9 +617,7 @@ export const api = {
       query = query.eq("obra_id", obraId);
     }
     
-    const { data, error } = await query;
-    if (error) throw error;
-    return data || [];
+    return collectPages((from, to) => query.range(from, to));
   },
 
   getRelatorio: async (
@@ -626,10 +626,10 @@ export const api = {
     obraId?: string,
   ): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    let query = supabase
+    let query = withEmpresa(supabase
       .from("vw_relatorio_presencas")
-      .select("*")
-      .order("data", { ascending: false });
+      .select("*", { count: 'exact' }))
+      .order("data", { ascending: false }).order('funcionario_id');
 
     if (dataInicial) {
       query = query.gte("data", dataInicial);
@@ -641,10 +641,7 @@ export const api = {
       query = query.eq("obra_id", obraId);
     }
 
-    const { data, error } = await query;
-    if (error) {
-      throw error;
-    }
+    const data = await collectPages((from, to) => query.range(from, to));
     
     const filteredData = (data as any[]).filter((row) => {
       const dataDiaria = new Date(row.data).getTime();
@@ -666,6 +663,14 @@ export const api = {
   },
 
   // Storage
+  getRelatorioComAtestados: async (inicio?: string, fim?: string, obraId?: string) => {
+    if (!getEmpresaId()) throw new Error('Empresa não identificada. Faça login novamente.');
+    // Merge before filtering worksite: actual attendance may reference a previous worksite.
+    const [registros, atestados, funcionarios] = await Promise.all([
+      api.getRelatorio(inicio, fim), api.getAtestados(), api.getFuncionarios('todos'),
+    ]);
+    return { registros: aplicarAtestados(registros, atestados, funcionarios, { inicio, fim, obraId }), funcionarios };
+  },
 
   uploadPhoto: async (
     bucket: string,
@@ -816,12 +821,12 @@ export const api = {
       supabase
         .from("presencas")
         .select(
-          "presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria)",
+          "presente, tipo_diaria, percentual_diaria, funcionario:funcionarios!inner(tipo_colaborador, funcao:funcoes(valor_diaria))",
         ),
     )
       .eq("data", hoje)
       .or("tipo_colaborador.eq.DIARISTA,tipo_colaborador.is.null", {
-        referencedTable: "funcionarios",
+        referencedTable: "funcionario",
       });
     if (error) throw error;
     let presentesHoje = 0;
@@ -830,9 +835,7 @@ export const api = {
     presencasHojeData?.forEach((p: any) => {
       if (p.presente) {
         presentesHoje++;
-        let valor = Number((p.funcionario as any)?.funcao?.valor_diaria || 0);
-        if (p.tipo_diaria === "MEIA_DIARIA") valor = valor / 2;
-        valorTotalHoje += valor;
+        valorTotalHoje += calcularDiaria({ ...p, tipo_colaborador: p.funcionario?.tipo_colaborador, valor_diaria: p.funcionario?.funcao?.valor_diaria });
       } else {
         faltasHoje++;
       }
@@ -891,11 +894,10 @@ export const api = {
   // Atestados
   getAtestados: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { data, error } = await withEmpresa(
-      supabase.from("medical_certificates").select("*, funcionario:funcionarios(*)")
-    );
-    if (error) throw error;
-    return data;
+    const query = withEmpresa(
+      supabase.from("medical_certificates").select("*, funcionario:funcionarios(*)", { count: 'exact' })
+    ).order('id');
+    return collectPages((from, to) => query.range(from, to));
   },
 
   createAtestado: async (atestado: any): Promise<any> => {
@@ -1167,6 +1169,10 @@ export const api = {
   ): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
 
+    if (condicao !== 'PERFEITO_ESTADO' && condicao !== 'DANIFICADA') {
+      throw new Error('Condição de devolução inválida.');
+    }
+
     const { data: emprestimo } = await withEmpresa(
       supabase.from("emprestimos_ferramentas"),
     )
@@ -1289,7 +1295,8 @@ export const api = {
     usuario_id: string,
   ): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    const { error: updError } = await withEmpresa(supabase.from("ferramentas").update({ status: "QUEBRADA" }).eq("id", ferramenta_id));
+    const status = requireToolStatus('QUEBRADA');
+    const { error: updError } = await withEmpresa(supabase.from("ferramentas").update({ status }).eq("id", ferramenta_id));
     if (updError) throw updError;
 
     const { data: fData } = await withEmpresa(supabase.from("ferramentas").select("nome, codigo_interno"),
@@ -1472,7 +1479,7 @@ export const api = {
         p_usuario_id: usuario_id,
         p_token: token,
         p_plataforma: plataforma.toUpperCase(),
-        p_dispositivo_id: dispositivo_id ?? null,
+        p_dispositivo_id: dispositivo_id,
       });
 
       if (error) {

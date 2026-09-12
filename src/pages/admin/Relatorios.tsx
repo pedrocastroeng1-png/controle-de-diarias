@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
+import { valorFinanceiro } from '../../lib/atestados-relatorio';
 import { Obra, Presenca } from '../../lib/types';
 import { format, parseISO } from 'date-fns';
 import { useLocation } from 'react-router-dom';
@@ -54,70 +55,14 @@ export default function Relatorios() {
   async function loadRelatorio(inicio: string, fim: string, obra: string) {
     setLoading(true);
     setErro('');
-    let data: any[] = [];
-    let atestados: any[] = [];
-    let funcionarios: any[] = [];
-
     try {
-      [data, funcionarios] = await Promise.all([
-        api.getRelatorio(inicio, fim, obra),
-        api.getFuncionarios('todos')
-      ]);
-      
-      try {
-        atestados = await api.getAtestados(); // Fetch all or we could create a date-filtered one
-      } catch (err) {
-        console.error("Erro ao carregar atestados", err);
-      }
-      
-      const funcionariosMap = new Map(funcionarios.map(f => [f.id, f]));
-      const atestadoRecords = [];
-      
-      // Parse atestados and create simulated records
-      atestados.forEach(atestado => {
-        const start = parseISO(atestado.start_date);
-        const end = parseISO(atestado.end_date);
-        let curr = start;
-        
-        while (curr <= end) {
-          const dateStr = format(curr, 'yyyy-MM-dd');
-          
-          // Only include if it falls within the requested range
-          if ((!inicio || dateStr >= inicio) && (!fim || dateStr <= fim)) {
-            const func = funcionariosMap.get(atestado.employee_id);
-            if (func) {
-              // Check if obra matches
-              if (!obra || func.obra?.nome === obra) {
-                atestadoRecords.push({
-                  id: `atestado-${atestado.id}-${dateStr}`,
-                  data: dateStr,
-                  status: 'ATESTADO MÉDICO',
-                  funcionario: func.nome,
-                  funcao: func.funcao?.nome || '',
-                  valor_diaria: func.funcao?.valor_diaria || 0,
-                  obra: func.obra?.nome || '',
-                  atestado_original_id: atestado.id,
-                  atestado_description: atestado.description,
-                  atestado_photo_path: atestado.photo_path
-                });
-              }
-            }
-          }
-          curr = new Date(curr.getTime() + 86400000); // add one day
-        }
-      });
-      
-      // Merge and sort
-      const merged = [...data, ...atestadoRecords].sort((a, b) => {
-        if (a.data > b.data) return -1;
-        if (a.data < b.data) return 1;
-        return a.funcionario.localeCompare(b.funcionario);
-      });
-      
-      setRelatorio(merged);
+      const { registros, funcionarios } = await api.getRelatorioComAtestados(inicio, fim, obra);
+      setRelatorio(registros);
       setFuncionariosBase(funcionarios);
     } catch (e) {
-      setErro('Ocorreu um erro ao gerar o relatório.');
+      setRelatorio([]);
+      setFuncionariosBase([]);
+      setErro('Não foi possível calcular o relatório completo, incluindo os atestados. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -125,8 +70,7 @@ export default function Relatorios() {
 
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    const obraSelecionada = obras.find(o => o.id === obraId)?.nome || '';
-    loadRelatorio(dataInicial, dataFinal, obraSelecionada);
+    loadRelatorio(dataInicial, dataFinal, obraId);
   }
 
   const agruparPorFuncionario = () => {
@@ -151,7 +95,7 @@ export default function Relatorios() {
         }
         
         // Use row's valor_calculado for the exact amount (fallback to valor_diaria if old record)
-        let rowValor = Number(p.valor_calculado) || Number(p.valor_diaria) || 0;
+        let rowValor = valorFinanceiro(p);
         if (agrupado[fId].isCLT) {
            rowValor = 0;
         }
@@ -243,10 +187,10 @@ export default function Relatorios() {
               records: []
             };
           }
-          const rowValor = Number(p.valor_calculado) || Number(p.valor_diaria) || 0;
+          const rowValor = valorFinanceiro(p);
           fAgrupado[fId].records.push(p);
 
-          if (p.status === 'PRESENTE') {
+          if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO') {
             if (p.tipo_diaria === 'MEIA_DIARIA') {
                fAgrupado[fId].dias += 0.5;
                fAgrupado[fId].meias += 1;
@@ -273,11 +217,11 @@ export default function Relatorios() {
       let totalFolha = 0;
       
       filteredRelatorio.forEach((r: any) => {
-        if (r.status === 'PRESENTE' && r.tipo_diaria !== 'MEIA_DIARIA') inteirasGeral++;
+        if ((r.status === 'PRESENTE' || r.status === 'ATESTADO MÉDICO') && r.tipo_diaria !== 'MEIA_DIARIA') inteirasGeral++;
         if (r.status === 'MEIA DIÁRIA' || r.tipo_diaria === 'MEIA_DIARIA') meiasGeral++;
         if (r.status === 'FALTOU') faltasGeral++;
-        if (r.status === 'PRESENTE' || r.status === 'MEIA DIÁRIA') {
-             totalFolha += (Number(r.valor_calculado) || Number(r.valor_diaria) || 0);
+        if (r.status === 'PRESENTE' || r.status === 'MEIA DIÁRIA' || r.status === 'ATESTADO MÉDICO') {
+             totalFolha += (valorFinanceiro(r));
         }
       });
       const totalFuncionarios = agrupado.length;
@@ -450,7 +394,7 @@ export default function Relatorios() {
             
             doc.setTextColor(0, 0, 0);
             doc.setFont("helvetica", "normal");
-            const vCalc = Number(record.valor_calculado) || 0;
+            const vCalc = valorFinanceiro(record);
             doc.text(`VALOR: ${formatCurrency(vCalc)}`, 110, currentY);
             
             let photoMeta: any = null;
@@ -670,9 +614,9 @@ export default function Relatorios() {
         : 'Todos os períodos';
 
       // Fetch from new views
-      const obraSelecionada = obras.find(o => o.id === obraId)?.nome || '';
-      const folhaData = await api.getFolhaDiarias(dataInicial, dataFinal, obraSelecionada);
-      const cltData = await api.getRelatorioCLT(dataInicial, dataFinal, obraSelecionada);
+      const { registros } = await api.getRelatorioComAtestados(dataInicial, dataFinal, obraId);
+      const folhaData = registros.filter(row => row.tipo_colaborador === 'DIARISTA' && ['PRESENTE', 'ATESTADO MÉDICO'].includes(row.status ?? ''));
+      const cltData = registros.filter(row => row.tipo_colaborador === 'CLT');
 
       // Group DIARISTAS
       const diaristasMap: Record<string, any> = {};
@@ -691,7 +635,7 @@ export default function Relatorios() {
             total: 0
           };
         }
-        let rowValor = Number(p.valor_calculado) || Number(p.valor_diaria) || 0;
+        let rowValor = valorFinanceiro(p);
         if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO' || p.status === 'MEIA_DIARIA' || p.tipo_diaria === 'MEIA_DIARIA' || p.status === 'MEIA DIÁRIA') {
           diaristasMap[fId].dias += 1;
           diaristasMap[fId].total += rowValor;
@@ -718,7 +662,7 @@ export default function Relatorios() {
         { header: 'Valor Calculado', key: 'valor', width: 15 }
       ];
 
-      const folhaOrdenada = [...folhaData].sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+      const folhaOrdenada = [...folhaData].sort((a, b) => a.data!.localeCompare(b.data!));
       
       folhaOrdenada.forEach((p) => {
         if (p.eh_clt || p.tipo_colaborador === "CLT") return;
@@ -738,7 +682,7 @@ export default function Relatorios() {
           tipo_diaria: p.tipo_diaria === 'MEIA_DIARIA' ? 'Meia Diária' : 'Diária',
           percentual: (p.percentual_diaria || (p.tipo_diaria === 'MEIA_DIARIA' ? 50 : 100)) + '%',
           valor_base: Number(p.valor_diaria) || 0,
-          valor: Number(p.valor_calculado) || Number(p.valor_diaria) || 0
+          valor: valorFinanceiro(p)
         });
       });
       
@@ -1398,7 +1342,7 @@ const handleExportPagamentosCaixa = () => {
                     const tipoDiaria = p.tipo_diaria === 'MEIA_DIARIA' || p.status === 'MEIA DIÁRIA' ? 'MEIA DIÁRIA' : 'DIÁRIA';
                     const percent = p.percentual_diaria || (tipoDiaria === 'MEIA DIÁRIA' ? 50 : 100);
                     const vBase = Number(p.valor_diaria) || Number(p.valorDiaria) || 0;
-                    const vCalc = Number(p.valor_calculado) || vBase;
+                    const vCalc = valorFinanceiro(p);
 
                     return (
                       <tr key={idx} className="hover:bg-gray-50">

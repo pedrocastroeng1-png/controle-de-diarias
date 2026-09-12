@@ -36,7 +36,6 @@ export default function Dashboard() {
     const countByStatus = {
       ATIVA: 0,
       EMPRESTADA: 0,
-      QUEBRADA: 0,
       EM_REPARO: 0,
       PERDIDA: 0,
       INATIVA: 0
@@ -128,7 +127,7 @@ export default function Dashboard() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
           <p className="text-sm font-medium text-gray-500">Aguardando Reparo (Quebradas)</p>
           <div className="mt-1 flex items-center justify-between">
-            <h3 className="text-2xl font-bold text-gray-900">{stats.countByStatus.QUEBRADA}</h3>
+            <p className="text-sm text-amber-700">Indisponível no banco atual</p>
             <div className="p-2 bg-red-50 text-red-600 rounded-lg"><AlertTriangle className="h-5 w-5" /></div>
           </div>
         </div>
