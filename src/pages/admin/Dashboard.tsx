@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { api } from '../../lib/api';
-import { calcularDiaria } from '../../lib/diarias';
-import { supabase } from '../../lib/supabase';
+import type { RegistroRelatorio } from '../../lib/atestados-relatorio';
+import { dataEmMaceio, funcionariosNasObras, custoDasObras } from '../../lib/dashboard-data';
 import { Funcionario, Obra, Funcao, Presenca } from '../../lib/types';
 import { HardHat, Users, CheckCircle, XCircle, AlertTriangle, Info, ChevronRight, Activity, ArrowLeft, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
@@ -13,67 +13,66 @@ export default function Dashboard() {
   const [funcoes, setFuncoes] = useState<Funcao[]>([]);
   const [presencas, setPresencas] = useState<Presenca[]>([]);
   
+  const [financeiro, setFinanceiro] = useState<RegistroRelatorio[]>([]);
   const [erro, setErro] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [selectedParentObraId, setSelectedParentObraId] = useState<string | null>(null);
 
-  const hoje = new Date();
-  const dataStr = format(hoje, 'yyyy-MM-dd');
+  const [dataStr, setDataStr] = useState(() => dataEmMaceio());
+  const hoje = new Date(`${dataStr}T12:00:00`);
   const hojeFormatado = format(hoje, "dd 'de' MMMM", { locale: ptBR });
 
   useEffect(() => {
-    let channel: any;
+    const timer = window.setInterval(() => setDataStr(dataEmMaceio()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
+  useEffect(() => {
+    let disposed = false;
+    let loading = false;
     async function loadData() {
+      if (loading || disposed) return;
+      loading = true;
       try {
-        setIsLoading(true);
-        const [obrasData, funcoesData, funcionariosData, presencasData] = await Promise.all([
-          api.getObras(),
-          api.getFuncoes(),
-          api.getFuncionarios('todos', false),
-          api.getPresencas(dataStr)
+        const [obrasData, funcoesData, relatorioData, presencasData] = await Promise.all([
+          api.getObras(), api.getFuncoes(), api.getRelatorioComAtestados(dataStr, dataStr), api.getPresencas(dataStr)
         ]);
-
+        if (disposed) return;
         setObras(obrasData);
         setFuncoes(funcoesData);
-        setFuncionarios(funcionariosData);
+        setFuncionarios(relatorioData.funcionarios);
+        setFinanceiro(relatorioData.registros);
         setPresencas(presencasData);
-
-        // Se houver apenas 1 obra principal ativa, auto-seleciona ela.
-        const parentObras = obrasData.filter(o => !o.parent_obra_id && o.ativo !== false);
-        if (parentObras.length === 1) {
-          setSelectedParentObraId(parentObras[0].id);
-        }
-
-        // Setup realtime subscription for presencas
-        if (supabase) {
-          channel = supabase.channel('public:presencas')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'presencas', filter: `data=eq.${dataStr}` }, () => {
-              // Reload presencas on any change
-              api.getPresencas(dataStr).then(setPresencas).catch(console.error);
-            })
-            .subscribe();
-        }
-
-      } catch (error) {
-        setErro('Ocorreu um erro ao carregar os dados.');
+        setErro('');
+        const parents = obrasData.filter(o => !o.parent_obra_id && o.ativo !== false);
+        setSelectedParentObraId(current => parents.some(o => o.id === current) ? current : parents.length === 1 ? parents[0].id : null);
+      } catch {
+        if (!disposed) setErro('Não foi possível atualizar o painel. Tentaremos novamente ao recuperar a conexão.');
       } finally {
-        setIsLoading(false);
+        loading = false;
+        if (!disposed) setIsLoading(false);
       }
     }
-    
-    loadData();
-
+    setIsLoading(true);
+    void loadData();
+    const refresh = () => { if (document.visibilityState === 'visible') void loadData(); };
+    const timer = window.setInterval(refresh, 60_000);
+    window.addEventListener('focus', refresh);
+    window.addEventListener('online', refresh);
+    document.addEventListener('visibilitychange', refresh);
     return () => {
-      if (channel) {
-        supabase?.removeChannel(channel);
-      }
+      disposed = true;
+      window.clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+      window.removeEventListener('online', refresh);
+      document.removeEventListener('visibilitychange', refresh);
     };
   }, [dataStr]);
 
   // Filtra funcionários válidos para "hoje"
   const validFuncionarios = useMemo(() => {
     return funcionarios.filter(f => {
+      if (presencas.some(p => p.funcionario_id === f.id)) return true;
       if (f.data_admissao && f.data_admissao > dataStr) return false;
       if (f.ativo === false) {
         if (f.data_desligamento && dataStr > f.data_desligamento) return false;
@@ -81,7 +80,7 @@ export default function Dashboard() {
       }
       return true;
     });
-  }, [funcionarios, dataStr]);
+  }, [funcionarios, dataStr, presencas]);
 
   // Função para normalizar nome da função (Pedreiro de acabamento -> Pedreiro)
   const getFuncaoBase = (fnName: string) => {
@@ -93,7 +92,7 @@ export default function Dashboard() {
   };
 
   // Helper para analisar a composição de uma lista de funcionários e suas presenças
-  const analyzeComposition = (emps: Funcionario[], pres: Presenca[]) => {
+  const analyzeComposition = (emps: Funcionario[], pres: Presenca[], obraIds?: string[]) => {
     const presentes = emps.filter(e => pres.some(p => p.funcionario_id === e.id && p.presente === true));
     const faltas = emps.length - presentes.length;
     
@@ -102,7 +101,7 @@ export default function Dashboard() {
     let apontadores = 0;
     let outros = 0;
     let diaristasPresentes = 0;
-    let custoDiarias = 0;
+    const custoDiarias = custoDasObras(financeiro, obraIds);
 
     presentes.forEach(emp => {
       const fn = funcoes.find(f => f.id === emp.funcao_id);
@@ -114,11 +113,6 @@ export default function Dashboard() {
       
       if (emp.tipo_colaborador !== 'CLT') {
         diaristasPresentes++;
-        
-        const pRecord = pres.find(p => p.funcionario_id === emp.id && p.presente === true);
-        if (pRecord) {
-            custoDiarias += calcularDiaria({ ...pRecord, tipo_colaborador: emp.tipo_colaborador, valor_diaria: fn?.valor_diaria });
-        }
       }
     });
 
@@ -154,23 +148,24 @@ export default function Dashboard() {
     return parentObras.map(po => {
       const sub = obras.filter(o => o.parent_obra_id === po.id && o.ativo !== false);
       const allIds = [po.id, ...sub.map(s => s.id)];
-      const emps = validFuncionarios.filter(f => allIds.includes(f.obra_id));
-      const comp = analyzeComposition(emps, presencas);
+      const emps = funcionariosNasObras(validFuncionarios, presencas, allIds);
+      const comp = analyzeComposition(emps, presencas, allIds);
 
       return {
         ...po,
+        directComp: analyzeComposition(funcionariosNasObras(validFuncionarios, presencas, [po.id]), presencas, [po.id]),
         subobrasCount: sub.length,
         subobras: sub.map(s => {
-          const sEmps = validFuncionarios.filter(f => f.obra_id === s.id);
+          const sEmps = funcionariosNasObras(validFuncionarios, presencas, [s.id]);
           return {
             ...s,
-            comp: analyzeComposition(sEmps, presencas)
+            comp: analyzeComposition(sEmps, presencas, [s.id])
           };
         }),
         comp
       };
     });
-  }, [obras, validFuncionarios, presencas, funcoes]);
+  }, [obras, validFuncionarios, presencas, funcoes, financeiro]);
 
   if (isLoading) {
     return <div className="p-8 text-center text-gray-500 animate-pulse">Carregando Central de Operações...</div>;
@@ -263,7 +258,7 @@ export default function Dashboard() {
           <div className="bg-amber-50 border border-amber-100 text-amber-900 rounded-xl p-6 shadow-sm flex flex-col justify-between">
              <h2 className="text-sm font-semibold text-amber-600 uppercase tracking-wider mb-2">Custo de Diárias</h2>
              <div className="text-3xl font-bold">{formatCurrency(totalComp.custoDiarias)}</div>
-             <p className="text-amber-700 text-xs mt-2 font-medium bg-amber-100/50 p-1.5 rounded inline-block">Refere-se a {totalComp.diaristasPresentes} diaristas</p>
+             <p className="text-amber-700 text-xs mt-2 font-medium bg-amber-100/50 p-1.5 rounded inline-block">Inclui atestados em dias úteis · CLT fora do cálculo</p>
           </div>
         </div>
         
@@ -480,7 +475,7 @@ export default function Dashboard() {
         <h3 className="text-lg font-bold text-gray-900 mb-4">Visão por Obra</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
            {/* Incluir a própria obra principal caso existam funcionários atrelados diretamente nela */}
-           {[activeObra, ...activeObra.subobras].filter(o => o.comp.total > 0).map(sub => (
+           {[{ ...activeObra, comp: activeObra.directComp }, ...activeObra.subobras].filter(o => o.comp.total > 0).map(sub => (
               <div key={sub.id} className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow">
                 <h4 className="font-bold text-lg text-gray-900 truncate" title={sub.nome}>{sub.nome}</h4>
                 <div className="mt-4 grid grid-cols-2 gap-y-2 text-sm">
@@ -526,7 +521,7 @@ export default function Dashboard() {
                 </div>
               </div>
            ))}
-           {[activeObra, ...activeObra.subobras].filter(o => o.comp.total > 0).length === 0 && (
+           {[{ ...activeObra, comp: activeObra.directComp }, ...activeObra.subobras].filter(o => o.comp.total > 0).length === 0 && (
               <div className="col-span-full p-8 text-center text-gray-500 bg-white border border-gray-200 rounded-xl">
                 Nenhuma frente de trabalho ativa com funcionários vinculados.
               </div>
