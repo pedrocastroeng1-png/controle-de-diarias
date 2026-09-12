@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '../../lib/api';
+import RelatorioFuncionarios from '../../components/funcionarios/RelatorioFuncionarios';
 import { Funcionario, Funcao, Obra } from '../../lib/types';
 import { Edit2, Ban, Plus, RefreshCcw, CheckSquare, Square, Check, X } from 'lucide-react';
 
@@ -243,6 +244,7 @@ export default function Funcionarios() {
 
   return (
     <div className="max-w-6xl mx-auto">
+      <RelatorioFuncionarios />
       <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center mb-6 gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900">Funcionários</h2>
