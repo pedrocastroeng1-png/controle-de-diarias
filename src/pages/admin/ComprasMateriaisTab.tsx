@@ -143,9 +143,25 @@ export default function ComprasMateriaisTab() {
     }
   };
 
+  const handleDeleteCompra = async (id: string) => {
+    if (!isAdmin) return;
+    if (!confirm('Tem certeza que deseja excluir esta compra? Esta ação não pode ser desfeita e removerá os itens e movimentações associadas.')) return;
+    try {
+      setLoading(true);
+      await apiMateriaisRPC.excluirCompraMaterial(id);
+      await fetchData();
+      if (view === 'details' && selectedCompra?.id === id) {
+        setView('list');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Erro ao excluir compra.');
+      setLoading(false);
+    }
+  };
+
   const addItem = () => {
-    setItensForm([
-      ...itensForm, 
+    setItensForm(prev => [
+      ...prev, 
       { id: Date.now().toString(), categoria_id: '', material_id: '', quantidade: 1, valor_unitario: 0, funcionario_id: null, produto_search: '', is_open: false }
     ]);
   };
@@ -177,7 +193,7 @@ export default function ComprasMateriaisTab() {
   };
 
   const removeItem = (id: string) => {
-    setItensForm(itensForm.filter(item => item.id !== id));
+    setItensForm(prev => prev.filter(item => item.id !== id));
   };
 
 
@@ -333,12 +349,23 @@ export default function ComprasMateriaisTab() {
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(compra.total_calculado)}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <button
-                          onClick={() => handleViewDetails(compra.id)}
-                          className="text-blue-600 hover:text-blue-900 flex items-center gap-1 justify-end w-full"
-                        >
-                          <Eye className="w-4 h-4" /> Detalhes
-                        </button>
+                        <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => handleViewDetails(compra.id)}
+                            className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                          >
+                            <Eye className="w-4 h-4" /> Detalhes
+                          </button>
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDeleteCompra(compra.id)}
+                              className="text-red-600 hover:text-red-900 flex items-center gap-1"
+                              title="Excluir Compra"
+                            >
+                              <Trash2 className="w-4 h-4" /> Excluir
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -355,14 +382,25 @@ export default function ComprasMateriaisTab() {
   if (view === 'details' && selectedCompra) {
     return (
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setView('list')}
-            className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-          <h2 className="text-xl font-bold text-gray-900">Detalhes da Compra</h2>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setView('list')}
+              className="p-2 text-gray-500 hover:bg-gray-100 rounded-lg transition-colors"
+            >
+              <ArrowLeft className="w-6 h-6" />
+            </button>
+            <h2 className="text-xl font-bold text-gray-900">Detalhes da Compra</h2>
+          </div>
+          {isAdmin && (
+            <button
+              onClick={() => handleDeleteCompra(selectedCompra.id)}
+              className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium border border-red-200"
+            >
+              <Trash2 className="w-4 h-4" />
+              Excluir Compra
+            </button>
+          )}
         </div>
         
         <div className="bg-white border border-gray-200 rounded-lg p-6 space-y-6">

@@ -161,5 +161,24 @@ export const apiMateriaisRPC = {
     
     if (error) throw error;
     return data;
+  },
+
+  excluirCompraMaterial: async (compra_id: string) => {
+    const { supabase } = await import('./supabase');
+    const { getEmpresaId } = await import('./api');
+    if (!supabase) throw new Error("Supabase não configurado");
+    const empresa_id = getEmpresaId();
+    const usuario_id = getCurrentUserId();
+    if (!empresa_id) throw new Error("Empresa não identificada.");
+    if (!usuario_id) throw new Error("Usuário não identificado.");
+    
+    const { error } = await supabase.rpc('excluir_compra_material', {
+      p_empresa_id: empresa_id,
+      p_usuario_id: usuario_id,
+      p_compra_id: compra_id
+    });
+    
+    if (error) throw error;
+    return true;
   }
 };
