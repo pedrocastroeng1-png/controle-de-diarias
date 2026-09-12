@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FileText, ChevronDown, ChevronUp, Search, Check, Download } from 'lucide-react';
 import { api, getEmpresaId } from '../../lib/api';
 import type { Funcionario } from '../../lib/types';
+import { allVisibleSelected, toggleVisibleSelection } from '../../lib/employee-selection';
 import { EmployeeAvatar } from './EmployeeAvatar';
 
 async function carregarFoto(f: Funcionario): Promise<string | null> {
@@ -121,18 +122,20 @@ export default function RelatorioFuncionarios() {
           <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center mb-6">
             <div className="flex bg-gray-200/50 p-1 rounded-lg w-full md:w-auto">
               <button
+                disabled={gerando || carregando}
                 type="button"
                 className={`flex-1 md:flex-none px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${grupo === 'ativos' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
                 onClick={() => { setGrupo('ativos'); setSelecionados([]); setDownload(null); setProgresso(''); setErro(''); setBusca(''); }}
               >
-                Ativos
+                Ativos ({funcionarios.filter(f => f.ativo === true).length})
               </button>
               <button
+                disabled={gerando || carregando}
                 type="button"
                 className={`flex-1 md:flex-none px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${grupo === 'inativos' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}
                 onClick={() => { setGrupo('inativos'); setSelecionados([]); setDownload(null); setProgresso(''); setErro(''); setBusca(''); }}
               >
-                Inativos
+                Inativos ({funcionarios.filter(f => f.ativo === false).length})
               </button>
             </div>
 
@@ -142,6 +145,8 @@ export default function RelatorioFuncionarios() {
               </div>
               <input
                 type="text"
+                disabled={gerando || carregando}
+                aria-label="Buscar funcionário no relatório"
                 placeholder="Buscar funcionário..."
                 value={busca}
                 onChange={(e) => setBusca(e.target.value)}
@@ -162,9 +167,10 @@ export default function RelatorioFuncionarios() {
                     <input 
                       type="checkbox" 
                       disabled={!lista.length} 
-                      checked={lista.length > 0 && selecionados.length === lista.length}
+                      checked={allVisibleSelected(selecionados, lista.map(f => f.id))}
                       onChange={e => { 
-                        setSelecionados(e.target.checked ? lista.map(f => f.id) : []); 
+                        const checked = e.target.checked;
+                        setSelecionados(ids => toggleVisibleSelection(ids, lista.map(f => f.id), checked));
                         setDownload(null); 
                         setProgresso(''); 
                       }} 
@@ -208,7 +214,7 @@ export default function RelatorioFuncionarios() {
           )}
 
           {erro && (
-            <div className="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-100 flex items-center">
+            <div role="alert" className="mt-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-100 flex items-center">
               {erro}
             </div>
           )}
@@ -222,7 +228,7 @@ export default function RelatorioFuncionarios() {
             >
               {gerando ? (
                 <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <svg className="motion-safe:animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                   </svg>
