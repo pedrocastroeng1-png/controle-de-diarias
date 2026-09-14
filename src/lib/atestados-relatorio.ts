@@ -13,7 +13,7 @@ type Atestado = Pick<Tables<'medical_certificates'>, 'id' | 'employee_id' | 'emp
 type Filtro = { inicio?: string; fim?: string; obraId?: string };
 
 /** Civil dates in UTC: weekday selection must not depend on browser timezone/DST. */
-export function diasUteisAtestado(inicio: string, fim: string): string[] {
+export function diasUteisAtestado(inicio: string, fim: string, feriados: string[] = []): string[] {
   const parse = (value: string) => {
     const date = new Date(`${value}T00:00:00Z`);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value) || !Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== value) throw new Error('Data de atestado inválida.');
@@ -24,14 +24,17 @@ export function diasUteisAtestado(inicio: string, fim: string): string[] {
   if (date > end) throw new Error('Período de atestado inválido.');
   const result: string[] = [];
   while (date <= end) {
-    if (date.getUTCDay() >= 1 && date.getUTCDay() <= 5) result.push(date.toISOString().slice(0, 10));
+    const dateStr = date.toISOString().slice(0, 10);
+    if (date.getUTCDay() >= 1 && date.getUTCDay() <= 5 && !feriados.includes(dateStr)) {
+      result.push(dateStr);
+    }
     date.setUTCDate(date.getUTCDate() + 1);
   }
   return result;
 }
 
 /** One financial record per employee/day; certificates replace, never add to, attendance. */
-export function aplicarAtestados(registros: RegistroRelatorio[], atestados: Atestado[], funcionarios: Funcionario[], filtro: Filtro = {}): RegistroRelatorio[] {
+export function aplicarAtestados(registros: RegistroRelatorio[], atestados: Atestado[], funcionarios: Funcionario[], filtro: Filtro = {}, feriados: string[] = []): RegistroRelatorio[] {
   const key = (empresa: string | null | undefined, funcionario: string, data: string) => `${empresa}:${funcionario}:${data}`;
   const result = new Map<string, RegistroRelatorio>();
   for (const row of registros) {
@@ -45,7 +48,7 @@ export function aplicarAtestados(registros: RegistroRelatorio[], atestados: Ates
     const employee = employees.get(certificate.employee_id);
     if (!employee || employee.empresa_id !== certificate.empresa_id) throw new Error('Atestado sem funcionário correspondente na empresa.');
     if (employee.tipo_colaborador !== 'DIARISTA') continue;
-    for (const data of diasUteisAtestado(certificate.start_date, certificate.end_date)) {
+    for (const data of diasUteisAtestado(certificate.start_date, certificate.end_date, feriados)) {
       if ((filtro.inicio && data < filtro.inicio) || (filtro.fim && data > filtro.fim)) continue;
       if ((employee.data_admissao && data < employee.data_admissao) || (employee.data_desligamento && data > employee.data_desligamento)) continue;
       const id = key(certificate.empresa_id, employee.id, data);
@@ -72,6 +75,20 @@ export function aplicarAtestados(registros: RegistroRelatorio[], atestados: Ates
         atestado_ids: [...new Set([...(row.atestado_ids ?? []), certificate.id])],
         atestado_description: row.atestado_description ?? certificate.description,
         atestado_photo_path: row.atestado_photo_path ?? certificate.photo_path,
+      });
+    }
+  }
+  
+  // Zero out attendance/allowances on holidays
+  for (const [id, row] of result.entries()) {
+    if (row.data && feriados.includes(row.data)) {
+      result.set(id, {
+        ...row,
+        status_original: row.status_original || row.status,
+        status: 'FERIADO - NÃO REMUNERADO',
+        valor_calculado: 0,
+        valor_relatorio: '0.00',
+        percentual_diaria: 0
       });
     }
   }

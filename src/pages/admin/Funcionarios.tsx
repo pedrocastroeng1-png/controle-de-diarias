@@ -317,12 +317,11 @@ export default function Funcionarios() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
-      
-      <div className="flex flex-col md:flex-row md:justify-between items-start md:items-center gap-4">
+    <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-            <Users className="w-7 h-7 text-blue-700" />
+            <Users className="w-8 h-8 text-blue-600" />
             Funcionários
           </h2>
           <p className="text-sm text-gray-500 mt-1">
@@ -331,28 +330,28 @@ export default function Funcionarios() {
         </div>
         <button
           onClick={openNewModal}
-          className="flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-800 transition-colors"
+          className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 transition-colors"
         >
-          <Plus className="w-4 h-4" />
-          Cadastrar funcionário
+          <Plus className="w-5 h-5" />
+          Cadastrar Funcionário
         </button>
       </div>
 
       {erro && !isModalOpen && (
-        <div className="rounded-lg bg-red-50 p-4 border border-red-100 flex items-center gap-3">
+        <div className="rounded-xl bg-red-50 p-4 border border-red-100 flex items-center gap-3">
           <AlertCircle className="w-5 h-5 text-red-600 shrink-0" />
           <p className="text-sm text-red-700">{erro}</p>
         </div>
       )}
 
       {/* Filters and Search */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 justify-between items-center">
-        <div className="flex bg-gray-100 p-1 rounded-lg w-full md:w-auto">
+      <div className="bg-white p-2 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-2">
+        <div className="flex w-full md:w-auto p-1 bg-gray-100 rounded-lg">
           {(['todos', 'ativos', 'inativos'] as const).map((opt) => (
             <button
               key={opt}
               onClick={() => setFilter(opt)}
-              className={`flex-1 md:flex-none px-4 py-1.5 text-sm font-medium rounded-md capitalize transition-colors ${
+              className={`flex-1 md:flex-none px-6 py-2 text-sm font-medium rounded-md capitalize transition-colors ${
                 filter === opt ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
               }`}
             >
@@ -360,8 +359,8 @@ export default function Funcionarios() {
             </button>
           ))}
         </div>
-        <div className="relative w-full md:w-80">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <div className="relative w-full md:w-80 px-1 pb-1 md:px-0 md:pb-0">
+          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none pb-1 md:pb-0">
             <Search className="h-4 w-4 text-gray-400" />
           </div>
           <input
@@ -370,22 +369,26 @@ export default function Funcionarios() {
             placeholder="Buscar por nome..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-gray-50/50"
+            className="block w-full pl-10 pr-4 py-2 border border-transparent hover:border-gray-300 focus:bg-white focus:border-blue-500 rounded-lg sm:text-sm bg-gray-50 outline-none transition-all"
           />
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 text-sm text-gray-500">
-        <button type="button" onClick={handleSelectAll} disabled={loading || !visibleIds.length} aria-pressed={allSelected} className="md:hidden text-blue-700 disabled:opacity-50">{allSelected ? 'Desmarcar busca' : 'Selecionar todos na busca'}</button>
-        <span aria-live="polite">{loading ? 'Atualizando…' : `${filteredFuncionarios.length} de ${funcionarios.length} funcionários no filtro ${filter}`}{updatedAt && ` · Atualizado às ${updatedAt.toLocaleTimeString('pt-BR')}`}</span>
-        <button type="button" onClick={() => void loadData()} disabled={loading} className="text-blue-700 disabled:opacity-50">Atualizar lista</button>
+      <div className="flex items-center justify-between px-1 text-sm text-gray-500">
+        <span aria-live="polite" className="font-medium">
+          {loading ? 'Atualizando...' : `${filteredFuncionarios.length} de ${funcionarios.length} registros`}
+        </span>
+        <button type="button" onClick={() => void loadData()} disabled={loading} className="text-blue-600 hover:text-blue-700 font-medium transition-colors disabled:opacity-50 flex items-center gap-1">
+          <RefreshCcw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+          Atualizar
+        </button>
       </div>
 
       {/* Mass Edit Banner */}
       {selectedIds.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
-            <div className="bg-blue-100 text-blue-700 font-bold px-3 py-1 rounded-full text-sm">
+            <div className="bg-blue-600 text-white font-bold px-3 py-1 rounded-full text-sm shadow-sm">
               {selectedIds.length}
             </div>
             <span className="text-sm font-medium text-blue-900">funcionários selecionados</span>
@@ -393,87 +396,28 @@ export default function Funcionarios() {
           <div className="flex gap-2">
             <button
               onClick={() => setSelectedIds([])}
-              className="px-4 py-2 text-sm font-medium text-blue-700 bg-white border border-blue-200 rounded-lg hover:bg-blue-50 transition-colors"
+              className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-100/50 rounded-lg hover:bg-blue-100 transition-colors"
             >
               Cancelar
             </button>
             <button
               onClick={() => setShowMassEdit(true)}
-              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 shadow-sm transition-colors"
+              className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg shadow-sm hover:bg-blue-700 transition-colors"
             >
-              Alterar Obra em Massa
+              Alterar Obra
             </button>
           </div>
         </div>
       )}
 
-      {showMassEdit && (
-        <CenteredDialog labelId="mass-edit-title" onClose={closeMassEdit}>
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="flex items-center justify-between p-4 border-b border-gray-100">
-              <h3 id="mass-edit-title" className="text-lg font-bold text-gray-900">Alteração em Massa</h3>
-              <button aria-label="Fechar alteração em massa" disabled={massEditSaving} onClick={closeMassEdit} className="text-gray-400 hover:text-gray-600 transition-colors">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-            <div className="p-6">
-              <p className="text-sm text-gray-600 mb-4">
-                Você está prestes a alterar a obra de <strong>{selectedIds.length}</strong> funcionários. Selecione a nova obra:
-              </p>
-              <div className="mb-4">
-                <label htmlFor="massObra" className="block text-sm font-medium text-gray-700 mb-1">
-                  Nova Obra
-                </label>
-                <select
-                  id="massObra"
-                  disabled={massEditSaving}
-                  value={massEditObraId}
-                  onChange={(e) => setMassEditObraId(e.target.value)}
-                  className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                >
-                  <option value="" disabled>Selecione a nova obra</option>
-                  {obras.filter(o => !o.parent_obra_id).map(o => (
-                    <optgroup key={o.id} label={o.nome}>
-                      <option value={o.id}>{o.nome} (Principal)</option>
-                      {obras.filter(sub => sub.parent_obra_id === o.id).map(sub => (
-                        <option key={sub.id} value={sub.id}>- {sub.nome}</option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end gap-3">
-              <button
-                disabled={massEditSaving} onClick={closeMassEdit}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleMassEdit}
-                disabled={!massEditObraId || massEditSaving}
-                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50 shadow-sm"
-              >
-                {massEditSaving ? 'Aplicando...' : 'Aplicar alteração'}
-              </button>
-            </div>
-          </div>
-        </CenteredDialog>
-      )}
-
       {/* Desktop Table */}
-      <div className="hidden md:block bg-white shadow-sm rounded-xl border border-gray-100 overflow-x-auto">
+      <div className="hidden md:block bg-white shadow-sm rounded-xl border border-gray-200 overflow-hidden">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50/80">
+          <thead className="bg-gray-50">
             <tr>
-              <th scope="col" className="px-6 py-4 w-10 text-center">
-                <button aria-label="Selecionar todos na busca" aria-pressed={allSelected} disabled={loading || !visibleIds.length} onClick={handleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
-                  {allSelected ? (
-                    <CheckSquare className="h-5 w-5 text-blue-600" />
-                  ) : (
-                    <Square className="h-5 w-5" />
-                  )}
+              <th scope="col" className="px-6 py-4 w-12 text-center">
+                <button aria-label="Selecionar todos" aria-pressed={allSelected} disabled={loading || !visibleIds.length} onClick={handleSelectAll} className="text-gray-400 hover:text-blue-600 transition-colors">
+                  {allSelected ? <CheckSquare className="h-5 w-5 text-blue-600" /> : <Square className="h-5 w-5" />}
                 </button>
               </th>
               <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -485,7 +429,7 @@ export default function Funcionarios() {
               <th scope="col" className="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Status
               </th>
-              <th scope="col" className="px-6 py-4 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">
+              <th scope="col" className="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider w-32">
                 Ações
               </th>
             </tr>
@@ -501,20 +445,16 @@ export default function Funcionarios() {
                 </td>
               </tr>
             ) : filteredFuncionarios.map((funcionario) => (
-              <tr key={funcionario.id} className={`hover:bg-gray-50/80 transition-colors ${funcionario.ativo === false ? 'opacity-60 bg-gray-50' : ''}`}>
+              <tr key={funcionario.id} className={`hover:bg-gray-50/50 transition-colors ${funcionario.ativo === false ? 'opacity-60 bg-gray-50' : ''}`}>
                 <td className="px-6 py-4 whitespace-nowrap text-center">
                   <button aria-label={`Selecionar ${funcionario.nome}`} aria-pressed={selectedIds.includes(funcionario.id)} onClick={() => handleSelect(funcionario.id)} className="text-gray-400 hover:text-blue-600 transition-colors">
-                    {selectedIds.includes(funcionario.id) ? (
-                      <CheckSquare className="h-5 w-5 text-blue-600" />
-                    ) : (
-                      <Square className="h-5 w-5" />
-                    )}
+                    {selectedIds.includes(funcionario.id) ? <CheckSquare className="h-5 w-5 text-blue-600" /> : <Square className="h-5 w-5" />}
                   </button>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center gap-4">
-                    <EmployeeAvatar nome={funcionario.nome} photoPath={funcionario.photo_path} className="w-10 h-10" />
-                    <div>
+                    <EmployeeAvatar nome={funcionario.nome} photoPath={funcionario.photo_path} className="w-12 h-12 shadow-sm border border-gray-100" />
+                    <div className="flex flex-col">
                       <div className="text-sm font-semibold text-gray-900">{funcionario.nome}</div>
                       <div className="text-xs text-gray-500 mt-0.5 font-medium">{funcionario.tipo_colaborador || 'DIARISTA'}</div>
                     </div>
@@ -524,19 +464,21 @@ export default function Funcionarios() {
                   <div className="text-sm font-medium text-gray-900">{funcionario.funcao?.nome || '-'}</div>
                   <div className="text-xs text-gray-500 mt-0.5">{funcionario.obra?.nome || '-'}</div>
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                <td className="px-6 py-4 whitespace-nowrap">
                   {funcionario.ativo !== false ? (
-                    <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-md bg-green-100 text-green-800">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                       Ativo
                     </span>
                   ) : (
-                    <span className="px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-md bg-gray-200 text-gray-700">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-500/20">
+                      <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                       Inativo
                     </span>
                   )}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex gap-2 justify-center">
+                <td className="px-6 py-4 whitespace-nowrap text-right">
+                  <div className="flex gap-2 justify-end">
                     <button 
                       onClick={() => handleEdit(funcionario)} 
                       className="text-blue-600 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors" 
@@ -555,7 +497,7 @@ export default function Funcionarios() {
                     ) : (
                       <button 
                         onClick={() => handleReactivate(funcionario.id)} 
-                        className="text-green-600 bg-green-50 hover:bg-green-100 p-2 rounded-lg transition-colors" 
+                        className="text-emerald-600 bg-emerald-50 hover:bg-emerald-100 p-2 rounded-lg transition-colors" 
                         title="Reativar"
                       >
                         <RefreshCcw className="h-4 w-4" />
@@ -571,31 +513,25 @@ export default function Funcionarios() {
       </div>
 
       {/* Mobile Cards */}
-      <div className="md:hidden space-y-3">
+      <div className="md:hidden space-y-4">
         {loading ? (
-          <div className="p-8 text-center text-sm text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">
-            Carregando dados...
-          </div>
+          <div className="text-center py-8 text-sm text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">Carregando dados...</div>
         ) : filteredFuncionarios.length === 0 ? (
-          <div className="p-8 text-center text-sm text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">
+          <div className="text-center py-8 text-sm text-gray-500 bg-white rounded-xl shadow-sm border border-gray-100">
             Nenhum funcionário encontrado.
           </div>
         ) : (
           filteredFuncionarios.map((funcionario) => (
-            <div key={funcionario.id} className={`bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col gap-4 relative overflow-hidden ${funcionario.ativo === false ? 'opacity-75 bg-gray-50/50' : ''}`}>
+            <div key={funcionario.id} className={`bg-white rounded-xl border border-gray-200 shadow-sm p-5 flex flex-col gap-4 relative overflow-hidden transition-all ${funcionario.ativo === false ? 'opacity-75 bg-gray-50' : ''}`}>
               <div className="flex justify-between items-start">
                 <div className="flex items-center gap-3">
                   <button aria-label={`Selecionar ${funcionario.nome}`} aria-pressed={selectedIds.includes(funcionario.id)} onClick={() => handleSelect(funcionario.id)} className="text-gray-400 hover:text-blue-600 transition-colors -ml-1">
-                    {selectedIds.includes(funcionario.id) ? (
-                      <CheckSquare className="h-6 w-6 text-blue-600" />
-                    ) : (
-                      <Square className="h-6 w-6" />
-                    )}
+                    {selectedIds.includes(funcionario.id) ? <CheckSquare className="h-6 w-6 text-blue-600" /> : <Square className="h-6 w-6" />}
                   </button>
-                  <EmployeeAvatar nome={funcionario.nome} photoPath={funcionario.photo_path} className="w-12 h-12" />
-                  <div>
-                    <h4 className="font-semibold text-gray-900 leading-tight">{funcionario.nome}</h4>
-                    <span className={`mt-1 inline-flex px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wider ${
+                  <EmployeeAvatar nome={funcionario.nome} photoPath={funcionario.photo_path} className="w-14 h-14 shadow-sm border border-gray-100" />
+                  <div className="flex flex-col">
+                    <h4 className="font-bold text-gray-900 leading-tight">{funcionario.nome}</h4>
+                    <span className={`mt-1 inline-flex w-fit px-2 py-0.5 text-[10px] font-bold rounded-md uppercase tracking-wider ${
                       funcionario.tipo_colaborador === 'CLT' ? 'bg-indigo-100 text-indigo-700' : 'bg-orange-100 text-orange-700'
                     }`}>
                       {funcionario.tipo_colaborador || 'DIARISTA'}
@@ -603,31 +539,33 @@ export default function Funcionarios() {
                   </div>
                 </div>
                 {funcionario.ativo !== false ? (
-                  <span className="px-2 py-1 text-[10px] font-bold rounded-md bg-green-100 text-green-800 uppercase tracking-wider">
+                  <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20 uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                     Ativo
                   </span>
                 ) : (
-                  <span className="px-2 py-1 text-[10px] font-bold rounded-md bg-gray-200 text-gray-700 uppercase tracking-wider">
+                  <span className="shrink-0 inline-flex items-center gap-1 px-2 py-1 text-[10px] font-bold rounded-full bg-gray-100 text-gray-600 ring-1 ring-inset ring-gray-500/20 uppercase tracking-wider">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
                     Inativo
                   </span>
                 )}
               </div>
               
-              <div className="grid grid-cols-2 gap-3 bg-gray-50/80 p-3 rounded-lg border border-gray-100/50 text-sm">
+              <div className="grid grid-cols-2 gap-3 bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-sm mt-1">
                 <div>
-                  <p className="text-xs text-gray-500 font-medium mb-0.5">Função</p>
-                  <p className="font-medium text-gray-900 truncate">{funcionario.funcao?.nome || '-'}</p>
+                  <p className="text-xs text-gray-500 font-medium mb-1">Função</p>
+                  <p className="font-semibold text-gray-900 truncate">{funcionario.funcao?.nome || '-'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-500 font-medium mb-0.5">Obra</p>
-                  <p className="font-medium text-gray-900 truncate">{funcionario.obra?.nome || '-'}</p>
+                  <p className="text-xs text-gray-500 font-medium mb-1">Obra</p>
+                  <p className="font-semibold text-gray-900 truncate">{funcionario.obra?.nome || '-'}</p>
                 </div>
               </div>
 
-              <div className="flex gap-2 border-t border-gray-100 pt-3">
+              <div className="flex gap-2 border-t border-gray-100 pt-4 mt-1">
                 <button 
                   onClick={() => handleEdit(funcionario)} 
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm hover:bg-blue-100 transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-blue-50 text-blue-700 rounded-lg font-medium text-sm hover:bg-blue-100 transition-colors"
                 >
                   <Edit2 className="h-4 w-4" />
                   Editar
@@ -635,18 +573,18 @@ export default function Funcionarios() {
                 {funcionario.ativo !== false ? (
                   <button 
                     onClick={() => handleDelete(funcionario.id)} 
-                    className="flex items-center justify-center p-2 bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition-colors shrink-0" 
-                    title="Desativar"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-50 text-red-700 rounded-lg font-medium text-sm hover:bg-red-100 transition-colors"
                   >
                     <Ban className="h-4 w-4" />
+                    Desativar
                   </button>
                 ) : (
                   <button 
                     onClick={() => handleReactivate(funcionario.id)} 
-                    className="flex items-center justify-center p-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors shrink-0" 
-                    title="Reativar"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-700 rounded-lg font-medium text-sm hover:bg-emerald-100 transition-colors"
                   >
                     <RefreshCcw className="h-4 w-4" />
+                    Reativar
                   </button>
                 )}
               </div>
@@ -657,289 +595,261 @@ export default function Funcionarios() {
 
       <RelatorioFuncionarios />
 
-      {/* Registration/Edit Modal */}
-      {isModalOpen && (
-        <CenteredDialog labelId="employee-dialog-title" onClose={closeModal}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-200">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 id="employee-dialog-title" className="text-xl font-bold text-gray-900">
-                {editId ? 'Editar Funcionário' : 'Cadastrar Funcionário'}
-              </h3>
-              <button 
-                disabled={saving}
-                onClick={closeModal} 
-                aria-label="Fechar ficha do funcionário"
-                className="text-gray-400 hover:text-gray-600 bg-gray-50 hover:bg-gray-100 p-2 rounded-full transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
+      {isModalOpen && (<CenteredDialog labelId="employee-dialog-title" onClose={closeModal}>
+<div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col motion-safe:animate-in motion-safe:zoom-in-95 motion-safe:duration-200">
+<div className="flex items-center justify-between p-5 border-b border-gray-100">
+<h3 id="employee-dialog-title" className="text-xl font-bold text-gray-900">{editId ? 'Editar Funcionário' : 'Novo Funcionário'}</h3>
+<button aria-label="Fechar" disabled={saving} onClick={closeModal} className="text-gray-400 hover:text-gray-600 transition-colors"><X className="h-5 w-5" /></button>
+</div>
+        <form onSubmit={handleSubmit} className="flex flex-col h-full max-h-[85vh]">
+          {formError && (
+            <div className="mx-6 mt-6 p-4 bg-red-50 border border-red-100 rounded-xl flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-red-700 leading-relaxed">{formError}</p>
             </div>
+          )}
 
-            <div className="flex-1 min-h-0 overflow-y-auto p-5 sm:p-6">
-              {formError && (
-                <div className="mb-6 rounded-lg bg-red-50 p-4 border border-red-100">
-                  <p role="alert" className="text-sm text-red-700">{formError}</p>
-                </div>
-              )}
-
-              <form id="funcionarioForm" onSubmit={handleSubmit}>
-                <fieldset disabled={saving} className="space-y-8 min-w-0">
-                
-                {/* Photo Section */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 pb-6 border-b border-gray-100">
-                  <div className="relative group shrink-0">
-                    <div className="w-24 h-24 rounded-full overflow-hidden bg-gray-100 border-4 border-white shadow-md flex items-center justify-center">
-                      {previewUrl ? (
-                        <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                      ) : !removeFoto && currentPhotoPath ? (
-                        <EmployeeAvatar nome={nome || 'A'} photoPath={currentPhotoPath} className="w-full h-full" />
-                      ) : (
-                        <User className="h-10 w-10 text-gray-300" />
-                      )}
-                    </div>
-                    <label 
-                      htmlFor="foto" 
-                      className="absolute bottom-0 right-0 bg-blue-600 text-white p-2 rounded-full shadow-lg cursor-pointer hover:bg-blue-700 transition-colors transform translate-x-1 translate-y-1"
-                      title="Alterar foto"
-                    >
-                      <ImageIcon className="h-4 w-4" />
-                      <input
-                        type="file"
-                        id="foto"
-                        accept="image/*"
-                        onChange={handlePhotoSelect}
-                        className="sr-only"
-                        aria-label="Selecionar foto do funcionário"
-                      />
-                    </label>
-                  </div>
-                  <div>
-                    <h4 className="font-semibold text-gray-900 mb-1">{nome || 'Novo funcionário'}</h4>
-                    <p className="text-sm text-gray-600 mb-2">{tipoColaborador}{editEmployee && ` · ${editEmployee.ativo ? 'Ativo' : 'Inativo'}`}</p>
-                    <p className="text-sm text-gray-500 mb-3">Recomendado: imagem quadrada, formato JPG ou PNG.</p>
-                    {((currentPhotoPath && !removeFoto) || previewUrl) && (
-                      <button
-                        type="button"
-                        onClick={handleRemovePhoto}
-                        className="text-sm font-medium text-red-600 hover:text-red-700 bg-red-50 px-3 py-1.5 rounded-lg"
-                      >
-                        Remover foto
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {/* Personal Info Section */}
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <User className="w-4 h-4 text-blue-600" />
-                    Informações Pessoais
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                    <div className="md:col-span-2">
-                      <label htmlFor="nome" className="block text-sm font-medium text-gray-700 mb-1">
-                        Nome Completo
-                      </label>
-                      <input
-                        type="text"
-                        id="nome"
-                        required
-                        value={nome}
-                        onChange={(e) => { setNome(e.target.value); markDirty(); }}
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                        placeholder="Ex: João da Silva"
-                      />
-                    </div>
-                    
-                    <div>
-                      <label htmlFor="funcao" className="block text-sm font-medium text-gray-700 mb-1">
-                        Função
-                      </label>
-                      <select
-                        id="funcao"
-                        required
-                        value={funcaoId}
-                        onChange={(e) => { setFuncaoId(e.target.value); markDirty(); }}
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                      >
-                        <option value="" disabled>Selecione uma função</option>
-                        {editEmployee?.funcao && !funcoes.some(f => f.id === editEmployee.funcao_id) && <option value={editEmployee.funcao_id}>{editEmployee.funcao.nome} (atual)</option>}
-                        {funcoes.map((f) => (
-                          <option key={f.id} value={f.id}>{f.nome}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label htmlFor="obra" className="block text-sm font-medium text-gray-700 mb-1">
-                        Obra / Local de Trabalho
-                      </label>
-                      <select
-                        id="obra"
-                        required
-                        value={obraId}
-                        onChange={(e) => { setObraId(e.target.value); markDirty(); }}
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                      >
-                        <option value="" disabled>Selecione uma obra</option>
-                        {editEmployee?.obra && !obras.some(o => o.id === editEmployee.obra_id) && <option value={editEmployee.obra_id}>{editEmployee.obra.nome} (atual)</option>}
-                        {obras.filter(o => !o.parent_obra_id).map(o => (
-                          <optgroup key={o.id} label={o.nome}>
-                            <option value={o.id}>{o.nome} (Principal)</option>
-                            {obras.filter(sub => sub.parent_obra_id === o.id).map(sub => (
-                              <option key={sub.id} value={sub.id}>- {sub.nome}</option>
-                            ))}
-                          </optgroup>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label htmlFor="tipoColaborador" className="block text-sm font-medium text-gray-700 mb-1">
-                        Tipo de Colaborador
-                      </label>
-                      <select
-                        id="tipoColaborador"
-                        required
-                        value={tipoColaborador}
-                        onChange={(e) => { setTipoColaborador(e.target.value as "DIARISTA" | "CLT"); markDirty(); }}
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                      >
-                        <option value="DIARISTA">Diarista</option>
-                        <option value="CLT">CLT</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Payment Info Section */}
-                <div>
-                  <h4 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-4 flex items-center gap-2">
-                    <DollarSign className="w-4 h-4 text-blue-600" />
-                    Informações de Pagamento
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 p-5 bg-gray-50 rounded-xl border border-gray-100">
-                    <div className="md:col-span-2">
-                      <label htmlFor="formaPagamento" className="block text-sm font-medium text-gray-700 mb-1">
-                        Forma de Pagamento
-                      </label>
-                      <select
-                        id="formaPagamento"
-                        value={formaPagamento}
-                        onChange={(e) => { setFormaPagamento(e.target.value as any); markDirty(); }}
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                      >
-                        <option value="">Selecione...</option>
-                        <option value="CAIXA ECONOMICA FEDERAL">Caixa Econômica Federal</option>
-                        <option value="PIX">PIX</option>
-                      </select>
-                    </div>
-
-                    {formaPagamento === 'CAIXA ECONOMICA FEDERAL' && (
-                      <>
-                        <div>
-                          <label htmlFor="agencia" className="block text-sm font-medium text-gray-700 mb-1">Agência</label>
-                          <input
-                            type="text"
-                            id="agencia"
-                            value={agencia}
-                            onChange={(e) => { setAgencia(e.target.value); markDirty(); }}
-                            className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                            placeholder="Ex: 0001"
-                          />
-                        </div>
-                        <div>
-                          <label htmlFor="tipoConta" className="block text-sm font-medium text-gray-700 mb-1">Tipo de Conta</label>
-                          <select
-                            id="tipoConta"
-                            value={tipoConta}
-                            onChange={(e) => { setTipoConta(e.target.value as any); markDirty(); }}
-                            className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                          >
-                            <option value="">Selecione...</option>
-                            <option value="CONTA CORRENTE">Conta Corrente</option>
-                            <option value="CONTA POUPANÇA">Conta Poupança</option>
-                          </select>
-                        </div>
-                        <div>
-                          <label htmlFor="conta" className="block text-sm font-medium text-gray-700 mb-1">Número da Conta</label>
-                          <input
-                            type="text"
-                            id="conta"
-                            value={conta}
-                            onChange={(e) => { setConta(e.target.value); markDirty(); }}
-                            className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                            placeholder="Ex: 12345-6"
-                          />
-                        </div>
-                      </>
-                    )}
-
-                    {formaPagamento === 'PIX' && (
-                      <div className="md:col-span-2">
-                        <label htmlFor="chavePix" className="block text-sm font-medium text-gray-700 mb-1">Chave PIX</label>
-                        <input
-                          type="text"
-                          id="chavePix"
-                          value={chavePix}
-                          onChange={(e) => { setChavePix(e.target.value); markDirty(); }}
-                          className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                          placeholder="CPF, E-mail, Telefone ou Chave Aleatória"
-                        />
+          <div className="flex-1 overflow-y-auto px-6 py-6">
+            <div className="space-y-6">
+              
+              <div className="flex justify-center pb-2">
+                <div className="relative group">
+                  <div className="w-28 h-28 rounded-full overflow-hidden bg-gray-100 border-4 border-white shadow-md flex items-center justify-center transition-colors">
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : currentPhotoPath ? (
+                       <EmployeeAvatar nome={nome || 'Preview'} photoPath={currentPhotoPath} className="w-full h-full" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-gray-400 group-hover:text-blue-500 transition-colors">
+                        <ImageIcon className="w-8 h-8" />
+                        <span className="text-xs font-medium">Add Foto</span>
                       </div>
                     )}
-
-                    <div className="md:col-span-2">
-                      <label htmlFor="observacaoPagamento" className="block text-sm font-medium text-gray-700 mb-1">
-                        Observação de Pagamento
-                      </label>
-                      <textarea
-                        id="observacaoPagamento"
-                        value={observacaoPagamento}
-                        onChange={(e) => { setObservacaoPagamento(e.target.value); markDirty(); }}
-                        rows={2}
-                        className="block w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 sm:text-sm bg-white shadow-sm"
-                        placeholder="Ex: Conta em nome da esposa..."
-                      />
-                    </div>
                   </div>
+                  <label className="absolute bottom-0 right-0 p-2 bg-blue-600 text-white rounded-full shadow-lg cursor-pointer hover:bg-blue-700 transition-transform hover:scale-105">
+                    <Upload className="w-5 h-5" />
+                    <input type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
+                  </label>
+                  {(previewUrl || currentPhotoPath) && (
+                    <button type="button" onClick={handleRemovePhoto} className="absolute top-0 right-0 p-1.5 bg-red-500 text-white rounded-full shadow-lg cursor-pointer hover:bg-red-600 transition-transform hover:scale-105" title="Remover foto">
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nome Completo *</label>
+                <input
+                  type="text"
+                  required
+                  value={nome}
+                  onChange={e => { setNome(e.target.value); markDirty(); }}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors px-4 py-2.5 border outline-none"
+                  placeholder="Nome do colaborador"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Colaborador *</label>
+                  <select
+                    required
+                    value={tipoColaborador}
+                    onChange={e => { setTipoColaborador(e.target.value as any); markDirty(); }}
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors px-4 py-2.5 border outline-none"
+                  >
+                    <option value="DIARISTA">Diarista</option>
+                    <option value="CLT">CLT</option>
+                  </select>
                 </div>
 
-                </fieldset>
-              </form>
-            </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Função *</label>
+                  <select
+                    required
+                    value={funcaoId}
+                    onChange={e => { setFuncaoId(e.target.value); markDirty(); }}
+                    className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors px-4 py-2.5 border outline-none"
+                  >
+                    <option value="">Selecione uma função</option>
+                    {funcoes.map((f) => (
+                      <option key={f.id} value={f.id}>{f.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
 
-            <div className="p-5 border-t border-gray-100 bg-gray-50 flex justify-end gap-3 rounded-b-2xl">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Obra Alocada *</label>
+                <select
+                  required
+                  value={obraId}
+                  onChange={e => { setObraId(e.target.value); markDirty(); }}
+                  className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors px-4 py-2.5 border outline-none"
+                >
+                  <option value="">Selecione uma obra</option>
+                  {obras.map((o) => (
+                    <option key={o.id} value={o.id}>{o.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-gray-50 -mx-6 px-6 py-6 border-t border-b border-gray-100">
+                <h3 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <DollarSign className="w-5 h-5 text-gray-500" />
+                  Dados Bancários (Opcional)
+                </h3>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Forma de Pagamento</label>
+                    <select
+                      value={formaPagamento}
+                      onChange={e => { setFormaPagamento(e.target.value as any); markDirty(); }}
+                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors px-4 py-2.5 border outline-none"
+                    >
+                      <option value="">Selecione...</option>
+                      <option value="CAIXA ECONOMICA FEDERAL">Caixa Econômica Federal</option>
+                      <option value="PIX">Pix</option>
+                    </select>
+                  </div>
+
+                  {formaPagamento === 'CAIXA ECONOMICA FEDERAL' && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                      <div className="sm:col-span-2">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Tipo de Conta *</label>
+                        <select
+                          required
+                          value={tipoConta}
+                          onChange={e => { setTipoConta(e.target.value as any); markDirty(); }}
+                          className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white transition-colors px-4 py-2.5 border outline-none"
+                        >
+                          <option value="">Selecione...</option>
+                          <option value="CONTA CORRENTE">Conta Corrente</option>
+                          <option value="CONTA POUPANÇA">Conta Poupança</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Agência *</label>
+                        <input
+                          type="text"
+                          required
+                          value={agencia}
+                          onChange={e => { setAgencia(e.target.value); markDirty(); }}
+                          className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors px-4 py-2.5 border outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Conta *</label>
+                        <input
+                          type="text"
+                          required
+                          value={conta}
+                          onChange={e => { setConta(e.target.value); markDirty(); }}
+                          className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors px-4 py-2.5 border outline-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {formaPagamento === 'PIX' && (
+                    <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Chave Pix *</label>
+                      <input
+                        type="text"
+                        required
+                        value={chavePix}
+                        onChange={e => { setChavePix(e.target.value); markDirty(); }}
+                        className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors px-4 py-2.5 border outline-none"
+                        placeholder="CPF, E-mail, Telefone ou Chave Aleatória"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Observações do Pagamento</label>
+                    <textarea
+                      value={observacaoPagamento}
+                      onChange={e => { setObservacaoPagamento(e.target.value); markDirty(); }}
+                      rows={2}
+                      className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 transition-colors px-4 py-2.5 border outline-none"
+                      placeholder="Ex: Conta no nome da esposa..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-6 border-t border-gray-200 bg-white">
+            <div className="flex justify-end gap-3">
               <button
                 type="button"
-                disabled={saving}
                 onClick={closeModal}
-                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm transition-colors"
+                disabled={saving}
+                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                form="funcionarioForm"
                 disabled={saving}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-lg hover:bg-blue-700 disabled:opacity-50 shadow-sm transition-colors flex items-center gap-2"
+                className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
               >
-                {saving ? (
-                  <>
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Salvando...
-                  </>
-                ) : (
-                  editId ? 'Salvar alterações' : 'Cadastrar funcionário'
-                )}
+                {saving && <RefreshCcw className="w-4 h-4 animate-spin" />}
+                {saving ? 'Salvando...' : 'Salvar'}
               </button>
             </div>
           </div>
-        </CenteredDialog>
-      )}
+        </form>
+</div>
+</CenteredDialog>
+)}
+
+      {showMassEdit && (<CenteredDialog labelId="mass-edit-title" onClose={closeMassEdit}>
+<div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
+<div className="flex items-center justify-between p-4 border-b border-gray-100">
+<h3 id="mass-edit-title" className="text-lg font-bold text-gray-900">Alteração em Massa</h3>
+<button aria-label="Fechar" disabled={massEditSaving} onClick={closeMassEdit} className="text-gray-400 hover:text-gray-600 transition-colors"><X className="h-5 w-5" /></button>
+</div>
+        <div className="p-6">
+          <p className="text-sm text-gray-600 mb-6">
+            Selecione a nova obra para os {selectedIds.length} funcionários selecionados:
+          </p>
+          <div className="space-y-4">
+            <select
+              value={massEditObraId}
+              onChange={(e) => setMassEditObraId(e.target.value)}
+              className="w-full rounded-lg border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 px-4 py-2.5 border outline-none"
+            >
+              <option value="">Selecione a obra destino</option>
+              {obras.map((o) => (
+                <option key={o.id} value={o.id}>{o.nome}</option>
+              ))}
+            </select>
+          </div>
+          <div className="mt-8 flex justify-end gap-3">
+            <button
+              onClick={closeMassEdit}
+              disabled={massEditSaving}
+              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={handleMassEdit}
+              disabled={massEditSaving || !massEditObraId}
+              className="px-5 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors disabled:opacity-50 flex items-center gap-2"
+            >
+              {massEditSaving && <RefreshCcw className="w-4 h-4 animate-spin" />}
+              {massEditSaving ? 'Alterando...' : 'Confirmar Alteração'}
+            </button>
+          </div>
+        </div>
+      </div>
+</CenteredDialog>
+)}
     </div>
   );
 }

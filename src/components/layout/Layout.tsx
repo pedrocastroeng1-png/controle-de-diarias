@@ -27,6 +27,7 @@ import {
   ChevronDown,
   ChevronRight,
   Package,
+  CalendarOff
 } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { MonitorDown, CheckCircle2 } from "lucide-react";
@@ -172,7 +173,7 @@ export function AdminLayout() {
       section: "ADMINISTRAÇÃO",
       name: "Cadastros",
       icon: Briefcase,
-      items: [{ name: "Funções", path: "/admin/funcoes" }],
+      items: [{ name: "Funções", path: "/admin/funcoes" }, { name: "Feriados", path: "/admin/feriados" }],
     },
   ];
 

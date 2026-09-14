@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { api } from "../../lib/api";
+import { Feriado } from "../../lib/types";
 import { Funcionario } from "../../lib/types";
 import { format, parseISO } from "date-fns";
 import { compressImage } from "../../lib/imageUtils";
@@ -28,6 +29,8 @@ export default function PresencaPage() {
   const [funcionariosNaoRegistrados, setFuncionariosNaoRegistrados] = useState<
     Funcionario[]
   >([]);
+  const [feriados, setFeriados] = useState<Feriado[]>([]);
+  const isFeriado = feriados.some(f => f.data === selectedDate);
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";

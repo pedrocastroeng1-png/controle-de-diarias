@@ -394,3 +394,11 @@ export interface VwRelatorioComprasMateriais {
   usuario_registro: string;
   created_at: string;
 }
+
+export interface Feriado {
+  id: string;
+  empresa_id: string;
+  data: string;
+  descricao: string;
+  created_at: string;
+}

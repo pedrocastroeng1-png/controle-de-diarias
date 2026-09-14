@@ -227,6 +227,28 @@ export const api = {
 
   login: async (usuario: string, senha: string): Promise<any | null> => {
     if (!supabase) throw new Error("Supabase não configurado");
+
+    // Attempt secure server login first to obtain JWT session
+    try {
+      const res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ usuario, senha })
+      });
+      if (res.ok) {
+        const json = await res.json();
+        if (json.token) {
+          localStorage.setItem('@diarias:token', json.token);
+        }
+        if (json.user) {
+          return json.user;
+        }
+      } else if (res.status === 401 || res.status === 403) {
+        throw new Error("Usuário ou senha inválidos.");
+      }
+    } catch (e: any) {
+      if (e.message === "Usuário ou senha inválidos.") throw e;
+    }
     const { data, error } = await supabase
       .from("usuarios")
       .select("id, usuario, perfil, senha, empresa_id, login, email")
@@ -627,10 +649,11 @@ export const api = {
   getRelatorioComAtestados: async (inicio?: string, fim?: string, obraId?: string) => {
     if (!getEmpresaId()) throw new Error('Empresa não identificada. Faça login novamente.');
     // Merge before filtering worksite: actual attendance may reference a previous worksite.
-    const [registros, atestados, funcionarios] = await Promise.all([
-      api.getRelatorio(inicio, fim), api.getAtestados(), api.getFuncionarios('todos'),
+    const [registros, atestados, funcionarios, feriadosData] = await Promise.all([
+      api.getRelatorio(inicio, fim), api.getAtestados(), api.getFuncionarios('todos'), api.getFeriados(),
     ]);
-    return { registros: aplicarAtestados(registros, atestados, funcionarios, { inicio, fim, obraId }), funcionarios };
+    const feriados = (feriadosData || []).map((f: any) => f.data);
+    return { registros: aplicarAtestados(registros, atestados, funcionarios, { inicio, fim, obraId }, feriados), funcionarios };
   },
 
   uploadPhoto: async (
@@ -1854,5 +1877,51 @@ export const api = {
   toggleFornecedorStatus: async (id: string, ativo: boolean): Promise<void> => {
     if (!supabase) throw new Error("Supabase não configurado");
     const { error } = await withEmpresa(supabase.from("fornecedores")).update({ ativo }).eq("id", id);
-  }
+  },
+  getFeriados: async (): Promise<any[]> => {
+    const token = localStorage.getItem('@diarias:token');
+    if (token) {
+      try {
+        const res = await fetch('/api/feriados', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          return await res.json();
+        }
+      } catch (e) {
+        console.warn("API feriados failed", e);
+      }
+    }
+    // No fallback to supabase client since it's intentionally restricted
+    return [];
+  },
+  
+  createFeriado: async (data: string, descricao: string) => {
+    const token = localStorage.getItem('@diarias:token');
+    if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+    const res = await fetch('/api/feriados', {
+      method: 'POST',
+      headers: { 
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ data, descricao })
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Erro ao cadastrar feriado");
+    return json;
+  },
+
+  deleteFeriado: async (id: string) => {
+    const token = localStorage.getItem('@diarias:token');
+    if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+    const res = await fetch(`/api/feriados/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    const json = await res.json();
+    if (!res.ok) throw new Error(json.error || "Erro ao excluir feriado");
+    return json;
+  },
+  
 };

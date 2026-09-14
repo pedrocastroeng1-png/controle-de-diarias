@@ -224,7 +224,7 @@ export default function RelatorioFuncionarios() {
               type="button" 
               disabled={carregando || gerando || !selecionados.length} 
               onClick={() => void gerar()} 
-              className="flex items-center gap-2 rounded-lg bg-blue-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-800 disabled:opacity-50 transition-colors"
+              className="flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               {gerando ? (
                 <>

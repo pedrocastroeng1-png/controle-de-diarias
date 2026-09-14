@@ -12,6 +12,7 @@ import Login from './pages/auth/Login';
 import Dashboard from './pages/admin/Dashboard';
 import Obras from './pages/admin/Obras';
 import Funcoes from './pages/admin/Funcoes';
+import Feriados from './pages/admin/Feriados';
 import Funcionarios from './pages/admin/Funcionarios';
 import ControleMateriais from './pages/admin/ControleMateriais';
 import FerramentasAdmin from './pages/admin/Ferramentas';
@@ -64,6 +65,7 @@ function App() {
               <Route path="dashboard" element={<Dashboard />} />
               <Route path="obras" element={<Obras />} />
               <Route path="funcoes" element={<Funcoes />} />
+              <Route path="feriados" element={<Feriados />} />
               <Route path="funcionarios" element={<Funcionarios />} />
               <Route path="ferramentas" element={<FerramentasAdmin />} />
               <Route path="controle-materiais" element={<ControleMateriais />} />
