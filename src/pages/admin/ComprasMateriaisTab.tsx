@@ -165,7 +165,7 @@ export default function ComprasMateriaisTab() {
   const addItem = () => {
     setItensForm(prev => [
       ...prev, 
-      { id: crypto.randomUUID(), categoria_id: multiplasObras ? categorias.find(c => c.nome?.trim().toLowerCase() === 'epi')?.id || '' : '', material_id: '', quantidade: 1, unidade_compra: '', valor_unitario: 0, destinatarios: [''], obras_destino: [multiplasObras ? '' : compraForm.obra_id], produto_search: '', is_open: false }
+      { id: crypto.randomUUID(), categoria_id: multiplasObras ? categorias.find(c => c.nome?.trim().toLowerCase() === 'epi')?.id || '' : '', material_id: '', quantidade: 1, unidade_compra: '', valor_unitario: 0, valor_unitario_text: '', destinatarios: [''], obras_destino: [multiplasObras ? '' : compraForm.obra_id], produto_search: '', is_open: false }
     ]);
   };
 
@@ -247,6 +247,35 @@ export default function ComprasMateriaisTab() {
     }
   };
 
+  const handleValorUnitarioChange = (id: string, value: string) => {
+    updateItem(id, 'valor_unitario_text', value);
+  };
+
+  const handleValorUnitarioBlur = (id: string, text: string) => {
+    if (!text || text.trim() === '') {
+      updateItem(id, { valor_unitario: NaN, valor_unitario_text: '' });
+      return;
+    }
+
+    const commaCount = (text.match(/,/g) || []).length;
+    const dotCount = (text.match(/\./g) || []).length;
+    
+    if (commaCount + dotCount > 1) {
+      updateItem(id, 'valor_unitario', NaN);
+      return;
+    }
+
+    const numericString = text.replace(',', '.');
+    const parsed = parseFloat(numericString);
+
+    if (Number.isFinite(parsed) && parsed >= 0) {
+      const formattedText = parsed.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      updateItem(id, { valor_unitario: parsed, valor_unitario_text: formattedText });
+    } else {
+      updateItem(id, 'valor_unitario', NaN);
+    }
+  };
+
     const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (savingRef.current) return;
@@ -263,7 +292,7 @@ export default function ComprasMateriaisTab() {
       const item = itensForm[i];
       if (!item.material_id) return setFormError(`Selecione o produto para o item ${i + 1}.`);
       if (!Number.isFinite(item.quantidade) || item.quantidade <= 0) return setFormError(`A quantidade do item ${i + 1} deve ser maior que zero.`);
-      if (!Number.isFinite(item.valor_unitario) || item.valor_unitario < 0) return setFormError(`O valor unitário do item ${i + 1} não pode ser negativo.`);
+      if (!Number.isFinite(item.valor_unitario) || item.valor_unitario < 0) return setFormError(`O valor unitário do item ${i + 1} é inválido ou negativo.`);
       
       const material = materiais.find(m => m.id === item.material_id);
       if (!material) return setFormError(`Produto indisponível no item ${i + 1}. Recarregue o catálogo.`);
@@ -809,12 +838,12 @@ export default function ComprasMateriaisTab() {
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Valor Unit. *</label>
                         <input
-                          type="number"
+                          type="text"
+                          inputMode="decimal"
                           required
-                          min="0"
-                          step="0.01"
-                          value={item.valor_unitario === 0 ? '' : item.valor_unitario}
-                          onChange={e => updateItem(item.id, 'valor_unitario', parseFloat(e.target.value) || 0)}
+                          value={item.valor_unitario_text ?? ''}
+                          onChange={e => handleValorUnitarioChange(item.id, e.target.value)}
+                          onBlur={e => handleValorUnitarioBlur(item.id, e.target.value)}
                           className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
