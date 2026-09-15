@@ -1,3 +1,4 @@
+import { serverApi } from './server-api';
 import { supabase } from "./supabase";
 import bcrypt from "bcryptjs";
 import type { TablesUpdate } from '../types/database.generated';
@@ -225,58 +226,13 @@ export const api = {
     return data;
   },
 
-  login: async (usuario: string, senha: string): Promise<any | null> => {
-    if (!supabase) throw new Error("Supabase não configurado");
-
-    // Attempt secure server login first to obtain JWT session
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario, senha })
-      });
-      if (res.ok) {
-        const json = await res.json();
-        if (json.token) {
-          localStorage.setItem('@diarias:token', json.token);
-        }
-        if (json.user) {
-          return json.user;
-        }
-      } else if (res.status === 401 || res.status === 403) {
-        throw new Error("Usuário ou senha inválidos.");
-      }
-    } catch (e: any) {
-      if (e.message === "Usuário ou senha inválidos.") throw e;
-    }
-    const { data, error } = await supabase
-      .from("usuarios")
-      .select("id, usuario, perfil, senha, empresa_id, login, email")
-      .or(`usuario.eq."${usuario}",login.eq."${usuario}",email.eq."${usuario}"`)
-      .eq("ativo", true)
-      .single();
-
-    if (error || !data) {
-      throw new Error("Usuário ou senha inválidos.");
-    }
-
-    const { senha: passwordHash, ...userData } = data;
-
-    let isValid = false;
-    if (
-      passwordHash &&
-      (passwordHash.startsWith("$2a$") || passwordHash.startsWith("$2b$"))
-    ) {
-      isValid = await bcrypt.compare(senha, passwordHash);
-    } else {
-      isValid = senha === passwordHash;
-    }
-
-    if (!isValid) {
-      throw new Error("Usuário ou senha inválidos.");
-    }
-
-    return userData;
+  login: async (usuario: string, senha: string): Promise<any> => {
+    localStorage.removeItem('@diarias:token');
+    const res = await fetch('/api/auth/login', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({usuario,senha}), signal: AbortSignal.timeout(20000) });
+    const json = await res.json();
+    if (!res.ok || !json.token || !json.user) throw new Error(json.error || 'Não foi possível entrar.');
+    localStorage.setItem('@diarias:token', json.token);
+    return json.user;
   },
 
   // Obras
@@ -488,6 +444,8 @@ export const api = {
   },
 
   salvarPresencas: async (presencas: Array<any>, empresaIdContext?: string): Promise<any[]> => {
+    const holidays = await api.getFeriados();
+    if (presencas.some(p => holidays.some(h => h.data === p.data))) throw new Error('Feriado — dia não remunerado.');
     if (!supabase) throw new Error("Supabase não configurado");
     if (!presencas || presencas.length === 0) return [];
 
@@ -1651,13 +1609,7 @@ export const api = {
     return data || [];
   },
 
-  getMateriais: async (): Promise<any[]> => {
-    if (!supabase) throw new Error("Supabase não configurado");
-    let query = withEmpresa(supabase.from("materiais")).select("*, category:material_categories(*)");
-    const { data, error } = await query.eq("ativo", true).order("nome");
-    if (error) throw error;
-    return data || [];
-  },
+  getMateriais: async (): Promise<any[]> => serverApi('/api/produtos'),
 
   getComprasMateriais: async (): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
@@ -1681,31 +1633,7 @@ export const api = {
     }));
   },
 
-  getCompraDetalhes: async (compraId: string): Promise<any> => {
-    if (!supabase) throw new Error("Supabase não configurado");
-    const { data: compra, error: compraError } = await withEmpresa(
-      supabase.from("compras_materiais"),
-    )
-      .select(
-        "*, obra:obras(nome), fornecedor_rel:fornecedores(nome), registrador:usuarios!registrado_por(usuario)",
-      )
-      .eq("id", compraId)
-      .single();
-    if (compraError) throw compraError;
-
-    const { data: itens, error: itensError } = await withEmpresa(
-      supabase.from("compras_materiais_itens"),
-    )
-      .select("*, material:materiais(*, category:material_categories(*)), funcionario:funcionarios(nome)")
-      .eq("compra_id", compraId);
-    if (itensError) throw itensError;
-
-    const total_calculado = (itens || []).reduce(
-      (acc: number, item: any) => acc + (Number(item.valor_total) || 0),
-      0,
-    );
-    return { ...compra, itens: itens || [], total_calculado };
-  },
+  getCompraDetalhes: async (compraId: string): Promise<any> => serverApi(`/api/produtos?compra=${encodeURIComponent(compraId)}`),
 
   getMaterialQuantities: async (filters?: {
     obra_id?: string;
@@ -1715,33 +1643,24 @@ export const api = {
     data_final?: string;
   }): Promise<any[]> => {
     if (!supabase) throw new Error("Supabase não configurado");
-    let query = withEmpresa(supabase.from("compras_materiais_itens")).select(`
-        id,
-        quantidade,
-        valor_unitario,
-        valor_total,
-        compra:compras_materiais!inner(id, data_compra, fornecedor, obra_id, obra:obras(nome)),
-        material:materiais!inner(id, nome, unidade, categoria_id, category:material_categories(nome))
-      `);
-
-    if (filters?.obra_id) {
-      query = query.eq("compra.obra_id", filters.obra_id);
+    let query = withEmpresa(supabase.from("vw_relatorio_compras_materiais")).select('*').order('item_id');
+    if (filters?.obra_id) query = query.eq('obra_id', filters.obra_id);
+    if (filters?.categoria_id) query = query.eq('categoria_id', filters.categoria_id);
+    if (filters?.material_id) query = query.eq('material_id', filters.material_id);
+    if (filters?.data_inicial) query = query.gte('data_compra', filters.data_inicial);
+    if (filters?.data_final) query = query.lte('data_compra', filters.data_final);
+    const data: any[] = [];
+    for (let offset = 0; ; offset += 500) {
+      const { data: page, error } = await query.range(offset, offset + 499);
+      if (error) throw error;
+      for (const r of page || []) data.push({
+        id: r.item_id, quantidade: r.quantidade, valor_unitario: r.valor_unitario, valor_total: r.valor_total,
+        unidade_compra: r.unidade,
+        material: { id: r.material_id, nome: r.material, categoria_id: r.categoria_id, category: { nome: r.categoria } },
+        compra: { obra_id: r.obra_id, obra: { nome: r.obra }, data_compra: r.data_compra, fornecedor: r.fornecedor }
+      });
+      if (!page || page.length < 500) break;
     }
-    if (filters?.categoria_id) {
-      query = query.eq("material.categoria_id", filters.categoria_id);
-    }
-    if (filters?.material_id) {
-      query = query.eq("material_id", filters.material_id);
-    }
-    if (filters?.data_inicial) {
-      query = query.gte("compra.data_compra", filters.data_inicial);
-    }
-    if (filters?.data_final) {
-      query = query.lte("compra.data_compra", filters.data_final);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
 
     // Agregação no frontend
     const map = new Map<string, any>();
@@ -1769,13 +1688,14 @@ export const api = {
       // or just by Material?
       // The requirement says: "Se OBRA = Todas as Obras, mostrar: OBRA | MATERIAL | UNIDADE | QUANTIDADE"
       // So the grouping key must be obra_id + material_id
-      const key = `${obraId}_${matId}`;
+      const unit = item.unidade_compra || item.unidade_catalogo_legado || "Não informada";
+      const key = `${obraId}_${matId}_${unit}`;
 
       if (!map.has(key)) {
         map.set(key, {
           material_id: matId,
           material_nome: mat?.nome,
-          unidade: mat?.unidade,
+          unidade: unit,
           categoria_id: mat?.categoria_id,
           categoria_nome: cat?.nome,
           obra_id: obraId,
@@ -1878,50 +1798,6 @@ export const api = {
     if (!supabase) throw new Error("Supabase não configurado");
     const { error } = await withEmpresa(supabase.from("fornecedores")).update({ ativo }).eq("id", id);
   },
-  getFeriados: async (): Promise<any[]> => {
-    const token = localStorage.getItem('@diarias:token');
-    if (token) {
-      try {
-        const res = await fetch('/api/feriados', {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (res.ok) {
-          return await res.json();
-        }
-      } catch (e) {
-        console.warn("API feriados failed", e);
-      }
-    }
-    // No fallback to supabase client since it's intentionally restricted
-    return [];
-  },
-  
-  createFeriado: async (data: string, descricao: string) => {
-    const token = localStorage.getItem('@diarias:token');
-    if (!token) throw new Error("Sessão expirada. Faça login novamente.");
-    const res = await fetch('/api/feriados', {
-      method: 'POST',
-      headers: { 
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({ data, descricao })
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "Erro ao cadastrar feriado");
-    return json;
-  },
-
-  deleteFeriado: async (id: string) => {
-    const token = localStorage.getItem('@diarias:token');
-    if (!token) throw new Error("Sessão expirada. Faça login novamente.");
-    const res = await fetch(`/api/feriados/${id}`, {
-      method: 'DELETE',
-      headers: { 'Authorization': `Bearer ${token}` }
-    });
-    const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "Erro ao excluir feriado");
-    return json;
-  },
-  
+  getFeriados: async (): Promise<import('./types').Feriado[]> => serverApi('/api/feriados'),
+  gerenciarFeriado: async (params: any) => serverApi('/api/feriados', params),
 };
