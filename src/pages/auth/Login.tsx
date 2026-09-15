@@ -73,9 +73,7 @@ export default function Login() {
       }
     }
 
-    let success = false;
-    try { success = await login(usuario, senha); }
-    catch (e) { setErro(e instanceof Error ? e.message : 'Não foi possível entrar. Tente novamente.'); setLoading(false); return; }
+    const success = await login(usuario, senha);
 
     if (success) {
       const userStr = localStorage.getItem('@diarias:usuario');

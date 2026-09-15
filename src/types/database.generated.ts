@@ -626,8 +626,6 @@ export type Database = {
           id: string
           material_id: string
           quantidade: number
-          unidade_catalogo_legado: string | null
-          unidade_compra: string | null
           valor_total: number | null
           valor_unitario: number
         }
@@ -639,8 +637,6 @@ export type Database = {
           id?: string
           material_id: string
           quantidade: number
-          unidade_catalogo_legado?: string | null
-          unidade_compra?: string | null
           valor_total?: number | null
           valor_unitario?: number
         }
@@ -652,8 +648,6 @@ export type Database = {
           id?: string
           material_id?: string
           quantidade?: number
-          unidade_catalogo_legado?: string | null
-          unidade_compra?: string | null
           valor_total?: number | null
           valor_unitario?: number
         }
@@ -899,38 +893,6 @@ export type Database = {
             columns: ["operador_emprestimo_id"]
             isOneToOne: false
             referencedRelation: "usuarios"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      feriados: {
-        Row: {
-          created_at: string
-          data: string
-          descricao: string
-          empresa_id: string
-          id: string
-        }
-        Insert: {
-          created_at?: string
-          data: string
-          descricao: string
-          empresa_id: string
-          id?: string
-        }
-        Update: {
-          created_at?: string
-          data?: string
-          descricao?: string
-          empresa_id?: string
-          id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "feriados_empresa_id_fkey"
-            columns: ["empresa_id"]
-            isOneToOne: false
-            referencedRelation: "empresas"
             referencedColumns: ["id"]
           },
         ]
@@ -1330,10 +1292,8 @@ export type Database = {
           empresa_id: string
           id: string
           nome: string
-          observacao: string | null
           ordem: number
           unidade: string
-          unidades_permitidas: string[]
           updated_at: string
         }
         Insert: {
@@ -1343,10 +1303,8 @@ export type Database = {
           empresa_id: string
           id?: string
           nome: string
-          observacao?: string | null
           ordem?: number
           unidade: string
-          unidades_permitidas: string[]
           updated_at?: string
         }
         Update: {
@@ -1356,10 +1314,8 @@ export type Database = {
           empresa_id?: string
           id?: string
           nome?: string
-          observacao?: string | null
           ordem?: number
           unidade?: string
-          unidades_permitidas?: string[]
           updated_at?: string
         }
         Relationships: [
@@ -1460,8 +1416,6 @@ export type Database = {
           quantidade: number
           registrado_por: string | null
           tipo: string
-          unidade_catalogo_legado: string | null
-          unidade_movimento: string | null
           updated_at: string
           valor_unitario: number | null
         }
@@ -1479,8 +1433,6 @@ export type Database = {
           quantidade: number
           registrado_por?: string | null
           tipo: string
-          unidade_catalogo_legado?: string | null
-          unidade_movimento?: string | null
           updated_at?: string
           valor_unitario?: number | null
         }
@@ -1498,8 +1450,6 @@ export type Database = {
           quantidade?: number
           registrado_por?: string | null
           tipo?: string
-          unidade_catalogo_legado?: string | null
-          unidade_movimento?: string | null
           updated_at?: string
           valor_unitario?: number | null
         }
@@ -3030,7 +2980,6 @@ export type Database = {
           registrado_por: string | null
           registrado_por_nome: string | null
           unidade: string | null
-          unidade_confirmada: boolean | null
           valor_total: number | null
           valor_unitario: number | null
         }
@@ -3335,21 +3284,7 @@ export type Database = {
         }
         Returns: string
       }
-      gerenciar_feriado_seguro: {
-        Args: {
-          p_confirmar?: boolean
-          p_data: string
-          p_descricao: string
-          p_empresa: string
-          p_fingerprint?: string
-          p_id: string
-          p_operacao: string
-          p_usuario: string
-        }
-        Returns: Json
-      }
       get_internal_push_dispatch_secret: { Args: never; Returns: string }
-      limitar_login: { Args: { p_chave: string }; Returns: boolean }
       registrar_compra_material: {
         Args: {
           p_data_compra?: string
@@ -3570,3 +3505,4 @@ export const Constants = {
     },
   },
 } as const
+

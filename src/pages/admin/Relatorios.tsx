@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../../lib/api';
-import { diasFinanceiros, valorFinanceiro } from '../../lib/atestados-relatorio';
+import { valorFinanceiro } from '../../lib/atestados-relatorio';
 import { Obra, Presenca } from '../../lib/types';
 import { format, parseISO } from 'date-fns';
 import { useLocation } from 'react-router-dom';
@@ -100,11 +100,11 @@ export default function Relatorios() {
            rowValor = 0;
         }
         
-        if (diasFinanceiros(p) > 0) {
-          // Use paid-day equivalents consistently with exports.
-          agrupado[fId].dias += diasFinanceiros(p);
+        if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO' || p.status === 'MEIA_DIARIA' || p.tipo_diaria === 'MEIA_DIARIA') {
+          // If it's half day, we count as 1 presence but total will be 50%
+          agrupado[fId].dias += 1;
           agrupado[fId].total += rowValor;
-        } else if ((p.status === 'FALTOU' || p.status === 'FERIADO - NÃO REMUNERADO')) {
+        } else if (p.status === 'FALTOU') {
           agrupado[fId].faltas += 1;
         }
       }
@@ -204,7 +204,7 @@ export default function Relatorios() {
             fAgrupado[fId].dias += 0.5;
             fAgrupado[fId].meias += 1;
             fAgrupado[fId].total += rowValor;
-          } else if ((p.status === 'FALTOU' || p.status === 'FERIADO - NÃO REMUNERADO')) {
+          } else if (p.status === 'FALTOU') {
             fAgrupado[fId].faltas += 1;
           }
         }
@@ -217,9 +217,9 @@ export default function Relatorios() {
       let totalFolha = 0;
       
       filteredRelatorio.forEach((r: any) => {
-        if (diasFinanceiros(r) === 1) inteirasGeral++;
-        if (diasFinanceiros(r) === 0.5) meiasGeral++;
-        if (r.status === 'FALTOU' || r.status === 'FERIADO - NÃO REMUNERADO') faltasGeral++;
+        if ((r.status === 'PRESENTE' || r.status === 'ATESTADO MÉDICO') && r.tipo_diaria !== 'MEIA_DIARIA') inteirasGeral++;
+        if (r.status === 'MEIA DIÁRIA' || r.tipo_diaria === 'MEIA_DIARIA') meiasGeral++;
+        if (r.status === 'FALTOU') faltasGeral++;
         if (r.status === 'PRESENTE' || r.status === 'MEIA DIÁRIA' || r.status === 'ATESTADO MÉDICO') {
              totalFolha += (valorFinanceiro(r));
         }
@@ -349,12 +349,12 @@ export default function Relatorios() {
         
                 for (const record of records) {
           const dataStr = format(parseISO(record.data), 'dd/MM/yyyy');
-          const isFalta = record.status === 'FALTOU' || record.status === 'FERIADO - NÃO REMUNERADO';
+          const isFalta = record.status === 'FALTOU';
           const isAtestado = record.status === 'ATESTADO MÉDICO';
           const isFerias = record.status === 'FÉRIAS';
           const isFolga = record.status === 'FOLGA';
-          const isMeia = diasFinanceiros(record) === 0.5;
-          const isPresente = diasFinanceiros(record) > 0;
+          const isMeia = record.tipo_diaria === 'MEIA_DIARIA' || record.status === 'MEIA DIÁRIA';
+          const isPresente = record.status === 'PRESENTE' || isMeia;
           
           const blockHeight = isPresente ? 35 : 12; 
           
@@ -381,7 +381,7 @@ export default function Relatorios() {
             doc.setFont("helvetica", "normal");
             doc.text(`VALOR: R$ 0,00`, 110, currentY);
             currentY += 4;
-          } else if (isFerias || isFolga) {
+          } else if (isAtestado || isFerias || isFolga) {
             doc.setTextColor(180, 83, 9);
             doc.text(`${record.status}`, 45, currentY);
             doc.setTextColor(0, 0, 0);
@@ -413,7 +413,7 @@ export default function Relatorios() {
                 }
             }
 
-            if (!isAtestado && photoMeta?.path) {
+            if ((photoMeta && photoMeta.path) || record.atestado_photo_path) {
                const photoDate = new Date((photoMeta && photoMeta.taken_at) ? photoMeta.taken_at : record.data);
                const twentyDaysAgo = new Date();
                twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
@@ -426,8 +426,8 @@ export default function Relatorios() {
                  currentY += 4;
                } else {
                  try {
-                   const bucket = 'attendance-photos';
-                   const path = photoMeta.path;
+                   const bucket = record.status === 'ATESTADO MÉDICO' ? 'medical-certificates' : 'attendance-photos';
+                   const path = photoMeta ? photoMeta.path : record.atestado_photo_path;
                    const urlPromise = api.getPhotoUrl(bucket, path);
                    const url = await Promise.race([
                      urlPromise,
@@ -514,15 +514,18 @@ export default function Relatorios() {
     const obrasGroup: Record<string, any[]> = {};
     let totalPresentes = 0;
     let totalFaltas = 0;
+    let totalAtestados = 0;
 
     dailyData.forEach(p => {
       const obraName = p.obra_nome || p.obra || 'Sem Obra';
       if (!obrasGroup[obraName]) obrasGroup[obraName] = [];
       obrasGroup[obraName].push(p);
       
-      totalPresentes += diasFinanceiros(p);
-      if (p.status === 'FALTOU' || p.status === 'FERIADO - NÃO REMUNERADO') totalFaltas++;
-
+      if (p.status === 'PRESENTE' && p.tipo_diaria === 'MEIA_DIARIA') totalPresentes += 0.5;
+      else if (p.status === 'PRESENTE') totalPresentes += 1;
+      else if (p.status === 'MEIA DIÁRIA') totalPresentes += 0.5;
+      else if (p.status === 'FALTOU') totalFaltas++;
+      else if (p.status === 'ATESTADO MÉDICO') totalAtestados++;
     });
 
     let currentY = 50;
@@ -552,7 +555,7 @@ export default function Relatorios() {
           currentY = 20;
         }
         let statusText = 'PRESENTE';
-        if (f.status === 'ATESTADO MÉDICO') statusText = 'PRESENTE';
+        if (f.status === 'ATESTADO MÉDICO') statusText = 'ATESTADO MÉDICO';
         else if (f.status === 'PRESENTE' && f.tipo_diaria === 'MEIA_DIARIA') statusText = 'MEIA DIÁRIA';
         else if (f.status === 'MEIA DIÁRIA') statusText = 'MEIA DIÁRIA';
         else if (f.status === 'FALTOU') statusText = 'FALTOU';
@@ -633,8 +636,8 @@ export default function Relatorios() {
           };
         }
         let rowValor = valorFinanceiro(p);
-        if (diasFinanceiros(p) > 0) {
-          diaristasMap[fId].dias += diasFinanceiros(p);
+        if (p.status === 'PRESENTE' || p.status === 'ATESTADO MÉDICO' || p.status === 'MEIA_DIARIA' || p.tipo_diaria === 'MEIA_DIARIA' || p.status === 'MEIA DIÁRIA') {
+          diaristasMap[fId].dias += 1;
           diaristasMap[fId].total += rowValor;
         }
       });
@@ -664,7 +667,7 @@ export default function Relatorios() {
       folhaOrdenada.forEach((p) => {
         if (p.eh_clt || p.tipo_colaborador === "CLT") return;
         let pStatus = '✘ Faltou';
-        if (p.status === 'ATESTADO MÉDICO') pStatus = '✔ Presente';
+        if (p.status === 'ATESTADO MÉDICO') pStatus = '🩺 Atestado Médico';
         else if (p.status === 'PRESENTE' && p.tipo_diaria === 'MEIA_DIARIA') pStatus = '🌗 Meia Diária';
         else if (p.status === 'MEIA DIÁRIA') pStatus = '🌗 Meia Diária';
         else if (p.status === 'PRESENTE') pStatus = '✔ Presente';
@@ -677,7 +680,7 @@ export default function Relatorios() {
           data: p.data ? format(parseISO(p.data), 'dd/MM/yyyy') : '',
           status: pStatus,
           tipo_diaria: p.tipo_diaria === 'MEIA_DIARIA' ? 'Meia Diária' : 'Diária',
-          percentual: (p.percentual_diaria ?? (p.tipo_diaria === 'MEIA_DIARIA' ? 50 : 100)) + '%',
+          percentual: (p.percentual_diaria || (p.tipo_diaria === 'MEIA_DIARIA' ? 50 : 100)) + '%',
           valor_base: Number(p.valor_diaria) || 0,
           valor: valorFinanceiro(p)
         });
@@ -1332,7 +1335,7 @@ const handleExportPagamentosCaixa = () => {
                   ) : [...relatorio].sort((a,b) => new Date(b.data).getTime() - new Date(a.data).getTime() || (a.funcionario_nome || a.funcionario || '').localeCompare(b.funcionario_nome || b.funcionario || '')).filter(p => (p.funcionario_nome || p.funcionario || '').toLowerCase().includes(searchTerm.toLowerCase())).map((p: any, idx) => {
                     let pStatus = 'Faltou';
                     let statusClass = 'bg-red-100 text-red-800';
-                    if (p.status === 'ATESTADO MÉDICO') { pStatus = 'Presente'; statusClass = 'bg-blue-100 text-blue-800'; }
+                    if (p.status === 'ATESTADO MÉDICO') { pStatus = 'Atestado Médico'; statusClass = 'bg-blue-100 text-blue-800'; }
                     else if (p.status === 'PRESENTE') { pStatus = 'Presente'; statusClass = 'bg-green-100 text-green-800'; }
                     else if (p.status === 'MEIA DIÁRIA') { pStatus = 'Presente'; statusClass = 'bg-green-100 text-green-800'; }
                     

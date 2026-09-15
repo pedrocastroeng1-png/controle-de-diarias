@@ -48,4 +48,4 @@ async function generate() {
   console.log("✅ All icons generated successfully!");
 }
 
-generate().catch(error => { console.error(error); process.exitCode = 1; });
+generate().catch(console.error);

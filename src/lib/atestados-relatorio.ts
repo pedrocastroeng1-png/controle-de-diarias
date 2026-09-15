@@ -100,10 +100,3 @@ export function valorFinanceiro(row: Pick<RegistroRelatorio, 'status' | 'eh_clt'
   if (row.eh_clt || row.tipo_colaborador === 'CLT' || !['PRESENTE', 'ATESTADO MÉDICO', 'MEIA_DIARIA', 'MEIA DIÁRIA'].includes(row.status ?? '')) return 0;
   return row.valor_calculado ?? calcularDiaria({ presente: true, tipo_colaborador: row.tipo_colaborador, valor_diaria: row.valor_diaria, percentual_diaria: row.percentual_diaria, tipo_diaria: row.tipo_diaria });
 }
-
-/** Paid-day equivalents, independent of the rate (a zero rate is still a paid-day record). */
-export function diasFinanceiros(row: Pick<RegistroRelatorio, 'status' | 'eh_clt' | 'tipo_colaborador' | 'percentual_diaria' | 'tipo_diaria'>): number {
-  if (row.eh_clt || row.tipo_colaborador === 'CLT' || !['PRESENTE','ATESTADO MÉDICO','MEIA_DIARIA','MEIA DIÁRIA'].includes(row.status ?? '')) return 0;
-  if (row.status === 'ATESTADO MÉDICO') return 1;
-  return (row.percentual_diaria ?? (row.tipo_diaria === 'MEIA_DIARIA' || row.status === 'MEIA DIÁRIA' || row.status === 'MEIA_DIARIA' ? 50 : 100)) / 100;
-}

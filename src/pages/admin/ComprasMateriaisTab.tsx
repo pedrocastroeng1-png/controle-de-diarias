@@ -81,7 +81,6 @@ export default function ComprasMateriaisTab() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      setError('');
       const [comprasData, obrasData, materiaisData, categoriasData, fornecedoresData] = await Promise.all([
         api.getComprasMateriais(),
         api.getObras(),
@@ -96,7 +95,20 @@ export default function ComprasMateriaisTab() {
       setFornecedores(fornecedoresData);
     
     } catch (err: any) {
-      setError(err.message || 'Erro ao carregar compras.');
+      if (err.message && err.message.includes('já está cadastrado')) {
+        alert('Este fornecedor já está cadastrado. Selecionando-o automaticamente...');
+        // Refresh and find it
+        const fornecedoresData = await api.getFornecedores({ ativo: true });
+        setFornecedores(fornecedoresData);
+        const existing = fornecedoresData.find(f => f.nome.toLowerCase() === novoFornecedorNome.trim().toLowerCase());
+        if (existing) {
+          setCompraForm(prev => ({ ...prev, fornecedor_id: existing.id }));
+        }
+        setShowFornecedorModal(false);
+        setNovoFornecedorNome('');
+      } else {
+        alert('Erro ao cadastrar fornecedor.');
+      }
     } finally {
 
       setLoading(false);
@@ -150,7 +162,7 @@ export default function ComprasMateriaisTab() {
   const addItem = () => {
     setItensForm(prev => [
       ...prev, 
-      { id: crypto.randomUUID(), categoria_id: '', material_id: '', quantidade: 1, unidade_compra: '', valor_unitario: 0, funcionario_id: null, produto_search: '', is_open: false }
+      { id: Date.now().toString(), categoria_id: '', material_id: '', quantidade: 1, unidade_compra: '', valor_unitario: 0, funcionario_id: null, produto_search: '', is_open: false }
     ]);
   };
 
@@ -164,7 +176,6 @@ export default function ComprasMateriaisTab() {
           // Reset material if category changes
           if (fieldOrUpdates === 'categoria_id') {
             updated.material_id = '';
-            updated.unidade_compra = '';
             updated.produto_search = '';
             updated.is_open = false;
             const isEpi = categorias.find((c: any) => c.id === value)?.nome?.trim().toLowerCase() === 'epi';
@@ -174,7 +185,6 @@ export default function ComprasMateriaisTab() {
           }
         } else {
           updated = { ...updated, ...fieldOrUpdates };
-          if (fieldOrUpdates.material_id !== undefined && fieldOrUpdates.material_id !== item.material_id) updated.unidade_compra = materiais.find(m => m.id === fieldOrUpdates.material_id)?.unidade || "";
         }
         return updated;
       }
@@ -273,7 +283,6 @@ export default function ComprasMateriaisTab() {
   }
 
   // LIST VIEW
-  if (view === 'list' && error) return <div role="alert" className="p-4 bg-red-50 text-red-700 rounded-xl">{error} <button onClick={() => void fetchData()} className="underline">Tentar novamente</button></div>;
   if (view === 'list') {
     const filteredCompras = compras.filter(c => 
       (c.fornecedor_rel?.nome || c.fornecedor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -447,7 +456,7 @@ export default function ComprasMateriaisTab() {
                         {item.quantidade}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500 text-center">
-                        {item.unidade_compra || item.unidade_catalogo_legado || "Não informada"}{!item.unidade_compra && <span className="block text-xs text-slate-500">Unidade do catálogo legado</span>}
+                        {item.material?.unidade}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">
                         {new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(item.valor_unitario)}
@@ -762,7 +771,11 @@ export default function ComprasMateriaisTab() {
                           disabled={!selectedMaterial}
                           className="w-full text-sm rounded border border-gray-300 px-1 py-1.5 focus:ring-blue-500 focus:border-blue-500"
                         >
-                          {(selectedMaterial?.unidades_permitidas || []).map((u: string) => <option key={u} value={u}>{u}</option>)}
+                          {selectedMaterial && (
+                            <option value={selectedMaterial.unidade}>{selectedMaterial.unidade}</option>
+                          )}
+                          <option value="KG">KG</option>
+                          <option value="UN">UN</option>
                         </select>
                       </div>
                     </div>
