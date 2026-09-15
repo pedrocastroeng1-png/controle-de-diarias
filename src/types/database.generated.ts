@@ -510,7 +510,7 @@ export type Database = {
           fornecedor_id: string | null
           id: string
           numero_recibo: string | null
-          obra_id: string
+          obra_id: string | null
           observacao: string | null
           registrado_em: string
           registrado_por: string
@@ -524,7 +524,7 @@ export type Database = {
           fornecedor_id?: string | null
           id?: string
           numero_recibo?: string | null
-          obra_id: string
+          obra_id?: string | null
           observacao?: string | null
           registrado_em?: string
           registrado_por: string
@@ -538,7 +538,7 @@ export type Database = {
           fornecedor_id?: string | null
           id?: string
           numero_recibo?: string | null
-          obra_id?: string
+          obra_id?: string | null
           observacao?: string | null
           registrado_em?: string
           registrado_por?: string
@@ -625,6 +625,7 @@ export type Database = {
           funcionario_id: string | null
           id: string
           material_id: string
+          obra_destino_id: string | null
           quantidade: number
           unidade_catalogo_legado: string | null
           unidade_compra: string | null
@@ -638,6 +639,7 @@ export type Database = {
           funcionario_id?: string | null
           id?: string
           material_id: string
+          obra_destino_id?: string | null
           quantidade: number
           unidade_catalogo_legado?: string | null
           unidade_compra?: string | null
@@ -651,6 +653,7 @@ export type Database = {
           funcionario_id?: string | null
           id?: string
           material_id?: string
+          obra_destino_id?: string | null
           quantidade?: number
           unidade_catalogo_legado?: string | null
           unidade_compra?: string | null
@@ -706,6 +709,55 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "materiais"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compras_materiais_itens_obra_destino_id_fkey"
+            columns: ["obra_destino_id"]
+            isOneToOne: false
+            referencedRelation: "obras"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "compras_materiais_itens_obra_destino_id_fkey"
+            columns: ["obra_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_equipe_detalhada"
+            referencedColumns: ["obra_id"]
+          },
+          {
+            foreignKeyName: "compras_materiais_itens_obra_destino_id_fkey"
+            columns: ["obra_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_dashboard_equipe_tempo_real"
+            referencedColumns: ["obra_id"]
+          },
+          {
+            foreignKeyName: "compras_materiais_itens_obra_destino_id_fkey"
+            columns: ["obra_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_equipe_tempo_real"
+            referencedColumns: ["obra_id"]
+          },
+          {
+            foreignKeyName: "compras_materiais_itens_obra_destino_id_fkey"
+            columns: ["obra_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_ferramentas_localizacao"
+            referencedColumns: ["obra_id"]
+          },
+          {
+            foreignKeyName: "compras_materiais_itens_obra_destino_id_fkey"
+            columns: ["obra_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_quadro_funcionarios_tempo_real"
+            referencedColumns: ["obra_id"]
+          },
+          {
+            foreignKeyName: "compras_materiais_itens_obra_destino_id_fkey"
+            columns: ["obra_destino_id"]
+            isOneToOne: false
+            referencedRelation: "vw_relatorio_funcionarios_clt"
+            referencedColumns: ["obra_id"]
           },
         ]
       }
@@ -3069,55 +3121,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "materiais"
             referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "compras_materiais_obra_id_fkey"
-            columns: ["obra_id"]
-            isOneToOne: false
-            referencedRelation: "obras"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "compras_materiais_obra_id_fkey"
-            columns: ["obra_id"]
-            isOneToOne: false
-            referencedRelation: "vw_dashboard_equipe_detalhada"
-            referencedColumns: ["obra_id"]
-          },
-          {
-            foreignKeyName: "compras_materiais_obra_id_fkey"
-            columns: ["obra_id"]
-            isOneToOne: false
-            referencedRelation: "vw_dashboard_equipe_tempo_real"
-            referencedColumns: ["obra_id"]
-          },
-          {
-            foreignKeyName: "compras_materiais_obra_id_fkey"
-            columns: ["obra_id"]
-            isOneToOne: false
-            referencedRelation: "vw_equipe_tempo_real"
-            referencedColumns: ["obra_id"]
-          },
-          {
-            foreignKeyName: "compras_materiais_obra_id_fkey"
-            columns: ["obra_id"]
-            isOneToOne: false
-            referencedRelation: "vw_ferramentas_localizacao"
-            referencedColumns: ["obra_id"]
-          },
-          {
-            foreignKeyName: "compras_materiais_obra_id_fkey"
-            columns: ["obra_id"]
-            isOneToOne: false
-            referencedRelation: "vw_quadro_funcionarios_tempo_real"
-            referencedColumns: ["obra_id"]
-          },
-          {
-            foreignKeyName: "compras_materiais_obra_id_fkey"
-            columns: ["obra_id"]
-            isOneToOne: false
-            referencedRelation: "vw_relatorio_funcionarios_clt"
-            referencedColumns: ["obra_id"]
           },
           {
             foreignKeyName: "compras_materiais_registrado_por_fkey"

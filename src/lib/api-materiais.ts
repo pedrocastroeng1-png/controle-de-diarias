@@ -137,7 +137,7 @@ export const apiMateriaisRPC = {
     p_data_compra: string | null;
     p_fornecedor_id: string | null;
     p_numero_recibo: string | null;
-    p_obra_id: string;
+    p_obra_id: string | null;
     p_itens: any[];
   }) => {
     const { supabase } = await import('./supabase');
@@ -155,7 +155,8 @@ export const apiMateriaisRPC = {
       p_fornecedor_id: params.p_fornecedor_id,
       p_itens: params.p_itens,
       p_numero_recibo: params.p_numero_recibo || undefined,
-      p_obra_id: params.p_obra_id,
+      // The real RPC accepts SQL NULL for multi-worksite EPI; generated RPC argument types omit nullability.
+      p_obra_id: params.p_obra_id as string,
       p_usuario_id: usuario_id
     });
     

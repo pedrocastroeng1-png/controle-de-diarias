@@ -1617,13 +1617,14 @@ export const api = {
       supabase.from("compras_materiais"),
     )
       .select(
-        "*, obra:obras(nome), fornecedor_rel:fornecedores(nome), registrador:usuarios!registrado_por(usuario), itens:compras_materiais_itens(valor_total)",
+        "*, obra:obras(nome), fornecedor_rel:fornecedores(nome), registrador:usuarios!registrado_por(usuario), itens:compras_materiais_itens(valor_total,obra_destino:obras(nome))",
       )
       .order("data_compra", { ascending: false })
       .order("created_at", { ascending: false });
     if (error) throw error;
     return (data || []).map((compra: any) => ({
       ...compra,
+      obras_nomes: [...new Set((compra.itens || []).map((i: any) => i.obra_destino?.nome || compra.obra?.nome).filter(Boolean))].join(', '),
       total_calculado: compra.itens
         ? compra.itens.reduce(
             (acc: number, item: any) => acc + (Number(item.valor_total) || 0),
