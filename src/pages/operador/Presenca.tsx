@@ -30,7 +30,7 @@ export default function PresencaPage() {
     Funcionario[]
   >([]);
   const [feriados, setFeriados] = useState<Feriado[]>([]);
-  const isFeriado = feriados.some(f => f.data === selectedDate);
+
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error";
@@ -50,6 +50,7 @@ export default function PresencaPage() {
 
   const handleToggleMeiaDiaria = async (presenca: any) => {
     if (!usuario) return;
+    if (isFeriado) { setErro("Feriado — dia não remunerado"); return; }
     const isMeia = presenca.tipo_diaria === "MEIA_DIARIA";
 
     try {
@@ -89,6 +90,7 @@ export default function PresencaPage() {
 
   const hoje = format(new Date(), "yyyy-MM-dd");
   const [selectedDate, setSelectedDate] = useState(hoje);
+  const isFeriado = feriados.some(f => f.data === selectedDate);
 
   useEffect(() => {
     loadFuncionariosEPresencas();
@@ -103,6 +105,7 @@ export default function PresencaPage() {
     let funcs: Funcionario[] = [];
     let presencasData: any[] = [];
     try {
+      setFeriados(await api.getFeriados());
       funcsRaw = await api.getFuncionarios("todos");
       presencasData = await api.getPresencas(selectedDate);
       
@@ -122,7 +125,7 @@ export default function PresencaPage() {
       });
       setFuncionarios(funcs);
     } catch (error) {
-      setErro("Ocorreu um erro ao carregar os dados.");
+      setErro(error instanceof Error ? error.message : "Ocorreu um erro ao carregar os dados.");
       setLoading(false);
       return;
     }
@@ -604,6 +607,7 @@ export default function PresencaPage() {
 
   return (
     <div className="max-w-3xl mx-auto pb-20">
+      {isFeriado && <div role="status" className="p-4 bg-amber-50 text-amber-800 rounded-xl">Feriado — dia não remunerado. O lançamento de presenças está bloqueado.</div>}
       {erro && (
         <div className="mb-4 text-sm text-red-600 bg-red-50 border border-red-100 p-3 rounded-lg">
           {erro}
@@ -737,7 +741,7 @@ export default function PresencaPage() {
                           : isPresent === false
                             ? "bg-white border-red-200 shadow-sm"
                             : "bg-white border-slate-200 shadow-sm"
-                      } ${!isAdmin && (jaRegistradoHoje || saving) ? "opacity-70" : ""} relative group`}
+                      } ${loading || !!erro || isFeriado || saving || (!isAdmin && jaRegistradoHoje) ? "opacity-70" : ""} relative group`}
                     >
                       <div className="flex items-center w-full">
                         <div
@@ -788,7 +792,7 @@ export default function PresencaPage() {
                                   togglePresenca(f.id, false);
                                 }}
                                 disabled={
-                                  !isAdmin && (jaRegistradoHoje || saving)
+                                  loading || !!erro || isFeriado || saving || (!isAdmin && jaRegistradoHoje)
                                 }
                                 className="px-3 py-1.5 rounded-full text-xs font-bold tracking-wide bg-red-50 text-red-700 ring-1 ring-inset ring-red-600/20 shadow-sm hover:bg-red-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                               >
@@ -800,7 +804,7 @@ export default function PresencaPage() {
                                   togglePresenca(f.id, true);
                                 }}
                                 disabled={
-                                  !isAdmin && (jaRegistradoHoje || saving)
+                                  loading || !!erro || isFeriado || saving || (!isAdmin && jaRegistradoHoje)
                                 }
                                 className="px-3 py-1.5 rounded-full text-xs font-bold tracking-wide bg-green-50 text-green-700 ring-1 ring-inset ring-green-600/20 shadow-sm hover:bg-green-100 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                               >
@@ -811,7 +815,7 @@ export default function PresencaPage() {
                             <button
                               onClick={() => togglePresenca(f.id, !isPresent)}
                               disabled={
-                                !isAdmin && (jaRegistradoHoje || saving)
+                                loading || !!erro || isFeriado || saving || (!isAdmin && jaRegistradoHoje)
                               }
                               className="cursor-pointer focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
                             >
@@ -833,7 +837,7 @@ export default function PresencaPage() {
         <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 sm:relative sm:bg-transparent sm:border-0 sm:p-0 z-10 flex gap-3">
           <button
             onClick={handleSalvarClick}
-            disabled={saving || jaRegistradoHoje}
+            disabled={loading || !!erro || isFeriado || saving || jaRegistradoHoje}
             className={`flex-1 flex items-center justify-center px-6 py-4 border border-transparent rounded-xl shadow-sm text-lg font-medium text-white focus:outline-none transition-colors ${
               savedSuccess
                 ? "bg-green-600 hover:bg-green-700"

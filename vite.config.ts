@@ -68,7 +68,7 @@ export default defineConfig(() => {
               src: "/icons/icon-512x512.png",
               type: "image/png",
               sizes: "512x512",
-              purpose: "any maskable"
+              purpose: "any"
             }
           ],
           start_url: "/",

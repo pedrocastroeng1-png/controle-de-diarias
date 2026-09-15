@@ -161,6 +161,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   
   const accessCompany = async (empresaId: string) => {
+    localStorage.removeItem('@diarias:token');
     if (!isOwner) return;
     setLoading(true);
     try {
@@ -218,14 +219,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
       return false;
     } catch (e) {
-      /* suppress login console error */
-      return false;
+      throw e;
     } finally {
       setLoading(false);
     }
   };
 
   const logout = () => {
+    localStorage.removeItem('@diarias:token');
     // 0. Deactivate token
     const token = localStorage.getItem("@diarias:push_token");
     if (token) {
