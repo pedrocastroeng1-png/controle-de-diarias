@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Loader2, FileText, ChevronLeft, Save, X, Eye, Trash2, ArrowLeft } from 'lucide-react';
+import { distribuirItemEpi, quantidadeEpiValida, redimensionarDestinacoes, MAX_DESTINACOES_EPI } from '../../lib/epi-destinacoes';
 import { api } from '../../lib/api';
 import { format } from 'date-fns';
 import { apiMateriaisRPC } from '../../lib/api-materiais';
@@ -42,6 +43,10 @@ export default function ComprasMateriaisTab() {
   const [categorias, setCategorias] = useState<any[]>([]);
   const [fornecedores, setFornecedores] = useState<any[]>([]);
   const [funcionarios, setFuncionarios] = useState<any[]>([]);
+  const [funcionariosLoading, setFuncionariosLoading] = useState(false);
+  const [funcionariosError, setFuncionariosError] = useState('');
+  const [funcionariosRetry, setFuncionariosRetry] = useState(0);
+  const savingRef = useRef(false);
   const [showFornecedorModal, setShowFornecedorModal] = useState(false);
   const [novoFornecedorNome, setNovoFornecedorNome] = useState('');
   
@@ -61,14 +66,23 @@ export default function ComprasMateriaisTab() {
   const [itensForm, setItensForm] = useState<any[]>([]);
   
   useEffect(() => {
-    if (compraForm.obra_id) {
-      api.getFuncionariosPorObra(compraForm.obra_id).then(setFuncionarios).catch(console.error);
-    } else {
-      setFuncionarios([]);
+    let cancelled = false;
+    setFuncionarios([]);
+    setFuncionariosError('');
+    if (!compraForm.obra_id) {
+      setFuncionariosLoading(false);
+      return;
     }
-    
-    // Clear EPI employees when work changes
-    setItensForm(prev => prev.map(item => ({ ...item, funcionario_id: null })));
+    setFuncionariosLoading(true);
+    api.getFuncionariosPorObra(compraForm.obra_id)
+      .then(data => { if (!cancelled) setFuncionarios(data); })
+      .catch(() => { if (!cancelled) setFuncionariosError('Não foi possível carregar os funcionários da obra.'); })
+      .finally(() => { if (!cancelled) setFuncionariosLoading(false); });
+    return () => { cancelled = true; };
+  }, [compraForm.obra_id, funcionariosRetry]);
+
+  useEffect(() => {
+    setItensForm(prev => prev.map(item => ({ ...item, destinatarios: (item.destinatarios || []).map(() => '') })));
   }, [compraForm.obra_id]);
 
   // Search
@@ -150,7 +164,7 @@ export default function ComprasMateriaisTab() {
   const addItem = () => {
     setItensForm(prev => [
       ...prev, 
-      { id: crypto.randomUUID(), categoria_id: '', material_id: '', quantidade: 1, unidade_compra: '', valor_unitario: 0, funcionario_id: null, produto_search: '', is_open: false }
+      { id: crypto.randomUUID(), categoria_id: '', material_id: '', quantidade: 1, unidade_compra: '', valor_unitario: 0, destinatarios: [''], produto_search: '', is_open: false }
     ]);
   };
 
@@ -169,17 +183,28 @@ export default function ComprasMateriaisTab() {
             updated.is_open = false;
             const isEpi = categorias.find((c: any) => c.id === value)?.nome?.trim().toLowerCase() === 'epi';
             if (!isEpi) {
-              updated.funcionario_id = null;
+              updated.destinatarios = [];
             }
           }
         } else {
           updated = { ...updated, ...fieldOrUpdates };
           if (fieldOrUpdates.material_id !== undefined && fieldOrUpdates.material_id !== item.material_id) updated.unidade_compra = materiais.find(m => m.id === fieldOrUpdates.material_id)?.unidade || "";
         }
+        const epi = categorias.find((c: any) => c.id === updated.categoria_id)?.nome?.trim().toLowerCase() === 'epi';
+        if (epi) updated.destinatarios = redimensionarDestinacoes(updated.destinatarios || [], updated.quantidade);
         return updated;
       }
       return item;
     }));
+  };
+
+  const updateQuantidade = (id: string, quantidade: number) => {
+    const item = itensForm.find(i => i.id === id);
+    if (!item) return;
+    const removidos = (item.destinatarios || []).slice(quantidade);
+    if (quantidadeEpiValida(quantidade) && quantidade < (item.destinatarios || []).length && removidos.some(Boolean)
+      && !window.confirm('Ao reduzir a quantidade, as últimas destinações preenchidas serão removidas. Continuar?')) return;
+    updateItem(id, 'quantidade', quantidade);
   };
 
   const removeItem = (id: string) => {
@@ -220,6 +245,7 @@ export default function ComprasMateriaisTab() {
 
     const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (savingRef.current) return;
     setFormError('');
     setFormSuccess('');
 
@@ -232,25 +258,33 @@ export default function ComprasMateriaisTab() {
     for (let i = 0; i < itensForm.length; i++) {
       const item = itensForm[i];
       if (!item.material_id) return setFormError(`Selecione o produto para o item ${i + 1}.`);
-      if (item.quantidade <= 0) return setFormError(`A quantidade do item ${i + 1} deve ser maior que zero.`);
-      if (item.valor_unitario < 0) return setFormError(`O valor unitário do item ${i + 1} não pode ser negativo.`);
+      if (!Number.isFinite(item.quantidade) || item.quantidade <= 0) return setFormError(`A quantidade do item ${i + 1} deve ser maior que zero.`);
+      if (!Number.isFinite(item.valor_unitario) || item.valor_unitario < 0) return setFormError(`O valor unitário do item ${i + 1} não pode ser negativo.`);
       
-      const isEpi = categorias.find((c: any) => c.id === item.categoria_id)?.nome?.trim().toLowerCase() === 'epi';
-      if (isEpi && !item.funcionario_id) {
-        return setFormError(`Para materiais EPI (Item ${i + 1}), selecione o funcionário.`);
-      }
-      
-      itensValidos.push({
+      const material = materiais.find(m => m.id === item.material_id);
+      if (!material) return setFormError(`Produto indisponível no item ${i + 1}. Recarregue o catálogo.`);
+      const isEpi = categorias.find((c: any) => c.id === material.categoria_id)?.nome?.trim().toLowerCase() === 'epi';
+      const base = {
         material_id: item.material_id,
         quantidade: item.quantidade,
         valor_unitario: item.valor_unitario,
-        funcionario_id: isEpi ? item.funcionario_id : null,
-        unidade_compra: item.unidade_compra || materiais.find(m => m.id === item.material_id)?.unidade || 'UN'
-      });
+        unidade_compra: item.unidade_compra || material.unidade
+      };
+      if (isEpi) {
+        if (funcionariosLoading || funcionariosError) return setFormError('Aguarde ou tente carregar novamente os funcionários da obra.');
+        try {
+          itensValidos.push(...distribuirItemEpi(base, item.destinatarios || [], new Set(funcionarios.map(f => f.id))));
+        } catch (err: any) {
+          return setFormError(`Item ${i + 1}: ${err.message}`);
+        }
+      } else {
+        itensValidos.push({ ...base, funcionario_id: null });
+      }
     }
 
     try {
       setIsSaving(true);
+      savingRef.current = true;
       await apiMateriaisRPC.registrarCompraMaterial({
         p_data_compra: compraForm.data_compra,
         p_fornecedor_id: compraForm.fornecedor_id,
@@ -260,10 +294,11 @@ export default function ComprasMateriaisTab() {
       });
       setFormSuccess('Compra registrada com sucesso!');
       await fetchData();
-      setTimeout(() => { setView('list'); }, 1500);
+      setView('list');
     } catch (err: any) {
       setFormError(err.message || 'Erro ao registrar compra.');
     } finally {
+      savingRef.current = false;
       setIsSaving(false);
     }
   };
@@ -630,6 +665,7 @@ export default function ComprasMateriaisTab() {
             {itensForm.map((item, index) => {
               const catMateriais = materiais.filter(m => m.categoria_id === item.categoria_id);
               const selectedMaterial = materiais.find(m => m.id === item.material_id);
+              const isEpi = categorias.find((c: any) => c.id === item.categoria_id)?.nome?.trim().toLowerCase() === 'epi';
               const totalItem = (item.quantidade || 0) * (item.valor_unitario || 0);
 
               return (
@@ -723,34 +759,17 @@ export default function ComprasMateriaisTab() {
                       )}
                     </div>
 
-                    {categorias.find((c: any) => c.id === item.categoria_id)?.nome?.trim().toLowerCase() === 'epi' && (
-                      <div className="sm:col-span-3">
-                        <label className="block text-xs font-medium text-gray-500 mb-1">Funcionário *</label>
-                        <select
-                          required
-                          value={item.funcionario_id || ''}
-                          onChange={e => updateItem(item.id, 'funcionario_id', e.target.value)}
-                          className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 bg-white"
-                        >
-                          <option value="">Selecione...</option>
-                          {funcionarios.map((f: any) => (
-                            <option key={f.id} value={f.id}>{f.nome}</option>
-                          ))}
-                        </select>
-                      </div>
-                    )}
-
-                    
                     <div className="sm:col-span-2 grid grid-cols-2 gap-2">
                       <div>
                         <label className="block text-xs font-medium text-gray-500 mb-1">Qtd *</label>
                         <input
                           type="number"
                           required
-                          min="0.01"
-                          step="0.01"
+                          min={isEpi ? 1 : 0.01}
+                          max={isEpi ? MAX_DESTINACOES_EPI : undefined}
+                          step={isEpi ? 1 : 0.01}
                           value={item.quantidade === 0 ? '' : item.quantidade}
-                          onChange={e => updateItem(item.id, 'quantidade', parseFloat(e.target.value) || 0)}
+                          onChange={e => updateQuantidade(item.id, parseFloat(e.target.value) || 0)}
                           className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500"
                         />
                       </div>
@@ -788,6 +807,34 @@ export default function ComprasMateriaisTab() {
                       </div>
                     </div>
                   </div>
+                  {isEpi && (
+                    <fieldset className="mt-4 rounded-lg border border-blue-100 bg-blue-50/40 p-4" disabled={isSaving}>
+                      <legend className="px-1 text-sm font-semibold text-blue-900">Destinação dos EPIs</legend>
+                      <p className="mb-3 text-sm text-gray-600">Selecione quem receberá cada {item.unidade_compra === 'PAR' ? 'par' : 'unidade'}. O mesmo funcionário pode receber mais de uma.</p>
+                      {!quantidadeEpiValida(item.quantidade) ? <p role="alert" className="text-sm text-red-600">Informe uma quantidade inteira de 1 a {MAX_DESTINACOES_EPI}.</p> : (
+                        <>
+                          <p className="mb-3 text-xs text-gray-600" aria-live="polite">{(item.destinatarios || []).filter(Boolean).length} de {item.quantidade} destinados</p>
+                          {funcionariosError && <p role="alert" className="mb-3 text-sm text-red-600">{funcionariosError} <button type="button" className="underline" onClick={() => setFuncionariosRetry(v => v + 1)}>Tentar novamente</button></p>}
+                          {!compraForm.obra_id && <p className="mb-3 text-sm text-gray-600">Selecione a obra da compra.</p>}
+                          {funcionariosLoading && <p role="status" className="mb-3 text-sm text-gray-600">Carregando funcionários...</p>}
+                          {compraForm.obra_id && !funcionariosLoading && !funcionariosError && funcionarios.length === 0 && <p className="mb-3 text-sm text-red-600">Não há funcionários ativos nesta obra.</p>}
+                          <div className="grid max-h-80 grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2">
+                            {(item.destinatarios || []).map((destinatario: string, posicao: number) => (
+                              <label key={posicao} className="block text-sm text-gray-700">
+                                {posicao + 1} — 1 {item.unidade_compra || selectedMaterial?.unidade || 'UN'}
+                                <select required value={destinatario} disabled={!compraForm.obra_id || funcionariosLoading || !!funcionariosError}
+                                  onChange={e => updateItem(item.id, 'destinatarios', item.destinatarios.map((id: string, i: number) => i === posicao ? e.target.value : id))}
+                                  className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
+                                  <option value="">Selecione o funcionário</option>
+                                  {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                                </select>
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </fieldset>
+                  )}
                 </div>
               );
             })}
