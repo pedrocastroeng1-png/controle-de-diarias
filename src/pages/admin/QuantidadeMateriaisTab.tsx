@@ -238,7 +238,7 @@ export default function QuantidadeMateriaisTab() {
             </div>
 
             {quantities.map((row) => {
-              const rowKey = `${row.obra_id}_${row.material_id}`;
+              const rowKey = `${row.obra_id}_${row.material_id}_${row.unidade}`;
               const isExpanded = expandedRow === rowKey;
               
               return (
