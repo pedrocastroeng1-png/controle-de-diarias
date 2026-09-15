@@ -26,7 +26,7 @@ export default async function handler(req: any, res: any) {
       const { data: itens, error: ie } = await db
         .from("compras_materiais_itens")
         .select(
-          "*,material:materiais(*,category:material_categories(*)),funcionario:funcionarios(nome)",
+          "*,material:materiais(*,category:material_categories(*)),funcionario:funcionarios(nome),obra_destino:obras(nome)",
         )
         .eq("empresa_id", user.empresa_id)
         .eq("compra_id", compra.id);
@@ -36,6 +36,7 @@ export default async function handler(req: any, res: any) {
         .json({
           ...compra,
           itens,
+          obras_nomes: [...new Set((itens || []).map(i => i.obra_destino?.nome || compra.obra?.nome).filter(Boolean))].join(', '),
           total_calculado: itens!.reduce(
             (s, i) => s + Number(i.valor_total || 0),
             0,

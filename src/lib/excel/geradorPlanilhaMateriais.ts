@@ -1,8 +1,8 @@
-import * as ExcelJS from 'exceljs';
-import { saveAs } from 'file-saver';
+import ExcelJS from 'exceljs';
+
 import { format, parseISO } from 'date-fns';
 
-export async function gerarPlanilhaGerencial(compras: any[]) {
+export function criarPlanilhaGerencial(compras: any[]) {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'Sistema de Controle';
   workbook.created = new Date();
@@ -148,20 +148,24 @@ export async function gerarPlanilhaGerencial(compras: any[]) {
     { header: 'QUANTIDADE', key: 'qtd', width: 15 },
     { header: 'UNIDADE', key: 'unidade', width: 10 },
     { header: 'VALOR UNITÁRIO', key: 'vunit', width: 20 },
-    { header: 'VALOR TOTAL', key: 'vtotal', width: 20 }
+    { header: 'VALOR TOTAL', key: 'vtotal', width: 20 },
+    { header: 'FUNCIONÁRIO', key: 'funcionario', width: 35 },
+    { header: 'RECIBO / NFe', key: 'recibo', width: 22 }
   ];
   
   entradas.getRow(1).font = { bold: true, color: { argb: white } };
   entradas.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: primaryColor } };
   entradas.getRow(1).alignment = { vertical: 'middle', horizontal: 'center' };
   
-  entradas.autoFilter = 'A1:I1';
+  entradas.autoFilter = 'A1:K1';
   entradas.views = [{ state: 'frozen', ySplit: 1 }];
 
   compras.forEach((c, idx) => {
     const r = entradas.addRow({
       data: format(parseISO(c.data_compra), 'dd/MM/yyyy'),
       obra: c.obra,
+      funcionario: c.funcionario_destinatario || '—',
+      recibo: c.numero_recibo || '—',
       fornecedor: c.fornecedor || 'N/A',
       material: c.material,
       categoria: c.categoria,
@@ -196,8 +200,8 @@ export async function gerarPlanilhaGerencial(compras: any[]) {
     const [mat, cat, un] = mStr.split('|');
     const rowIndex = idx + 2;
     const r = resumoMat.addRow({ mat, cat, un });
-    r.getCell('qtd').value = { formula: `SUMIF(ENTRADAS!D:D, A${rowIndex}, ENTRADAS!F:F)` };
-    r.getCell('vtotal').value = { formula: `SUMIF(ENTRADAS!D:D, A${rowIndex}, ENTRADAS!I:I)` };
+    r.getCell('qtd').value = { formula: `SUMIFS(ENTRADAS!F:F, ENTRADAS!D:D, A${rowIndex}, ENTRADAS!E:E, B${rowIndex}, ENTRADAS!G:G, C${rowIndex})` };
+    r.getCell('vtotal').value = { formula: `SUMIFS(ENTRADAS!I:I, ENTRADAS!D:D, A${rowIndex}, ENTRADAS!E:E, B${rowIndex}, ENTRADAS!G:G, C${rowIndex})` };
     r.getCell('qtd').numFmt = '#,##0.00';
     r.getCell('vtotal').numFmt = '"R$ "#,##0.00';
   });
@@ -209,13 +213,15 @@ export async function gerarPlanilhaGerencial(compras: any[]) {
   porObra.columns = entradas.columns;
   porObra.getRow(1).font = { bold: true, color: { argb: white } };
   porObra.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: primaryColor } };
-  porObra.autoFilter = 'A1:I1';
+  porObra.autoFilter = 'A1:K1';
   porObra.views = [{ state: 'frozen', ySplit: 1 }];
   
   compras.forEach((c, idx) => {
     const r = porObra.addRow({
       data: format(parseISO(c.data_compra), 'dd/MM/yyyy'),
       obra: c.obra,
+      funcionario: c.funcionario_destinatario || '—',
+      recibo: c.numero_recibo || '—',
       fornecedor: c.fornecedor || 'N/A',
       material: c.material,
       categoria: c.categoria,
@@ -344,6 +350,12 @@ export async function gerarPlanilhaGerencial(compras: any[]) {
     rRow++;
   });
 
+  return workbook;
+}
+
+export async function gerarPlanilhaGerencial(compras: any[]) {
+  const workbook = criarPlanilhaGerencial(compras);
+  const { saveAs } = await import('file-saver');
   const buffer = await workbook.xlsx.writeBuffer();
   saveAs(new Blob([buffer]), `Planilha_Gerencial_Entradas_${format(new Date(), 'ddMMyyyy')}.xlsx`);
 }

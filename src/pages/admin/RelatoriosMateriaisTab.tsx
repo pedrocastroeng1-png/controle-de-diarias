@@ -59,15 +59,11 @@ export default function RelatoriosMateriaisTab() {
   const handleExportExcel = async () => {
     setLoading(true);
     try {
-      // Se não houver dados buscados, busca todos
-      let dados = dataCompras;
-      if (dados.length === 0) {
-        dados = await apiMateriais.getRelatorioComprasMateriais({
-          obraId: obraId === 'todas' ? undefined : obraId,
-          startDate: dataInicial,
-          endDate: dataFinal
-        });
-      }
+      const dados = await apiMateriais.getRelatorioComprasMateriais({
+        obraId: obraId === 'todas' ? undefined : obraId,
+        startDate: dataInicial,
+        endDate: dataFinal
+      });
       await gerarPlanilhaGerencial(dados);
     } catch (err: any) {
       setError('Erro ao gerar Excel: ' + err.message);
@@ -158,6 +154,7 @@ export default function RelatoriosMateriaisTab() {
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Obra</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fornecedor</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Funcionário</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Qtd</th>
                   <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
                 </tr>
@@ -169,6 +166,7 @@ export default function RelatoriosMateriaisTab() {
                     <td className="px-4 py-3 text-sm">{c.obra}</td>
                     <td className="px-4 py-3 text-sm">{c.fornecedor || '-'}</td>
                     <td className="px-4 py-3 text-sm font-medium">{c.material}</td>
+                    <td className="px-4 py-3 text-sm">{c.funcionario_destinatario || '—'}</td>
                     <td className="px-4 py-3 text-sm text-right">{c.quantidade} {c.unidade}</td>
                     <td className="px-4 py-3 text-sm text-right font-bold">{formatCurrency(c.valor_total)}</td>
                   </tr>

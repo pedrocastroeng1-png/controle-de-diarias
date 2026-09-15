@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Search, Loader2, FileText, ChevronLeft, Save, X, Eye, Trash2, ArrowLeft } from 'lucide-react';
-import { distribuirItemEpi, quantidadeEpiValida, redimensionarDestinacoes, MAX_DESTINACOES_EPI } from '../../lib/epi-destinacoes';
+import { distribuirItemEpi, distribuirEpiEntreObras, quantidadeEpiValida, redimensionarDestinacoes, MAX_DESTINACOES_EPI } from '../../lib/epi-destinacoes';
 import { api } from '../../lib/api';
 import { format } from 'date-fns';
 import { apiMateriaisRPC } from '../../lib/api-materiais';
@@ -63,6 +63,7 @@ export default function ComprasMateriaisTab() {
     });
 
   
+  const multiplasObras = compraForm.obra_id === 'MULTIPLAS_EPI';
   const [itensForm, setItensForm] = useState<any[]>([]);
   
   useEffect(() => {
@@ -74,7 +75,7 @@ export default function ComprasMateriaisTab() {
       return;
     }
     setFuncionariosLoading(true);
-    api.getFuncionariosPorObra(compraForm.obra_id)
+    (compraForm.obra_id === 'MULTIPLAS_EPI' ? api.getFuncionarios('ativos') : api.getFuncionariosPorObra(compraForm.obra_id))
       .then(data => { if (!cancelled) setFuncionarios(data); })
       .catch(() => { if (!cancelled) setFuncionariosError('Não foi possível carregar os funcionários da obra.'); })
       .finally(() => { if (!cancelled) setFuncionariosLoading(false); });
@@ -82,7 +83,7 @@ export default function ComprasMateriaisTab() {
   }, [compraForm.obra_id, funcionariosRetry]);
 
   useEffect(() => {
-    setItensForm(prev => prev.map(item => ({ ...item, destinatarios: (item.destinatarios || []).map(() => '') })));
+    setItensForm(prev => prev.map(item => ({ ...item, destinatarios: (item.destinatarios || []).map(() => ''), obras_destino: (item.destinatarios || []).map(() => compraForm.obra_id === 'MULTIPLAS_EPI' ? '' : compraForm.obra_id) })));
   }, [compraForm.obra_id]);
 
   // Search
@@ -164,7 +165,7 @@ export default function ComprasMateriaisTab() {
   const addItem = () => {
     setItensForm(prev => [
       ...prev, 
-      { id: crypto.randomUUID(), categoria_id: '', material_id: '', quantidade: 1, unidade_compra: '', valor_unitario: 0, destinatarios: [''], produto_search: '', is_open: false }
+      { id: crypto.randomUUID(), categoria_id: multiplasObras ? categorias.find(c => c.nome?.trim().toLowerCase() === 'epi')?.id || '' : '', material_id: '', quantidade: 1, unidade_compra: '', valor_unitario: 0, destinatarios: [''], obras_destino: [multiplasObras ? '' : compraForm.obra_id], produto_search: '', is_open: false }
     ]);
   };
 
@@ -191,7 +192,10 @@ export default function ComprasMateriaisTab() {
           if (fieldOrUpdates.material_id !== undefined && fieldOrUpdates.material_id !== item.material_id) updated.unidade_compra = materiais.find(m => m.id === fieldOrUpdates.material_id)?.unidade || "";
         }
         const epi = categorias.find((c: any) => c.id === updated.categoria_id)?.nome?.trim().toLowerCase() === 'epi';
-        if (epi) updated.destinatarios = redimensionarDestinacoes(updated.destinatarios || [], updated.quantidade);
+        if (epi) {
+          updated.destinatarios = redimensionarDestinacoes(updated.destinatarios || [], updated.quantidade);
+          updated.obras_destino = redimensionarDestinacoes(updated.obras_destino || [], updated.quantidade);
+        }
         return updated;
       }
       return item;
@@ -264,6 +268,7 @@ export default function ComprasMateriaisTab() {
       const material = materiais.find(m => m.id === item.material_id);
       if (!material) return setFormError(`Produto indisponível no item ${i + 1}. Recarregue o catálogo.`);
       const isEpi = categorias.find((c: any) => c.id === material.categoria_id)?.nome?.trim().toLowerCase() === 'epi';
+      if (multiplasObras && !isEpi) return setFormError('No modo Várias obras, selecione apenas produtos EPI.');
       const base = {
         material_id: item.material_id,
         quantidade: item.quantidade,
@@ -273,7 +278,9 @@ export default function ComprasMateriaisTab() {
       if (isEpi) {
         if (funcionariosLoading || funcionariosError) return setFormError('Aguarde ou tente carregar novamente os funcionários da obra.');
         try {
-          itensValidos.push(...distribuirItemEpi(base, item.destinatarios || [], new Set(funcionarios.map(f => f.id))));
+          itensValidos.push(...(multiplasObras
+            ? distribuirEpiEntreObras(base, item.destinatarios || [], item.obras_destino || [], funcionarios, new Set(obras.map(o => o.id)))
+            : distribuirItemEpi(base, item.destinatarios || [], new Set(funcionarios.map(f => f.id)))));
         } catch (err: any) {
           return setFormError(`Item ${i + 1}: ${err.message}`);
         }
@@ -289,7 +296,7 @@ export default function ComprasMateriaisTab() {
         p_data_compra: compraForm.data_compra,
         p_fornecedor_id: compraForm.fornecedor_id,
         p_numero_recibo: compraForm.numero_recibo || null,
-        p_obra_id: compraForm.obra_id,
+        p_obra_id: multiplasObras ? null : compraForm.obra_id,
         p_itens: itensValidos
       });
       setFormSuccess('Compra registrada com sucesso!');
@@ -312,7 +319,7 @@ export default function ComprasMateriaisTab() {
   if (view === 'list') {
     const filteredCompras = compras.filter(c => 
       (c.fornecedor_rel?.nome || c.fornecedor || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-      c.obra?.nome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (c.obras_nomes || c.obra?.nome || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       c.numero_recibo?.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
@@ -367,7 +374,7 @@ export default function ComprasMateriaisTab() {
                         {format(new Date(compra.data_compra + 'T00:00:00'), 'dd/MM/yyyy')}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {compra.obra?.nome || 'N/A'}
+                        {compra.obras_nomes || compra.obra?.nome || '—'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {compra.fornecedor_rel?.nome || compra.fornecedor || '-'}
@@ -440,7 +447,7 @@ export default function ComprasMateriaisTab() {
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Obra</p>
-              <p className="text-base text-gray-900 mt-1">{selectedCompra.obra?.nome || 'N/A'}</p>
+              <p className="text-base text-gray-900 mt-1">{selectedCompra.obras_nomes || selectedCompra.obra?.nome || '—'}</p>
             </div>
             <div>
               <p className="text-sm font-medium text-gray-500">Fornecedor</p>
@@ -461,6 +468,7 @@ export default function ComprasMateriaisTab() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Produto</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Obra de destino</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Funcionário</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Qtd</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Unidade</th>
@@ -474,6 +482,9 @@ export default function ComprasMateriaisTab() {
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         <div className="font-medium">{item.material?.nome}</div>
                         <div className="text-xs text-gray-500">{item.material?.category?.nome}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {item.obra_destino?.nome || selectedCompra.obra?.nome || '—'}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                         {item.funcionario?.nome || '-'}
@@ -589,10 +600,18 @@ export default function ComprasMateriaisTab() {
             <select
               required
               value={compraForm.obra_id}
-              onChange={e => setCompraForm({...compraForm, obra_id: e.target.value})}
+              onChange={e => {
+                const obra = e.target.value;
+                if (obra === 'MULTIPLAS_EPI' && itensForm.some(i => categorias.find(c => c.id === i.categoria_id)?.nome?.trim().toLowerCase() !== 'epi')) {
+                  if (!window.confirm('O modo Várias obras aceita somente EPI. Remover os outros itens para continuar?')) return;
+                  setItensForm(prev => prev.filter(i => categorias.find(c => c.id === i.categoria_id)?.nome?.trim().toLowerCase() === 'epi'));
+                }
+                setCompraForm({...compraForm, obra_id: obra});
+              }}
               className="w-full rounded-lg border border-gray-300 px-3 py-2 focus:ring-blue-500 focus:border-blue-500 bg-white"
             >
               <option value="">Selecione uma obra...</option>
+              <option value="MULTIPLAS_EPI">Várias obras — EPI</option>
               {obras.filter(o => !o.parent_obra_id).map(obra => (
                 <optgroup key={obra.id} label={obra.nome}>
                   <option value={obra.id}>{obra.nome} (Principal)</option>
@@ -691,7 +710,7 @@ export default function ComprasMateriaisTab() {
                         className="w-full text-sm rounded border border-gray-300 px-2 py-1.5 focus:ring-blue-500 focus:border-blue-500 bg-white"
                       >
                         <option value="">Tipo de Produto...</option>
-                        {categorias.map((c: any) => {
+                        {categorias.filter(c => !multiplasObras || c.nome?.trim().toLowerCase() === 'epi').map((c: any) => {
                           const emoji = CATEGORY_EMOJIS[c.nome] || '';
                           return <option key={c.id} value={c.id}>{emoji ? `${emoji} ${c.nome}` : c.nome}</option>;
                         })}
@@ -820,15 +839,27 @@ export default function ComprasMateriaisTab() {
                           {compraForm.obra_id && !funcionariosLoading && !funcionariosError && funcionarios.length === 0 && <p className="mb-3 text-sm text-red-600">Não há funcionários ativos nesta obra.</p>}
                           <div className="grid max-h-80 grid-cols-1 gap-3 overflow-y-auto sm:grid-cols-2">
                             {(item.destinatarios || []).map((destinatario: string, posicao: number) => (
-                              <label key={posicao} className="block text-sm text-gray-700">
+                              <div key={posicao} className="block text-sm text-gray-700">
                                 {posicao + 1} — 1 {item.unidade_compra || selectedMaterial?.unidade || 'UN'}
-                                <select required value={destinatario} disabled={!compraForm.obra_id || funcionariosLoading || !!funcionariosError}
+                                {multiplasObras && <label className="mt-2 block">Obra de destino
+                                  <select required value={item.obras_destino?.[posicao] || ''}
+                                    onChange={e => updateItem(item.id, {
+                                      obras_destino: item.obras_destino.map((id: string, i: number) => i === posicao ? e.target.value : id),
+                                      destinatarios: item.destinatarios.map((id: string, i: number) => i === posicao ? '' : id)
+                                    })} className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2">
+                                    <option value="">Selecione a obra</option>
+                                    {obras.map(o => <option key={o.id} value={o.id}>{o.nome}</option>)}
+                                  </select>
+                                </label>}
+                                <label className="mt-2 block">Funcionário
+                                <select required value={destinatario} disabled={!compraForm.obra_id || funcionariosLoading || !!funcionariosError || (multiplasObras && !item.obras_destino?.[posicao])}
                                   onChange={e => updateItem(item.id, 'destinatarios', item.destinatarios.map((id: string, i: number) => i === posicao ? e.target.value : id))}
                                   className="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-500 focus:ring-blue-500">
                                   <option value="">Selecione o funcionário</option>
-                                  {funcionarios.map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                                  {funcionarios.filter(f => !multiplasObras || f.obra_id === item.obras_destino?.[posicao]).map(f => <option key={f.id} value={f.id}>{f.nome}</option>)}
                                 </select>
-                              </label>
+                                </label>
+                              </div>
                             ))}
                           </div>
                         </>

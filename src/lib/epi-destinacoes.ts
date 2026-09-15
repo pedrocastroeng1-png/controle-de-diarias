@@ -1,5 +1,22 @@
 export const MAX_DESTINACOES_EPI = 1000;
 
+export function distribuirEpiEntreObras(
+  item: { material_id: string; quantidade: number; valor_unitario: number; unidade_compra: string },
+  destinatarios: string[],
+  obras: string[],
+  funcionarios: { id: string; obra_id?: string | null }[],
+  obrasPermitidas: ReadonlySet<string>,
+) {
+  const itens = distribuirItemEpi(item, destinatarios, new Set(funcionarios.map(f => f.id)));
+  if (obras.length !== itens.length) throw new Error('Selecione a obra de cada destinação.');
+  return itens.map((linha, index) => {
+    const obra = obras[index];
+    if (!obra || !obrasPermitidas.has(obra) || funcionarios.find(f => f.id === linha.funcionario_id)?.obra_id !== obra)
+      throw new Error('Cada funcionário deve pertencer à obra selecionada na sua destinação.');
+    return { ...linha, obra_destino_id: obra };
+  });
+}
+
 export function quantidadeEpiValida(quantidade: number) {
   return Number.isSafeInteger(quantidade) && quantidade > 0 && quantidade <= MAX_DESTINACOES_EPI;
 }
