@@ -9,6 +9,37 @@ export interface Usuario {
   perfil: Perfil;
 }
 
+export interface UsuarioDetalhado {
+  id: string;
+  empresa_id?: string;
+  nome: string;
+  usuario: string;
+  login: string;
+  email?: string | null;
+  telefone?: string | null;
+  perfil: Perfil;
+  ativo: boolean;
+  tipo_usuario?: string;
+  arquivado?: boolean;
+  arquivado_em?: string | null;
+  created_at?: string;
+  updated_at?: string;
+  modo_permissoes?: 'PADRAO_PERFIL' | 'PERSONALIZADO';
+  acesso_obras_tipo?: 'TODAS' | 'SELECIONADAS';
+  obras_ids?: string[];
+  permissoes?: string[];
+}
+
+export interface PermissaoCatalogo {
+  id: string;
+  codigo: string;
+  nome: string;
+  descricao?: string | null;
+  modulo?: string | null;
+  perfil_padrao?: Perfil[];
+  ativo?: boolean;
+}
+
 export interface Obra {
   id: string;
   nome: string;

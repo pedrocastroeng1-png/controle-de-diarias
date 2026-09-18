@@ -173,7 +173,12 @@ export function AdminLayout() {
       section: "ADMINISTRAÇÃO",
       name: "Cadastros",
       icon: Briefcase,
-      items: [{ name: "Funções", path: "/admin/funcoes" }, { name: "Feriados", path: "/admin/feriados" }, { name: "Produtos", path: "/admin/produtos" }],
+      items: [
+        { name: "Funções", path: "/admin/funcoes" },
+        { name: "Usuários", path: "/admin/usuarios" },
+        { name: "Feriados", path: "/admin/feriados" },
+        { name: "Produtos", path: "/admin/produtos" },
+      ],
     },
   ];
 
