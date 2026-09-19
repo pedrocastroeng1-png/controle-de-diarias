@@ -762,7 +762,7 @@ export default function UsuariosAdmin() {
                             CONSULTA
                           </div>
                           <span className="text-[11px] text-slate-500 mt-1">
-                            Visualização de relatórios e auditorias.
+                            Visualização de relatórios e Quadro Atual.
                           </span>
                         </label>
                       </div>
