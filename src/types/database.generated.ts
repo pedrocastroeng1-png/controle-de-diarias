@@ -2195,9 +2195,6 @@ export type Database = {
           id: string
           obra_id: string
           percentual_diaria: number
-          photo_path: string | null
-          photo_taken_at: string | null
-          photo_taken_by: string | null
           presente: boolean
           tipo_diaria: string
           updated_at: string
@@ -2210,9 +2207,6 @@ export type Database = {
           id?: string
           obra_id: string
           percentual_diaria?: number
-          photo_path?: string | null
-          photo_taken_at?: string | null
-          photo_taken_by?: string | null
           presente: boolean
           tipo_diaria?: string
           updated_at?: string
@@ -2225,9 +2219,6 @@ export type Database = {
           id?: string
           obra_id?: string
           percentual_diaria?: number
-          photo_path?: string | null
-          photo_taken_at?: string | null
-          photo_taken_by?: string | null
           presente?: boolean
           tipo_diaria?: string
           updated_at?: string
@@ -2368,6 +2359,8 @@ export type Database = {
       }
       usuarios: {
         Row: {
+          arquivado: boolean
+          arquivado_em: string | null
           ativo: boolean
           created_at: string
           email: string | null
@@ -2383,6 +2376,8 @@ export type Database = {
           usuario: string
         }
         Insert: {
+          arquivado?: boolean
+          arquivado_em?: string | null
           ativo?: boolean
           created_at?: string
           email?: string | null
@@ -2398,6 +2393,8 @@ export type Database = {
           usuario: string
         }
         Update: {
+          arquivado?: boolean
+          arquivado_em?: string | null
           ativo?: boolean
           created_at?: string
           email?: string | null
@@ -3196,8 +3193,6 @@ export type Database = {
           obra_ativa: boolean | null
           obra_id: string | null
           obra_principal: string | null
-          photo_path: string | null
-          photo_taken_at: string | null
           status: string | null
           subobra: string | null
           subobra_id: string | null
