@@ -485,16 +485,6 @@ export const api = {
       );
     }
 
-    if (userProfile === "OPERADOR") {
-      for (const p of presencas) {
-        if (p.presente && !p.photo_path) {
-          throw new Error(
-            "Operadores devem obrigatoriamente anexar foto para registrar presença.",
-          );
-        }
-      }
-    }
-
     const { data, error } = await supabase
       .from("presencas")
       .upsert(
@@ -678,35 +668,9 @@ export const api = {
     return data.path;
   },
 
-  uploadAttendancePhoto: async (
-    file: Blob,
-    employeeId: string,
-    operationId?: string
-  ): Promise<string> => {
-    if (!supabase) throw new Error("Supabase não configurado");
-    const suffix = operationId ? operationId : new Date().toISOString().replace(/[:.]/g, "-");
-    const fileName = `${employeeId}_${suffix}.jpg`;
-    const { data, error } = await supabase.storage
-      .from("attendance-photos")
-      .upload(fileName, file, { contentType: "image/jpeg", upsert: true });
-
-    if (error) throw error;
-    return data.path;
-  },
-
-  deleteAttendancePhotos: async (paths: string[]): Promise<void> => {
-    if (!supabase || !paths || paths.length === 0) return;
-    try {
-      await supabase.storage.from("attendance-photos").remove(paths);
-    } catch (e) {
-      console.error("Failed to delete orphan photos", e);
-    }
-  },
-
   getPhotoUrl: async (
     bucket:
       | "employee-photos"
-      | "attendance-photos"
       | "medical-certificates"
       | "fotos_ferramentas",
     path: string,
@@ -726,29 +690,6 @@ export const api = {
     
     console.log(`[getPhotoUrl] Success - Generated URL for ${path}`);
     return data.signedUrl;
-  },
-
-  // Auditoria
-  getAuditoriaPresencas: async (
-    funcionario_id: string,
-  ): Promise<Presenca[]> => {
-    if (!supabase) throw new Error("Supabase não configurado");
-
-    // Get presences from last 15 days with photo
-    const quinzeDiasAtras = new Date();
-    quinzeDiasAtras.setDate(quinzeDiasAtras.getDate() - 15);
-    const dataLimite = quinzeDiasAtras.toISOString().split("T")[0];
-
-    let query = withEmpresa(supabase.from("presencas")).select(
-        `*, funcionario:funcionarios!inner(*, funcao:funcoes(*), obra:obras(*))`,
-      );
-    const { data, error } = await query.eq("funcionario_id", funcionario_id)
-      .not("photo_path", "is", null)
-      .gte("data", dataLimite)
-      .order("data", { ascending: false });
-
-    if (error) throw error;
-    return data as any;
   },
 
   getDashboardStats: async (hoje: string) => {

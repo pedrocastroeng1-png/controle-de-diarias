@@ -85,9 +85,6 @@ export interface Presenca {
   empresa_id?: string;
   created_at?: string;
   updated_at?: string;
-  photo_path?: string | null;
-  photo_taken_at?: string;
-  photo_taken_by?: string;
 
   funcionario?: Funcionario;
 }

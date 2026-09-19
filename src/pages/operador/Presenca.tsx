@@ -3,9 +3,8 @@ import { api } from "../../lib/api";
 import { Feriado } from "../../lib/types";
 import { Funcionario } from "../../lib/types";
 import { format, parseISO } from "date-fns";
-import { compressImage } from "../../lib/imageUtils";
 import { useAuth } from "../../contexts/AuthContext";
-import { User, Camera, CheckCircle } from "lucide-react";
+import { User, CheckCircle } from "lucide-react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 
 export default function PresencaPage() {
@@ -73,17 +72,6 @@ export default function PresencaPage() {
   const [funcToDelete, setFuncToDelete] = useState<string | null>(null);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [erro, setErro] = useState("");
-
-  const [cameraModalFuncId, setCameraModalFuncId] = useState<string | null>(
-    null,
-  );
-  const [previewPhoto, setPreviewPhoto] = useState<{
-    file: File;
-    url: string;
-  } | null>(null);
-  const [capturedFotos, setCapturedFotos] = useState<Record<string, File>>({});
-  const [employeeRegistrationPhoto, setEmployeeRegistrationPhoto] =
-    useState<string>("");
 
   const [jaRegistradoHoje, setJaRegistradoHoje] = useState(false);
   const [temRegistros, setTemRegistros] = useState(false);
@@ -230,18 +218,8 @@ export default function PresencaPage() {
       setPresencas((prev) => ({ ...prev, [funcionarioId]: false }));
       setSavedSuccess(false);
     } else {
-      const f = funcionarios.find((x) => x.id === funcionarioId);
-      if (f?.photo_path) {
-        try {
-          const url = await api.getPhotoUrl("employee-photos", f.photo_path);
-          setEmployeeRegistrationPhoto(url);
-        } catch (e) {
-          setEmployeeRegistrationPhoto("");
-        }
-      } else {
-        setEmployeeRegistrationPhoto("");
-      }
-      setCameraModalFuncId(funcionarioId);
+      setPresencas((prev) => ({ ...prev, [funcionarioId]: true }));
+      setSavedSuccess(false);
     }
   };
 
@@ -257,7 +235,6 @@ export default function PresencaPage() {
     if (isAdmin && savedRecords[actionMenuFuncId]) {
       try {
         setSaving(true);
-        const now = new Date().toISOString();
         await api.salvarPresencas([{
             funcionario_id: actionMenuFuncId,
             obra_id: funcionarios.find((f) => f.id === actionMenuFuncId)
@@ -265,8 +242,6 @@ export default function PresencaPage() {
             empresa_id: usuario?.empresa_id,
                             data: selectedDate,
             presente: newStatus,
-            photo_taken_at: now,
-            photo_taken_by: usuario?.id || null,
           },], usuario?.empresa_id);
       } catch (err: any) {
         // Revert on error
@@ -287,23 +262,6 @@ export default function PresencaPage() {
     setSavedSuccess(false);
     setActionMenuFuncId(null);
     showToast("✅ Status atualizado", "success");
-  };
-
-  const handleActionReplacePhoto = async () => {
-    if (!actionMenuFuncId) return;
-    const f = funcionarios.find((x) => x.id === actionMenuFuncId);
-    if (f?.photo_path) {
-      try {
-        const url = await api.getPhotoUrl("employee-photos", f.photo_path);
-        setEmployeeRegistrationPhoto(url);
-      } catch (e) {
-        setEmployeeRegistrationPhoto("");
-      }
-    } else {
-      setEmployeeRegistrationPhoto("");
-    }
-    setCameraModalFuncId(actionMenuFuncId);
-    setActionMenuFuncId(null);
   };
 
   const confirmDeleteFunc = async () => {
@@ -361,24 +319,12 @@ export default function PresencaPage() {
     setShowConfirm(false);
     setSaving(true);
     setErro("");
-    const uploadedPaths: string[] = [];
 
     try {
-      const now = new Date().toISOString();
-      const userId = usuario?.id || null;
-      const operationId = Date.now().toString(36);
 
       const pendingFuncionarios = funcionarios.filter(
         (f) => !atestadosAtivos[f.id] && presencas[f.id] !== undefined
       );
-
-      for (const f of pendingFuncionarios) {
-        if (presencas[f.id] === true) {
-          if (!isAdmin && !capturedFotos[f.id]) {
-            throw new Error(`Falta foto de presença para ${f.nome}`);
-          }
-        }
-      }
 
       if (!usuario || !usuario.empresa_id) {
         console.error("Contexto de empresa inválido:", { empresa_id: usuario?.empresa_id, id: usuario?.id, perfil: usuario?.perfil });
@@ -388,33 +334,13 @@ export default function PresencaPage() {
         throw new Error("Acesso negado: Usuários com perfil CONSULTA não podem registrar presenças.");
       }
 
-      const registrosToSave = await Promise.all(
-        pendingFuncionarios.map(async (f) => {
-          let photo_path = undefined;
-          let photo_taken_at = undefined;
-          let photo_taken_by = undefined;
-
-          if (presencas[f.id] === true && capturedFotos[f.id]) {
-            photo_path = await api.uploadAttendancePhoto(
-              capturedFotos[f.id],
-              f.id,
-              operationId
-            );
-            uploadedPaths.push(photo_path);
-            photo_taken_at = now;
-            photo_taken_by = userId;
-          }
-
-          return {
-            funcionario_id: f.id,
-            obra_id: f.obra_id,
-            empresa_id: usuario?.empresa_id,
-                            data: selectedDate,
-            presente: presencas[f.id],
-            ...(photo_path && { photo_path, photo_taken_at, photo_taken_by }),
-          };
-        })
-      );
+      const registrosToSave = pendingFuncionarios.map((f) => ({
+        funcionario_id: f.id,
+        obra_id: f.obra_id,
+        empresa_id: usuario.empresa_id,
+        data: selectedDate,
+        presente: presencas[f.id],
+      }));
 
       await api.salvarPresencas(registrosToSave, usuario?.empresa_id);
 
@@ -464,9 +390,6 @@ export default function PresencaPage() {
       setSavedSuccess(true);
       // showToast('✅ Presença registrada com sucesso!', 'success');
     } catch (error: any) {
-      if (uploadedPaths.length > 0) {
-        await api.deleteAttendancePhotos(uploadedPaths).catch(() => {});
-      }
       setErro(
         error.message || "Ocorreu um erro ao salvar a lista de presenças.",
       );
@@ -866,204 +789,6 @@ export default function PresencaPage() {
         </div>
       )}
 
-      {cameraModalFuncId && (
-        <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-t-3xl sm:rounded-2xl p-6 w-full max-w-sm shadow-xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0">
-            <div className="w-12 h-1.5 bg-gray-200 rounded-full mx-auto mb-6 sm:hidden"></div>
-            <h3 className="text-xl font-bold text-gray-900 mb-4 text-center">
-              Registrar Foto
-            </h3>
-
-            {!previewPhoto ? (
-              <>
-                <div className="mb-6">
-                  <span className="text-sm font-medium text-gray-700 block mb-2 text-center">
-                    Foto Atual
-                  </span>
-                  <div className="h-32 w-32 mx-auto rounded-full overflow-hidden bg-gray-100 flex items-center justify-center border-4 border-white shadow-md">
-                    {employeeRegistrationPhoto ? (
-                      <img
-                        src={employeeRegistrationPhoto}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <User className="w-12 h-12 text-gray-300" />
-                    )}
-                  </div>
-                  <p className="text-center font-bold mt-3 text-lg text-gray-900">
-                    {funcionarios.find((f) => f.id === cameraModalFuncId)?.nome}
-                  </p>
-                </div>
-                <label className="flex items-center justify-center w-full cursor-pointer px-4 py-4 bg-gray-900 text-white rounded-2xl text-center font-medium hover:bg-gray-800 transition shadow-md">
-                  <Camera className="w-6 h-6 mr-3" />
-                  Abrir Câmera
-                  <input
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) {
-                        compressImage(file)
-                          .then((compressedFile) => {
-                            setPreviewPhoto({
-                              file: compressedFile,
-                              url: URL.createObjectURL(compressedFile),
-                            });
-                          })
-                          .catch((err) => {
-                            console.error("Erro na compressão:", err);
-                            setPreviewPhoto({
-                              file,
-                              url: URL.createObjectURL(file),
-                            });
-                          });
-                      }
-                    }}
-                  />
-                </label>
-                {isAdmin && (
-                  <button
-                    disabled={saving}
-                    onClick={async () => {
-                      setSaving(true);
-                      try {
-                        if (isAdmin && savedRecords[cameraModalFuncId]) {
-                          const now = new Date().toISOString();
-                          await api.salvarPresencas([{
-                              funcionario_id: cameraModalFuncId,
-                              obra_id: funcionarios.find(
-                                (f) => f.id === cameraModalFuncId,
-                              )?.obra_id,
-                              empresa_id: usuario?.empresa_id,
-                            data: selectedDate,
-                              presente: true,
-                              photo_taken_at: now,
-                              photo_taken_by: usuario?.id || null,
-                            },], usuario?.empresa_id);
-                          showToast(
-                            "✅ Presença registrada sem foto!",
-                            "success",
-                          );
-                        } else {
-                          setPresencas((prev) => ({
-                            ...prev,
-                            [cameraModalFuncId]: true,
-                          }));
-                          setSavedSuccess(false);
-                        }
-
-                        setCameraModalFuncId(null);
-                        setPreviewPhoto(null);
-                      } catch (err: any) {
-                        setErro(err.message || "Erro ao processar");
-                        showToast("❌ Erro ao processar", "error");
-                      } finally {
-                        setSaving(false);
-                      }
-                    }}
-                    className="mt-4 w-full px-4 py-4 bg-gray-100 text-gray-700 rounded-2xl font-medium hover:bg-gray-200 transition shadow-sm"
-                  >
-                    Registrar Sem Foto
-                  </button>
-                )}
-                <button
-                  onClick={() => {
-                    setCameraModalFuncId(null);
-                    setPreviewPhoto(null);
-                  }}
-                  className="mt-4 w-full px-4 py-4 bg-white border-2 border-gray-100 text-gray-700 rounded-2xl font-medium hover:bg-gray-50 transition"
-                >
-                  Cancelar
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="mb-6">
-                  <span className="text-sm font-medium text-gray-700 block mb-2 text-center">
-                    Nova Foto
-                  </span>
-                  <div className="h-48 w-48 mx-auto rounded-3xl overflow-hidden bg-gray-100 flex items-center justify-center border-4 border-white shadow-md">
-                    <img
-                      src={previewPhoto.url}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                </div>
-                <button
-                  disabled={saving}
-                  onClick={async () => {
-                    setSaving(true);
-                    let uploadedPhotoPath = null;
-
-                    try {
-                      // If it's a replacement (already saved), update immediately
-                      if (isAdmin && savedRecords[cameraModalFuncId]) {
-                        const now = new Date().toISOString();
-                        const photo_path = await api.uploadAttendancePhoto(
-                          previewPhoto.file,
-                          cameraModalFuncId,
-                          Date.now().toString(36)
-                        );
-                        uploadedPhotoPath = photo_path;
-                        await api.salvarPresencas([{
-                            funcionario_id: cameraModalFuncId,
-                            obra_id: funcionarios.find(
-                              (f) => f.id === cameraModalFuncId,
-                            )?.obra_id,
-                            empresa_id: usuario?.empresa_id,
-                            data: selectedDate,
-                            presente: true,
-                            photo_path,
-                            photo_taken_at: now,
-                            photo_taken_by: usuario?.id || null,
-                          },], usuario?.empresa_id);
-                        showToast(
-                          "✅ Foto substituída com sucesso!",
-                          "success",
-                        );
-                      } else {
-                        // Standard flow: just save to state for bulk submission
-                        setCapturedFotos((prev) => ({
-                          ...prev,
-                          [cameraModalFuncId]: previewPhoto.file,
-                        }));
-                        setPresencas((prev) => ({
-                          ...prev,
-                          [cameraModalFuncId]: true,
-                        }));
-                        setSavedSuccess(false);
-                      }
-                      setCameraModalFuncId(null);
-                      setPreviewPhoto(null);
-                    } catch (err: any) {
-                      if (uploadedPhotoPath) {
-                        await api.deleteAttendancePhotos([uploadedPhotoPath]).catch(() => {});
-                      }
-                      setErro(err.message || "Erro ao processar foto");
-                      showToast("❌ Erro ao processar foto", "error");
-                    } finally {
-                      setSaving(false);
-                    }
-                  }}
-                  className="flex justify-center items-center w-full px-4 py-4 bg-green-600 text-white rounded-2xl text-center font-medium hover:bg-green-700 transition shadow-md disabled:opacity-70"
-                >
-                  {saving ? "Salvando..." : "Confirmar e Salvar"}
-                </button>
-                <button
-                  disabled={saving}
-                  onClick={() => setPreviewPhoto(null)}
-                  className="mt-4 w-full px-4 py-4 bg-white border-2 border-gray-100 text-gray-700 rounded-2xl font-medium hover:bg-gray-50 transition"
-                >
-                  Tirar Outra Foto
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-      )}
-
       {actionMenuFuncId && (
         <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50 p-0 sm:p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-t-3xl sm:rounded-2xl p-6 w-full max-w-sm shadow-xl animate-in slide-in-from-bottom-10 sm:slide-in-from-bottom-0">
@@ -1110,13 +835,6 @@ export default function PresencaPage() {
                   </button>
                 )}
 
-              <button
-                onClick={handleActionReplacePhoto}
-                className="w-full px-4 py-4 font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-2xl transition-colors flex items-center gap-4 text-left"
-              >
-                <span className="text-2xl">📸</span>{" "}
-                <span className="font-medium text-lg">Substituir Foto</span>
-              </button>
               <button
                 onClick={() => {
                   setFuncToDelete(actionMenuFuncId);
