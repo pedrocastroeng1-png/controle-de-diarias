@@ -7,17 +7,12 @@ import { format } from 'date-fns';
 export default function Painel() {
   const navigate = useNavigate();
   const [presencaCount, setPresencaCount] = useState(0);
-  const [presencaTime, setPresencaTime] = useState<string | null>(null);
 
   useEffect(() => {
     const hoje = format(new Date(), 'yyyy-MM-dd');
     api.getPresencas(hoje).then(res => {
       setPresencaCount(res.length);
-      if (res.length > 0) {
-        const times = res.map(p => new Date(p.photo_taken_at || p.data || new Date().toISOString()).getTime());
-        const lastTime = new Date(Math.max(...times));
-        setPresencaTime(format(lastTime, 'HH:mm'));
-      }
+
     });
   }, []);
 
@@ -48,7 +43,6 @@ export default function Painel() {
           </div>
           <div className="text-gray-600 text-sm space-y-1">
             <p><strong>{presencaCount}</strong> funcionários conferidos</p>
-            {presencaTime && <p>Finalizada às <strong>{presencaTime}</strong></p>}
           </div>
         </div>
 

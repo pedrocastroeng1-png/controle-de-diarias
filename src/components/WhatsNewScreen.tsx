@@ -74,7 +74,7 @@ export function WhatsNewScreen({ onContinue }: WhatsNewScreenProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 sm:gap-y-4 gap-x-4 sm:gap-x-6 mb-6 md:mb-8 shrink-0">
               <FeatureItem icon={Palette} title="Identidade" desc="Nova identidade visual PCEG" />
               <FeatureItem icon={Users} title="Equipe" desc="Fotos dos funcionários" />
-              <FeatureItem icon={ShieldCheck} title="Segurança" desc="Auditoria com imagens" />
+              <FeatureItem icon={ShieldCheck} title="Equipe por obra" desc="Consulte o Quadro Atual" />
               <FeatureItem icon={Zap} title="Desempenho" desc="Mais velocidade e estabilidade" />
               <FeatureItem icon={Smartphone} title="Mobile" desc="Melhor experiência no iPhone" />
               <FeatureItem icon={Settings} title="Evolução" desc="Correções e melhorias contínuas" />

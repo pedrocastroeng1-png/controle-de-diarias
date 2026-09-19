@@ -7,7 +7,6 @@ import { useLocation } from 'react-router-dom';
 import { FileDown, Printer, Search, Table as TableIcon, Calendar } from 'lucide-react';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import { supabase } from '../../lib/supabase';
 import * as ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { useAuth } from '../../contexts/AuthContext';
@@ -226,25 +225,6 @@ export default function Relatorios() {
       });
       const totalFuncionarios = agrupado.length;
       
-      const fetchImageAsBase64 = async (url: string) => {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000);
-          const response = await fetch(url, { signal: controller.signal });
-          clearTimeout(timeoutId);
-          if (!response.ok) return null;
-          const blob = await response.blob();
-          return new Promise<string | null>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.onerror = () => resolve(null);
-            reader.readAsDataURL(blob);
-          });
-        } catch (e) {
-          return null;
-        }
-      };
-
       // Page 1: Resumo
       doc.setFontSize(22);
       doc.setTextColor(30, 58, 95);
@@ -356,7 +336,7 @@ export default function Relatorios() {
           const isMeia = diasFinanceiros(record) === 0.5;
           const isPresente = diasFinanceiros(record) > 0;
           
-          const blockHeight = isPresente ? 35 : 12; 
+          const blockHeight = 12;
           
           if (currentY + blockHeight > 280) {
             doc.addPage();
@@ -397,67 +377,7 @@ export default function Relatorios() {
             const vCalc = valorFinanceiro(record);
             doc.text(`VALOR: ${formatCurrency(vCalc)}`, 110, currentY);
             
-            let photoMeta: any = null;
-            if (record.id && supabase) {
-                try {
-                    const fetchMetaPromise = supabase.from('presencas').select('photo_path, photo_taken_at').eq('id', record.id).single();
-                    const fetchMetaRes: any = await Promise.race([
-                        fetchMetaPromise,
-                        new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout Supabase Meta')), 3000))
-                    ]);
-                    if (fetchMetaRes && fetchMetaRes.data) {
-                        photoMeta = { path: fetchMetaRes.data.photo_path, taken_at: fetchMetaRes.data.photo_taken_at };
-                    }
-                } catch (e) {
-                    console.warn(`Falha metadados foto ${record.id}`);
-                }
-            }
-
-            if (!isAtestado && photoMeta?.path) {
-               const photoDate = new Date((photoMeta && photoMeta.taken_at) ? photoMeta.taken_at : record.data);
-               const twentyDaysAgo = new Date();
-               twentyDaysAgo.setDate(twentyDaysAgo.getDate() - 20);
-               
-               if (photoDate < twentyDaysAgo) {
-                 doc.setFontSize(8);
-                 doc.setTextColor(100, 116, 139);
-                 doc.text(`FOTO EXPIRADA`, 150, currentY);
-                 doc.setTextColor(0, 0, 0);
-                 currentY += 4;
-               } else {
-                 try {
-                   const bucket = 'attendance-photos';
-                   const path = photoMeta.path;
-                   const urlPromise = api.getPhotoUrl(bucket, path);
-                   const url = await Promise.race([
-                     urlPromise,
-                     new Promise<string>((_, reject) => setTimeout(() => reject(new Error('Timeout URL')), 4000))
-                   ]);
-                   const imgData = await fetchImageAsBase64(url);
-                   
-                   if (imgData) {
-                     const pdfWidth = 20;
-                     const pdfHeight = 26; 
-                     doc.addImage(imgData, 'JPEG', 150, currentY - 4, pdfWidth, pdfHeight);
-                     currentY += 26; // move past the miniature
-                   } else {
-                     doc.setFontSize(8);
-                     doc.setTextColor(100, 116, 139);
-                     doc.text(`FOTO INDISPONÍVEL`, 150, currentY);
-                     doc.setTextColor(0, 0, 0);
-                     currentY += 4;
-                   }
-                 } catch (e) {
-                   doc.setFontSize(8);
-                   doc.setTextColor(100, 116, 139);
-                   doc.text(`FOTO INDISPONÍVEL`, 150, currentY);
-                   doc.setTextColor(0, 0, 0);
-                   currentY += 4;
-                 }
-               }
-            } else {
-               currentY += 4;
-            }
+            currentY += 4;
           }
         }
         

@@ -762,7 +762,7 @@ export default function UsuariosAdmin() {
                             CONSULTA
                           </div>
                           <span className="text-[11px] text-slate-500 mt-1">
-                            Visualização de relatórios e auditorias.
+                            Visualização de relatórios e Quadro Atual.
                           </span>
                         </label>
                       </div>
@@ -994,7 +994,7 @@ export default function UsuariosAdmin() {
                         )}
                         {form.perfil === "CONSULTA" && (
                           <p>
-                            • Acesso de somente leitura para relatórios gerenciais, auditoria de presenças e folhas de diárias.
+                            • Acesso de somente leitura para relatórios gerenciais, quadro atual e folhas de diárias.
                           </p>
                         )}
                       </div>

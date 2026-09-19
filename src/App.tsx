@@ -26,7 +26,7 @@ import Atestados from './pages/admin/Atestados';
 import Communications from './pages/admin/Communications';
 import CentralComunicacoes from './pages/admin/CentralComunicacoes';
 
-import AuditoriaPresencas from './pages/admin/AuditoriaPresencas';
+import QuadroAtual from './pages/admin/QuadroAtual';
 import PresencaPage from './pages/operador/Presenca';
 import PainelOperador from './pages/operador/Painel';
 import FerramentasOperador from './pages/operador/Ferramentas';
@@ -81,7 +81,7 @@ function App() {
               <Route path="comunicacoes" element={<Communications />} />
               <Route path="central-comunicacoes" element={<CentralComunicacoes />} />
 
-              <Route path="auditoria" element={<AuditoriaPresencas />} />
+              <Route path="auditoria" element={<QuadroAtual />} />
             </Route>
 
             {/* Operator Routes */}

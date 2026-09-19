@@ -22,7 +22,6 @@ import {
   FileText,
   Stethoscope,
   Megaphone,
-  Camera,
   Bell,
   ChevronDown,
   ChevronRight,
@@ -136,7 +135,7 @@ export function AdminLayout() {
       items: [
         { name: "Presença", path: "/admin/presenca" },
         { name: "Atestados", path: "/admin/atestados" },
-        { name: "Auditoria de Presenças", path: "/admin/auditoria" },
+        { name: "Quadro Atual", path: "/admin/auditoria" },
       ],
     },
     {
@@ -194,7 +193,7 @@ export function AdminLayout() {
     },
     {
       section: "OPERAÇÃO",
-      name: "Auditoria de Presenças",
+      name: "Quadro Atual",
       path: "/admin/auditoria",
       icon: ClipboardCheck,
     },
