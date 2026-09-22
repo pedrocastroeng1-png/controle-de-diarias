@@ -1,3 +1,4 @@
+import { normalizeWhatsAppPhone } from '../../../src/lib/whatsapp-phone.js';
 import { createClient } from '@supabase/supabase-js';
 import bcrypt from 'bcryptjs';
 
@@ -39,6 +40,10 @@ export default async function handler(req: any, res: any) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    let telefone: string | null;
+    try { telefone = normalizeWhatsAppPhone(req.body.telefone); }
+    catch (error) { return res.status(400).json({ error: (error as Error).message }); }
+
     const hashedSenha = bcrypt.hashSync(senha, 10);
 
     const { data, error } = await supabase.from('usuarios').insert({
@@ -46,12 +51,13 @@ export default async function handler(req: any, res: any) {
       usuario,
       login: usuario,
       email: email || null,
+      telefone,
       senha: hashedSenha,
       perfil,
       empresa_id,
       ativo: true,
       tipo_usuario: perfil === 'ADMIN' ? 'GESTOR' : 'OPERADOR'
-    }).select('id, nome, usuario, email, perfil, empresa_id, ativo, created_at, tipo_usuario').single();
+    }).select('id, nome, usuario, email, telefone, perfil, empresa_id, ativo, created_at, tipo_usuario').single();
 
     if (error) {
       return res.status(500).json({ error: error.message });

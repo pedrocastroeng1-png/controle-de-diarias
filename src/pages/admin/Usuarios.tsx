@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Users,
+  MessageCircle,
   Plus,
   Search,
   Pencil,
@@ -21,6 +22,9 @@ import { CenteredDialog } from "../../components/ui/CenteredDialog";
 import { serverApi } from "../../lib/server-api";
 import type { Perfil, PermissaoCatalogo, UsuarioDetalhado, Obra } from "../../lib/types";
 
+import { WelcomeWhatsAppDialog } from "../../components/WelcomeWhatsAppDialog";
+import { normalizeWhatsAppPhone } from "../../lib/whatsapp-phone";
+
 interface ApiResponse {
   usuarios: UsuarioDetalhado[];
   obras: Obra[];
@@ -32,6 +36,7 @@ const emptyForm = {
   nome: "",
   login: "",
   email: "",
+  telefone: "",
   perfil: "OPERADOR" as Perfil,
   senha: "",
   acesso_obras_tipo: "TODAS" as "TODAS" | "SELECIONADAS",
@@ -67,6 +72,7 @@ export default function UsuariosAdmin() {
   const [confirmUser, setConfirmUser] = useState<UsuarioDetalhado | null>(null);
   const [confirmLoading, setConfirmLoading] = useState(false);
 
+  const [welcomeUser, setWelcomeUser] = useState<UsuarioDetalhado | null>(null);
   const busy = useRef(false);
 
   async function loadData() {
@@ -138,6 +144,7 @@ export default function UsuariosAdmin() {
       nome: u.nome || "",
       login: u.login || u.usuario || "",
       email: u.email || "",
+      telefone: u.telefone || "",
       perfil: u.perfil,
       senha: "",
       acesso_obras_tipo: u.acesso_obras_tipo || "TODAS",
@@ -187,6 +194,7 @@ export default function UsuariosAdmin() {
         nome: form.nome.trim(),
         login: form.login.trim().toLowerCase(),
         email: form.email.trim() || null,
+        telefone: normalizeWhatsAppPhone(form.telefone),
         perfil: form.perfil,
         senha: form.senha || undefined,
         acesso_obras_tipo: form.acesso_obras_tipo,
@@ -195,7 +203,9 @@ export default function UsuariosAdmin() {
         permissoes: form.permissoes,
       };
 
-      await serverApi("/api/usuarios", payload, "POST");
+      const savedUser = await serverApi<UsuarioDetalhado>("/api/usuarios", payload, "POST");
+      setForm(emptyForm);
+      if (!isEditing) setWelcomeUser(savedUser);
 
       setModalOpen(false);
       setSuccess(isEditing ? "Usuário atualizado com sucesso." : "Novo usuário cadastrado com sucesso.");
@@ -507,6 +517,11 @@ export default function UsuariosAdmin() {
                       {/* Ações */}
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
+                          {u.ativo && <button type="button" onClick={() => setWelcomeUser(u)}
+                            title="Pré-visualizar boas-vindas" aria-label={`Boas-vindas para ${u.nome || u.usuario}`}
+                            className="p-1.5 text-emerald-700 hover:bg-emerald-50 rounded-lg transition">
+                            <MessageCircle size={18} />
+                          </button>}
                           <button
                             onClick={() => handleOpenEdit(u)}
                             title="Editar usuário e permissões"
@@ -552,6 +567,8 @@ export default function UsuariosAdmin() {
           </div>
         )}
       </div>
+
+      {welcomeUser && <WelcomeWhatsAppDialog key={welcomeUser.id} user={welcomeUser} onClose={() => setWelcomeUser(null)} />}
 
       {/* Modal de Cadastro / Edição */}
       {modalOpen && (
@@ -652,6 +669,14 @@ export default function UsuariosAdmin() {
                         placeholder="Ex: João da Silva"
                         className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none"
                       />
+                    </div>
+
+                    <div>
+                      <label htmlFor="user-whatsapp" className="block text-sm font-medium text-slate-700 mb-1">WhatsApp com DDD (opcional)</label>
+                      <input id="user-whatsapp" type="tel" autoComplete="tel" maxLength={25} value={form.telefone}
+                        onChange={e => setForm({ ...form, telefone: e.target.value })} placeholder="(82) 99999-9999"
+                        className="w-full px-3.5 py-2.5 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+                      <p className="text-xs text-slate-500 mt-1">Após salvar, você poderá conferir e enviar o guia de boas-vindas pelo WhatsApp.</p>
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
