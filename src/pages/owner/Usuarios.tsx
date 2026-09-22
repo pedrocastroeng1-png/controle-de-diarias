@@ -1,6 +1,9 @@
+import { WelcomeWhatsAppDialog } from '../../components/WelcomeWhatsAppDialog';
+import { normalizeWhatsAppPhone } from '../../lib/whatsapp-phone';
+import type { WelcomeUser } from '../../lib/welcome-message';
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
-import { Users, Search, Plus, CheckCircle2, XCircle, Building2, Shield, Calendar, Edit, User } from 'lucide-react';
+import { Users, Search, Plus, CheckCircle2, XCircle, Building2, Shield, Calendar, Edit, User, MessageCircle } from 'lucide-react';
 
 export default function OwnerUsuarios() {
   const [usuarios, setUsuarios] = useState<any[]>([]);
@@ -21,6 +24,8 @@ export default function OwnerUsuarios() {
   const [newNome, setNewNome] = useState('');
   const [newUsuario, setNewUsuario] = useState('');
   const [newEmail, setNewEmail] = useState('');
+  const [newTelefone, setNewTelefone] = useState('');
+  const [welcomeUser, setWelcomeUser] = useState<WelcomeUser | null>(null);
   const [newSenha, setNewSenha] = useState('');
   const [newPerfil, setNewPerfil] = useState('OPERADOR');
   const [newEmpresaId, setNewEmpresaId] = useState('');
@@ -42,7 +47,7 @@ export default function OwnerUsuarios() {
 
       const { data: uData, error: uErr } = await supabase
         .from('usuarios')
-        .select('id, nome, usuario, email, perfil, empresa_id, ativo, created_at, updated_at, empresas(nome)')
+        .select('id, nome, usuario, email, telefone, perfil, empresa_id, ativo, created_at, updated_at, empresas(nome)')
         .order('created_at', { ascending: false });
 
       if (uErr) throw uErr;
@@ -71,6 +76,7 @@ export default function OwnerUsuarios() {
     setNewNome('');
     setNewUsuario('');
     setNewEmail('');
+    setNewTelefone('');
     setNewSenha('');
     setNewPerfil('OPERADOR');
     setNewEmpresaId(empresas[0]?.id || '');
@@ -80,6 +86,7 @@ export default function OwnerUsuarios() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     setSaving(true);
     setError('');
     
@@ -102,6 +109,7 @@ export default function OwnerUsuarios() {
           nome: newNome,
           usuario: newUsuario,
           email: newEmail,
+          telefone: normalizeWhatsAppPhone(newTelefone),
           empresa_id: newEmpresaId,
           perfil: newPerfil,
           senha: newSenha
@@ -114,6 +122,8 @@ export default function OwnerUsuarios() {
       }
 
       setShowModal(false);
+      setNewSenha('');
+      setWelcomeUser(data);
       await loadData();
     } catch (err: any) {
       setError(err.message || 'Erro ao criar usuário');
@@ -297,6 +307,7 @@ export default function OwnerUsuarios() {
                       {formatDate(u.created_at)}
                     </td>
                     <td className="p-4 text-right">
+                      {u.ativo && <button type="button" onClick={() => setWelcomeUser(u)} aria-label={`Boas-vindas para ${u.nome || u.usuario}`} title="Pré-visualizar boas-vindas" className="p-2 text-emerald-700 hover:bg-emerald-50 rounded-lg mr-2"><MessageCircle size={18} /></button>}
                       <button 
                         onClick={() => handleOpenEdit(u)}
                         className="px-3 py-1.5 text-sm bg-white border border-gray-200 hover:bg-gray-50 hover:border-gray-300 text-gray-700 rounded-lg transition-colors font-medium"
@@ -311,6 +322,8 @@ export default function OwnerUsuarios() {
           )}
         </div>
       </div>
+
+      {welcomeUser && <WelcomeWhatsAppDialog user={welcomeUser} onClose={() => setWelcomeUser(null)} />}
 
       {/* MODAL: NOVO USUÁRIO */}
       {showModal && (
@@ -378,6 +391,10 @@ export default function OwnerUsuarios() {
                   />
                 </div>
 
+                <div className="sm:col-span-2">
+                  <label htmlFor="owner-whatsapp" className="block text-sm font-medium text-gray-700 mb-1">WhatsApp com DDD (opcional)</label>
+                  <input id="owner-whatsapp" type="tel" autoComplete="tel" maxLength={25} value={newTelefone} onChange={e => setNewTelefone(e.target.value)} placeholder="(82) 99999-9999" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Perfil de Acesso *</label>
                   <select

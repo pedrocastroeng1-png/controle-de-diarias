@@ -1,3 +1,4 @@
+import { normalizeWhatsAppPhone } from "../../src/lib/whatsapp-phone.js";
 import bcrypt from "bcryptjs";
 import {
   authorize,
@@ -129,6 +130,11 @@ export default async function handler(req: any, res: any) {
     }
 
     const b = req.body || {};
+    let telefone: string | null | undefined;
+    if (Object.prototype.hasOwnProperty.call(b, "telefone")) {
+      try { telefone = normalizeWhatsAppPhone(b.telefone); }
+      catch (error) { throw new HttpError(400, (error as Error).message); }
+    }
     const action = b.action || (req.method === "PATCH" ? "update" : "create");
 
     // ==========================================
@@ -243,6 +249,7 @@ export default async function handler(req: any, res: any) {
         usuario: login,
         login,
         email,
+        telefone: telefone ?? null,
         perfil,
         senha: senhaHash,
         ativo: true,
@@ -391,6 +398,8 @@ export default async function handler(req: any, res: any) {
         tipo_usuario: perfil === "ADMIN" ? "GESTOR" : "OPERADOR",
         updated_at: new Date().toISOString(),
       };
+
+      if (telefone !== undefined) updatePayload.telefone = telefone;
 
       if (senha) {
         updatePayload.senha = await bcrypt.hash(senha, 10);
